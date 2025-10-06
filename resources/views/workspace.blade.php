@@ -13,21 +13,21 @@
         <div class="df-panel mt-3 p-3">
             <div class="row g-3">
                 <div class="col-md-3">
-                    <div class="text-muted small">Last Price</div>
-                    <div class="h4 fw-bold mb-0" id="lastPrice">$65,420.00</div>
+                    <div class="small" style="color: var(--muted-foreground);">Last Price</div>
+                    <div class="h4 fw-bold mb-0" id="lastPrice" style="color: var(--foreground);">$65,420.00</div>
                     <div class="text-success small" id="priceChange">+1,250.00 (+1.95%)</div>
                 </div>
                 <div class="col-md-3">
-                    <div class="text-muted small">24h High</div>
-                    <div class="fw-semibold" id="high24h">$66,800.00</div>
+                    <div class="small" style="color: var(--muted-foreground);">24h High</div>
+                    <div class="fw-semibold" id="high24h" style="color: var(--foreground);">$66,800.00</div>
                 </div>
                 <div class="col-md-3">
-                    <div class="text-muted small">24h Low</div>
-                    <div class="fw-semibold" id="low24h">$64,200.00</div>
+                    <div class="small" style="color: var(--muted-foreground);">24h Low</div>
+                    <div class="fw-semibold" id="low24h" style="color: var(--foreground);">$64,200.00</div>
                 </div>
                 <div class="col-md-3">
-                    <div class="text-muted small">Volume</div>
-                    <div class="fw-semibold" id="volume24h">28.5B BTC</div>
+                    <div class="small" style="color: var(--muted-foreground);">Volume</div>
+                    <div class="fw-semibold" id="volume24h" style="color: var(--foreground);">28.5B BTC</div>
                 </div>
             </div>
         </div>
@@ -37,15 +37,18 @@
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
     <script type="text/javascript">
         document.addEventListener('DOMContentLoaded', function() {
+            // Check current theme
+            const isDarkMode = document.documentElement.classList.contains('dark');
+
             new TradingView.widget({
                 "autosize": true,
                 "symbol": "BINANCE:BTCUSDT",
                 "interval": "D",
                 "timezone": "Etc/UTC",
-                "theme": "dark",
+                "theme": isDarkMode ? "dark" : "light",
                 "style": "1",
                 "locale": "en",
-                "toolbar_bg": "#1e293b",
+                "toolbar_bg": isDarkMode ? "#1e293b" : "#ffffff",
                 "enable_publishing": false,
                 "withdateranges": true,
                 "range": "1M",
@@ -78,6 +81,7 @@
                                  (changePercent >= 0 ? '+' : '') + changePercent.toFixed(2) + '%)';
                 changeElement.textContent = changeText;
                 changeElement.className = changePercent >= 0 ? 'text-success small' : 'text-danger small';
+                changeElement.style.color = changePercent >= 0 ? 'var(--success)' : 'var(--destructive)';
             }
 
             // Update price every 2 seconds

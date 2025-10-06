@@ -1,4 +1,4 @@
-@props(['title' => 'Workspace', 'subtitle' => 'BTCUSD · 1D · Bitstamp'])
+@props(['title' => 'Dashboard', 'subtitle' => 'BTCUSD · 1D · Bitstamp'])
 
 <header class="df-toolbar">
     <div class="d-flex align-items-center gap-3">
@@ -22,7 +22,7 @@
 
         <div class="d-flex flex-column">
             <h1 class="h6 mb-0 fw-semibold">{{ $title }}</h1>
-            <p class="small text-muted mb-0">{{ $subtitle }}</p>
+            {{-- <p class="small text-muted mb-0">{{ $subtitle }}</p> --}}
         </div>
     </div>
 

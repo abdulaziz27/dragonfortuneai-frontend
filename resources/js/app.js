@@ -12,6 +12,8 @@ document.addEventListener("alpine:init", () => {
     Alpine.data("sidebar", () => ({
         open: true,
         collapsed: false,
+        openSubmenus: {},
+        profileDropdownOpen: false,
 
         toggle() {
             this.open = !this.open;
@@ -19,14 +21,30 @@ document.addEventListener("alpine:init", () => {
 
         toggleCollapse() {
             this.collapsed = !this.collapsed;
+            // Close all submenus when collapsing
+            this.openSubmenus = {};
+            // Close profile dropdown when collapsing
+            this.profileDropdownOpen = false;
+        },
+
+        toggleSubmenu(menuId) {
+            this.openSubmenus[menuId] = !this.openSubmenus[menuId];
+        },
+
+        toggleProfileDropdown() {
+            this.profileDropdownOpen = !this.profileDropdownOpen;
+        },
+
+        closeProfileDropdown() {
+            this.profileDropdownOpen = false;
         },
     }));
 
     Alpine.data("theme", () => ({
-        dark: true,
+        dark: false,
 
         init() {
-            // Check for saved theme preference or default to dark
+            // Check for saved theme preference or default to light
             this.dark =
                 localStorage.getItem("theme") === "dark" ||
                 (!localStorage.getItem("theme") &&
@@ -38,6 +56,9 @@ document.addEventListener("alpine:init", () => {
             this.dark = !this.dark;
             this.applyTheme();
             localStorage.setItem("theme", this.dark ? "dark" : "light");
+
+            // Update TradingView theme if widget exists
+            this.updateTradingViewTheme();
         },
 
         applyTheme() {
@@ -45,6 +66,37 @@ document.addEventListener("alpine:init", () => {
                 document.documentElement.classList.add("dark");
             } else {
                 document.documentElement.classList.remove("dark");
+            }
+        },
+
+        updateTradingViewTheme() {
+            // Check if TradingView widget exists and update its theme
+            if (window.TradingView && document.getElementById("tradingChart")) {
+                // Remove existing widget
+                const container = document.getElementById("tradingChart");
+                container.innerHTML = "";
+
+                // Create new widget with updated theme
+                new TradingView.widget({
+                    autosize: true,
+                    symbol: "BINANCE:BTCUSDT",
+                    interval: "D",
+                    timezone: "Etc/UTC",
+                    theme: this.dark ? "dark" : "light",
+                    style: "1",
+                    locale: "en",
+                    toolbar_bg: this.dark ? "#1e293b" : "#ffffff",
+                    enable_publishing: false,
+                    withdateranges: true,
+                    range: "1M",
+                    hide_side_toolbar: false,
+                    allow_symbol_change: true,
+                    details: true,
+                    hotlist: true,
+                    calendar: false,
+                    studies: ["RSI@tv-basicstudies", "MACD@tv-basicstudies"],
+                    container_id: "tradingChart",
+                });
             }
         },
     }));
