@@ -33,6 +33,7 @@
     --sidebar-primary: #0f172a;
     --sidebar-primary-foreground: #f8fafc;
     --sidebar-accent: #f1f5f9;
+    --sidebar-accent-active: #e7eef7; /* slightly stronger than hover */
     --sidebar-accent-foreground: #0f172a;
     --sidebar-border: #e2e8f0;
     --sidebar-ring: #3b82f6;
@@ -76,6 +77,7 @@
     --sidebar-primary: #3b82f6;
     --sidebar-primary-foreground: #f8fafc;
     --sidebar-accent: #334155;
+    --sidebar-accent-active: #2a3446; /* slightly stronger than hover */
     --sidebar-accent-foreground: #f8fafc;
     --sidebar-border: #334155;
     --sidebar-ring: #3b82f6;
@@ -217,9 +219,9 @@ body {
 }
 
 .df-sidebar-menu-button.active {
-    background-color: var(--sidebar-primary);
-    color: var(--sidebar-primary-foreground);
-    font-weight: 500;
+    background-color: var(--sidebar-accent-active);
+    color: var(--sidebar-accent-foreground);
+    font-weight: 600;
 }
 
 .df-sidebar-menu-button-lg {
@@ -289,8 +291,7 @@ body {
 
 .df-submenu-item.active {
     color: var(--foreground);
-    background-color: var(--primary);
-    color: var(--primary-foreground);
+    background-color: var(--sidebar-accent-active);
 }
 
 .df-submenu-item::before {
@@ -306,7 +307,7 @@ body {
 }
 
 .df-submenu-item.active::before {
-    background-color: var(--primary-foreground);
+    background-color: var(--foreground);
 }
 
 /* Rotate animation for chevron */
