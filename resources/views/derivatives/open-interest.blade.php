@@ -76,120 +76,47 @@
             </div>
         </div>
 
-        <!-- Aggregate OI Trend Chart + Price Overlay -->
-        <div class="df-panel p-3" style="min-height: 420px;">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">📊 Total Market OI Trend</h5>
-                <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <span class="small text-secondary">Current: <span class="fw-bold" x-text="formatOI(currentOI)"></span></span>
-                    <span class="badge" :class="oiChange >= 0 ? 'badge-df-success' : 'badge-df-danger'" x-text="signed(oiChange) + '%'"></span>
-                    <!-- Divergence Alert -->
-                    <template x-if="divergenceDetected">
-                        <span class="badge badge-df-warning d-flex align-items-center gap-1">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                            </svg>
-                            Divergence Alert
-                        </span>
-                    </template>
+        <!-- Trading Insight Cards -->
+        <div class="row g-3 mb-3">
+            <div class="col-lg-4">
+                <div class="df-panel p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="text-primary">⭐</div>
+                        <div class="fw-semibold">Insight</div>
+                    </div>
+                    <div class="fw-semibold" x-text="biasInsight"></div>
+                    <div class="small" x-text="biasDetail"></div>
                 </div>
             </div>
-            <div style="position: relative; height: 340px; width: 100%;">
-                <canvas id="aggregateOIChart"></canvas>
-            </div>
-            <!-- Divergence Insight -->
-            <template x-if="divergenceDetected">
-                <div class="alert alert-warning mt-3 mb-0" role="alert">
-                    <div class="d-flex align-items-start gap-2">
-                        <div>⚠️</div>
-                        <div class="flex-grow-1">
-                            <div class="fw-semibold small">OI vs Price Divergence Detected</div>
-                            <div class="small" x-text="divergenceText"></div>
-                        </div>
+            <div class="col-lg-4">
+                <div class="df-panel p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="text-info">📈</div>
+                        <div class="fw-semibold">Trend Strength</div>
                     </div>
-                </div>
-            </template>
-        </div>
-
-        <!-- Exchange OI Distribution + Liquidation Heatmap -->
-        <div class="row g-3">
-            <div class="col-lg-6">
-                <div class="df-panel p-3" style="min-height: 380px;">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">🏢 Exchange Distribution</h5>
-                        <span class="small text-secondary">Dominance: <span class="fw-bold" x-text="dominantExchange"></span></span>
-                    </div>
-                    <div style="position: relative; height: 280px; width: 100%;">
-                        <canvas id="exchangeOIChart"></canvas>
-                    </div>
-                    <!-- Exchange Flow Insight -->
-                    <div class="mt-3 p-2 rounded" style="background: rgba(59, 130, 246, 0.05);">
-                        <div class="small">
-                            <strong>Capital Flow:</strong> <span x-text="exchangeFlowInsight"></span>
-                        </div>
-                    </div>
+                    <div class="fw-semibold" x-text="getTrendStrength()"></div>
+                    <div class="small" x-text="getTrendDetail()"></div>
                 </div>
             </div>
-            <div class="col-lg-6">
-                <div class="df-panel p-3" style="min-height: 380px;">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">💵 Stablecoin OI Trend</h5>
-                        <span class="badge" :class="stablecoinTrend >= 0 ? 'badge-df-success' : 'badge-df-danger'" x-text="signed(stablecoinTrend) + '%'"></span>
-                    </div>
-                    <div style="position: relative; height: 280px; width: 100%;">
-                        <canvas id="stablecoinOIChart"></canvas>
-                    </div>
-                    <!-- Stablecoin Insight -->
-                    <div class="mt-3 p-2 rounded" style="background: rgba(34, 197, 94, 0.05);">
-                        <div class="small">
-                            <strong>Leverage Health:</strong> <span x-text="stablecoinInsight"></span>
+            <div class="col-lg-4">
+                <div class="df-panel p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div :class="riskLevel === 'High' ? 'text-danger' : riskLevel === 'Moderate' ? 'text-warning' : 'text-success'">
+                            <span x-text="riskLevel === 'High' ? '🔴' : riskLevel === 'Moderate' ? '⚠️' : '✅'">⚠️</span>
                         </div>
+                        <div class="fw-semibold">Risk Level</div>
                     </div>
+                    <div class="fw-semibold"
+                         :class="riskLevel === 'High' ? 'text-danger' : riskLevel === 'Moderate' ? 'text-warning' : 'text-success'"
+                         x-text="riskLevel"></div>
+                    <div class="small" x-text="riskDetail"></div>
                 </div>
             </div>
         </div>
 
-        <!-- OI per Coin Table -->
-        <div class="df-panel p-3">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">🪙 Open Interest by Coin</h5>
-                <span class="small text-secondary" x-text="'Last update: ' + lastUpdate"></span>
-            </div>
-                    <div class="table-responsive">
-                <table class="table table-sm">
-                            <thead>
-                                <tr>
-                            <th>Coin</th>
-                                    <th>Exchange</th>
-                            <th>Current OI</th>
-                            <th>24h High</th>
-                            <th>24h Low</th>
-                            <th>Change</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                        <template x-for="coin in coinOIData.slice(0, 10)" :key="coin.symbol + coin.time">
-                            <tr>
-                                <td class="fw-semibold" x-text="coin.symbol"></td>
-                                <td class="small text-secondary" x-text="coin.exchange_list_str"></td>
-                                <td x-text="formatOI(coin.close)"></td>
-                                <td x-text="formatOI(coin.high)"></td>
-                                <td x-text="formatOI(coin.low)"></td>
-                                <td>
-                                    <span class="badge"
-                                          :class="((parseFloat(coin.close) - parseFloat(coin.open)) / parseFloat(coin.open) * 100) >= 0 ? 'badge-df-success' : 'badge-df-danger'"
-                                          x-text="signed((parseFloat(coin.close) - parseFloat(coin.open)) / parseFloat(coin.open) * 100) + '%'">
-                                    </span>
-                                </td>
-                                </tr>
-                        </template>
-                            </tbody>
-                        </table>
-            </div>
-        </div>
-
+        <!-- Key Metrics Overview - Most Important Section -->
         <!-- Exchange Comparison Cards -->
-        <div class="row g-3">
+        <div class="row g-3 mb-3">
             <template x-for="exchange in topExchanges" :key="exchange.exchange">
                 <div class="col-lg-3 col-md-4 col-sm-6">
                     <div class="df-panel p-3 text-center">
@@ -204,7 +131,7 @@
             </template>
         </div>
 
-        <!-- OI History Analysis (from /history endpoint) -->
+        <!-- OI Volatility Analysis -->
         <div class="df-panel p-3 mb-3">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">📈 OI Volatility Analysis</h5>
@@ -345,42 +272,115 @@
             </div>
         </div>
 
-
-        <!-- Trading Insight Cards -->
-        <div class="row g-3">
-            <div class="col-lg-4">
-                <div class="df-panel p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <div class="text-primary">⭐</div>
-                        <div class="fw-semibold">Insight</div>
-                    </div>
-                    <div class="fw-semibold" x-text="biasInsight"></div>
-                    <div class="small" x-text="biasDetail"></div>
+        <!-- Aggregate OI Trend Chart + Price Overlay -->
+        <div class="df-panel p-3" style="min-height: 420px;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">📊 Total Market OI Trend</h5>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <span class="small text-secondary">Current: <span class="fw-bold" x-text="formatOI(currentOI)"></span></span>
+                    <span class="badge" :class="oiChange >= 0 ? 'badge-df-success' : 'badge-df-danger'" x-text="signed(oiChange) + '%'"></span>
+                    <!-- Divergence Alert -->
+                    <template x-if="divergenceDetected">
+                        <span class="badge badge-df-warning d-flex align-items-center gap-1">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                            </svg>
+                            Divergence Alert
+                        </span>
+                    </template>
                 </div>
             </div>
-            <div class="col-lg-4">
-                <div class="df-panel p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <div class="text-info">📈</div>
-                        <div class="fw-semibold">Trend Strength</div>
-                    </div>
-                    <div class="fw-semibold" x-text="getTrendStrength()"></div>
-                    <div class="small" x-text="getTrendDetail()"></div>
-                </div>
+            <div style="position: relative; height: 340px; width: 100%;">
+                <canvas id="aggregateOIChart"></canvas>
             </div>
-            <div class="col-lg-4">
-                <div class="df-panel p-3">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <div :class="riskLevel === 'High' ? 'text-danger' : riskLevel === 'Moderate' ? 'text-warning' : 'text-success'">
-                            <span x-text="riskLevel === 'High' ? '🔴' : riskLevel === 'Moderate' ? '⚠️' : '✅'">⚠️</span>
+            <!-- Divergence Insight -->
+            <template x-if="divergenceDetected">
+                <div class="alert alert-warning mt-3 mb-0" role="alert">
+                    <div class="d-flex align-items-start gap-2">
+                        <div>⚠️</div>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold small">OI vs Price Divergence Detected</div>
+                            <div class="small" x-text="divergenceText"></div>
                         </div>
-                        <div class="fw-semibold">Risk Level</div>
                     </div>
-                    <div class="fw-semibold"
-                         :class="riskLevel === 'High' ? 'text-danger' : riskLevel === 'Moderate' ? 'text-warning' : 'text-success'"
-                         x-text="riskLevel"></div>
-                    <div class="small" x-text="riskDetail"></div>
                 </div>
+            </template>
+        </div>
+
+        <!-- Exchange OI Distribution + Liquidation Heatmap -->
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <div class="df-panel p-3" style="min-height: 380px;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">🏢 Exchange Distribution</h5>
+                        <span class="small text-secondary">Dominance: <span class="fw-bold" x-text="dominantExchange"></span></span>
+                    </div>
+                    <div style="position: relative; height: 280px; width: 100%;">
+                        <canvas id="exchangeOIChart"></canvas>
+                    </div>
+                    <!-- Exchange Flow Insight -->
+                    <div class="mt-3 p-2 rounded" style="background: rgba(59, 130, 246, 0.05);">
+                        <div class="small">
+                            <strong>Capital Flow:</strong> <span x-text="exchangeFlowInsight"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="df-panel p-3" style="min-height: 380px;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">💵 Stablecoin OI Trend</h5>
+                        <span class="badge" :class="stablecoinTrend >= 0 ? 'badge-df-success' : 'badge-df-danger'" x-text="signed(stablecoinTrend) + '%'"></span>
+                    </div>
+                    <div style="position: relative; height: 280px; width: 100%;">
+                        <canvas id="stablecoinOIChart"></canvas>
+                    </div>
+                    <!-- Stablecoin Insight -->
+                    <div class="mt-3 p-2 rounded" style="background: rgba(34, 197, 94, 0.05);">
+                        <div class="small">
+                            <strong>Leverage Health:</strong> <span x-text="stablecoinInsight"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- OI per Coin Table -->
+        <div class="df-panel p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">🪙 Open Interest by Coin</h5>
+                <span class="small text-secondary" x-text="'Last update: ' + lastUpdate"></span>
+            </div>
+                    <div class="table-responsive">
+                <table class="table table-sm">
+                            <thead>
+                                <tr>
+                            <th>Coin</th>
+                                    <th>Exchange</th>
+                            <th>Current OI</th>
+                            <th>24h High</th>
+                            <th>24h Low</th>
+                            <th>Change</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                        <template x-for="coin in coinOIData.slice(0, 10)" :key="coin.symbol + coin.time">
+                            <tr>
+                                <td class="fw-semibold" x-text="coin.symbol"></td>
+                                <td class="small text-secondary" x-text="coin.exchange_list_str"></td>
+                                <td x-text="formatOI(coin.close)"></td>
+                                <td x-text="formatOI(coin.high)"></td>
+                                <td x-text="formatOI(coin.low)"></td>
+                                <td>
+                                    <span class="badge"
+                                          :class="((parseFloat(coin.close) - parseFloat(coin.open)) / parseFloat(coin.open) * 100) >= 0 ? 'badge-df-success' : 'badge-df-danger'"
+                                          x-text="signed((parseFloat(coin.close) - parseFloat(coin.open)) / parseFloat(coin.open) * 100) + '%'">
+                                    </span>
+                                </td>
+                                </tr>
+                        </template>
+                            </tbody>
+                        </table>
             </div>
         </div>
     </div>
