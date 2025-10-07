@@ -151,6 +151,9 @@ body {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    position: relative; /* create stacking context for inner overlays */
+    z-index: 0;
+    overflow: hidden; /* prevent inner elements from exceeding card bounds */
 }
 
 /* Sidebar Components */
@@ -451,6 +454,17 @@ body {
     overflow: hidden;
 }
 
+/* Ensure Chart.js canvases fill their container */
+#fundingRateChart {
+    min-height: 320px;
+}
+
+#fundingRateChart canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+}
+
 /* Derivatives Core Styles */
 .derivatives-header {
     background: var(--card);
@@ -459,6 +473,8 @@ body {
     padding: 1.5rem;
     margin-bottom: 1.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 0;
 }
 
 .derivatives-header h1 {
@@ -507,6 +523,9 @@ body {
     padding: 1.5rem;
     height: 100%;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 0;
+    overflow: hidden;
 }
 
 .derivatives-chart-header {
@@ -545,6 +564,9 @@ body {
     padding: 1.5rem;
     height: 100%;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 0;
+    overflow: hidden;
 }
 
 .derivatives-table-title {
@@ -583,6 +605,14 @@ body {
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 1rem;
     margin-top: 1.5rem;
+    position: relative;
+    z-index: 0;
+    clear: both;
+}
+
+/* Prevent stat cards floating over other sections */
+.derivatives-stats-grid .derivatives-stat-card {
+    margin-bottom: 0;
 }
 
 .derivatives-stat-card {
@@ -592,6 +622,9 @@ body {
     padding: 1.5rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease-in-out;
+    position: relative;
+    z-index: 0;
+    overflow: hidden;
 }
 
 .derivatives-stat-card:hover {
@@ -1082,20 +1115,61 @@ body {
 /* Mobile Responsive */
 @media (max-width: 768px) {
     .df-sidebar {
-        position: fixed;
-        left: -100%;
-        top: 0;
-        height: 100vh;
-        z-index: 50;
-        transition: left 0.3s ease-in-out;
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        height: 100vh !important;
+        z-index: 50 !important;
+        width: var(--df-sidebar-width-mobile) !important;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+        transform: translateX(-100%) !important;
+        transition: transform 0.3s ease-in-out !important;
+        display: flex !important; /* Always visible on mobile, just transformed */
+        flex-direction: column !important;
     }
 
-    .df-sidebar.open {
-        left: 0;
+    /* When sidebar is open on mobile */
+    .df-sidebar.mobile-open {
+        transform: translateX(0) !important;
     }
 
     .df-sidebar-inset {
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+
+    /* Mobile overlay */
+    .mobile-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
         width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 40;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease-in-out;
+    }
+
+    .mobile-overlay.show {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    /* Prevent body scroll when sidebar is open on mobile */
+    body.sidebar-open {
+        overflow: hidden;
+    }
+
+    /* Override Alpine.js x-show for mobile - ensures sidebar is always in DOM */
+    .df-sidebar[style*="display: none"] {
+        display: flex !important;
+    }
+
+    /* Mobile sidebar open state */
+    .df-sidebar.mobile-open {
+        transform: translateX(0) !important;
     }
 }
 
@@ -1125,5 +1199,478 @@ body {
     }
     to {
         transform: translateX(0);
+    }
+}
+
+/* ============================================
+   DASHBOARD ENHANCEMENTS - Trader Analytics
+   ============================================ */
+
+/* Pulse Dot Animation (Live indicator) */
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    position: relative;
+    display: inline-block;
+}
+
+.pulse-success {
+    background-color: #22c55e;
+    animation: pulse-success 2s infinite;
+}
+
+.pulse-danger {
+    background-color: #ef4444;
+    animation: pulse-danger 2s infinite;
+}
+
+@keyframes pulse-success {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+    }
+}
+
+@keyframes pulse-danger {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+    }
+}
+
+/* Sparkline Container */
+.sparkline-container {
+    height: 24px;
+    width: 100%;
+    opacity: 0.9;
+}
+
+.sparkline-mini {
+    height: 20px;
+    width: 100%;
+    opacity: 0.7;
+}
+
+/* Metric Card Hover Effect */
+.metric-card-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: block;
+}
+
+.metric-card-hover:hover .df-panel {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.15),
+        0 8px 16px -4px rgba(0, 0, 0, 0.1);
+}
+
+.metric-card-hover:hover .metric-tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Metric Badge (Top-right indicator) */
+.metric-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.badge-success {
+    background-color: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.badge-danger {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.badge-neutral {
+    background-color: rgba(100, 116, 139, 0.15);
+    color: var(--muted-foreground);
+}
+
+.dark .badge-success {
+    background-color: rgba(34, 197, 94, 0.2);
+}
+
+.dark .badge-danger {
+    background-color: rgba(239, 68, 68, 0.2);
+}
+
+/* Metric Tooltip (Hidden by default, shows on hover) */
+.metric-tooltip {
+    position: absolute;
+    bottom: auto;
+    top: 100%;
+    margin-top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--popover);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    z-index: 1; /* ensure it stays inside its card stacking context */
+    pointer-events: none;
+}
+
+.metric-tooltip::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid var(--border);
+}
+
+.dark .metric-tooltip {
+    background: rgba(30, 41, 59, 0.95);
+    backdrop-filter: blur(8px);
+}
+
+/* Regime Gauge (Circular progress) */
+.regime-gauge {
+    position: relative;
+    display: inline-block;
+}
+
+.regime-gauge svg {
+    transition: all 0.5s ease-out;
+}
+
+.regime-gauge circle {
+    transition: stroke-dasharray 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Arrow indicators */
+.rotate-180 {
+    transform: rotate(180deg);
+    transition: transform 0.3s ease;
+}
+
+/* Watchlist card hover */
+.watchlist-card-hover {
+    transition: all 0.2s ease;
+}
+
+.watchlist-card-hover:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Progress bar customization */
+.progress {
+    background-color: rgba(148, 163, 184, 0.2);
+    border-radius: 999px;
+}
+
+.dark .progress {
+    background-color: rgba(148, 163, 184, 0.1);
+}
+
+/* Responsive adjustments for dashboard */
+@media (max-width: 768px) {
+    .metric-tooltip {
+        font-size: 0.7rem;
+        padding: 0.375rem 0.5rem;
+    }
+
+    .regime-gauge {
+        width: 100px !important;
+        height: 100px !important;
+    }
+
+    .sparkline-container,
+    .sparkline-mini {
+        opacity: 0.6;
+    }
+}
+
+/* ============================================
+   FUNDING RATE PAGE - Advanced Components
+   ============================================ */
+
+/* Cross-Exchange Heatmap Grid */
+.funding-heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+}
+
+.heatmap-cell {
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.heatmap-cell:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.heatmap-exchange {
+    font-size: 0.75rem;
+    font-weight: 600;
+    opacity: 0.8;
+    margin-bottom: 0.25rem;
+}
+
+.heatmap-value {
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.heatmap-trend {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Heatmap Color Scales */
+.heatmap-extreme-positive {
+    background: linear-gradient(
+        135deg,
+        rgba(34, 197, 94, 0.3),
+        rgba(34, 197, 94, 0.15)
+    );
+    border: 2px solid rgba(34, 197, 94, 0.5);
+    color: #16a34a;
+}
+
+.heatmap-high-positive {
+    background: linear-gradient(
+        135deg,
+        rgba(34, 197, 94, 0.2),
+        rgba(34, 197, 94, 0.1)
+    );
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #22c55e;
+}
+
+.heatmap-medium-positive {
+    background: linear-gradient(
+        135deg,
+        rgba(34, 197, 94, 0.1),
+        rgba(34, 197, 94, 0.05)
+    );
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+}
+
+.heatmap-low-positive {
+    background: linear-gradient(
+        135deg,
+        rgba(100, 116, 139, 0.1),
+        rgba(100, 116, 139, 0.05)
+    );
+    border: 1px solid rgba(100, 116, 139, 0.15);
+    color: var(--foreground);
+}
+
+.heatmap-low-negative {
+    background: linear-gradient(
+        135deg,
+        rgba(100, 116, 139, 0.1),
+        rgba(100, 116, 139, 0.05)
+    );
+    border: 1px solid rgba(100, 116, 139, 0.15);
+    color: var(--foreground);
+}
+
+.heatmap-medium-negative {
+    background: linear-gradient(
+        135deg,
+        rgba(239, 68, 68, 0.1),
+        rgba(239, 68, 68, 0.05)
+    );
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+.heatmap-high-negative {
+    background: linear-gradient(
+        135deg,
+        rgba(239, 68, 68, 0.2),
+        rgba(239, 68, 68, 0.1)
+    );
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+.heatmap-extreme-negative {
+    background: linear-gradient(
+        135deg,
+        rgba(239, 68, 68, 0.3),
+        rgba(239, 68, 68, 0.15)
+    );
+    border: 2px solid rgba(239, 68, 68, 0.5);
+    color: #dc2626;
+}
+
+/* Whale Alert Feed */
+.whale-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    position: relative;
+    z-index: 0;
+    overflow: hidden;
+}
+
+.whale-alert-item {
+    padding: 0.75rem;
+    border-radius: 8px;
+    border-left: 4px solid transparent;
+    background: var(--card);
+    transition: all 0.2s ease;
+    animation: slideInRight 0.5s ease-out;
+    position: relative;
+    z-index: 0;
+    contain: paint; /* isolate visual effects */
+}
+
+.whale-alert-item:hover {
+    background: var(--accent);
+    transform: translateX(4px);
+}
+
+.whale-alert-item.severity-critical {
+    border-left-color: #dc2626;
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.whale-alert-item.severity-high {
+    border-left-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.whale-alert-item.severity-medium {
+    border-left-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.whale-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Whale Leverage Bar */
+.whale-leverage-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(148, 163, 184, 0.2);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.leverage-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.5s ease;
+}
+
+/* Divergence Alerts */
+.divergence-alerts {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.divergence-alerts .alert {
+    margin-bottom: 0;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.alert-danger {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid #ef4444;
+    color: var(--foreground);
+}
+
+.alert-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-left: 3px solid #f59e0b;
+    color: var(--foreground);
+}
+
+.alert-info {
+    background: rgba(59, 130, 246, 0.1);
+    border-left: 3px solid #3b82f6;
+    color: var(--foreground);
+}
+
+/* Slide in animation */
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Dark mode adjustments */
+.dark .heatmap-cell {
+    backdrop-filter: blur(8px);
+}
+
+.dark .whale-alert-item {
+    background: rgba(30, 41, 59, 0.5);
+}
+
+.dark .whale-alert-item:hover {
+    background: rgba(51, 65, 85, 0.7);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .funding-heatmap-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .heatmap-cell {
+        padding: 0.75rem;
+    }
+
+    .heatmap-value {
+        font-size: 1rem;
+    }
+
+    .whale-feed {
+        max-height: 200px !important;
     }
 }

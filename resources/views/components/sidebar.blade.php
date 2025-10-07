@@ -18,7 +18,7 @@
                 </svg>
             </div>
             <div x-show="!{{ $collapsed ? 'true' : 'false' }}">
-                <div class="fw-semibold">Dragonfortune</div>
+                <div class="fw-semibold" style="font-size: 1rem;">Dragon Fortune</div>
                 <div class="small text-muted">Pro</div>
             </div>
         </div>

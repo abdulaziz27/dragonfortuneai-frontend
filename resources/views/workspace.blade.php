@@ -2,88 +2,197 @@
 
 @section('content')
     <div class="d-flex flex-column h-100 gap-3" x-data="dashboardData()">
-        <!-- Market Snapshot -->
-        <section class="df-panel p-3">
-            <div class="row g-3 align-items-end">
-                <div class="col-6 col-lg-3">
-                    <div class="small" style="color: var(--muted-foreground);">BTCUSDT · Last</div>
-                    <div class="h3 fw-bold mb-0" x-text="formatPrice(btc.last)">$65,420.00</div>
-                    <div class="small" :class="btc.chgPct >= 0 ? 'text-success' : 'text-danger'"
-                         x-text="signed(btc.chg) + ' (' + signed(btc.chgPct) + '%)'">
-                        +1,250.00 (+1.95%)
+        <!-- Market Snapshot + Regime Indicator -->
+        <div class="row g-3">
+            <div class="col-lg-8">
+                <section class="df-panel p-3 h-100">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-6 col-lg-3">
+                            <div class="small" style="color: var(--muted-foreground);">BTCUSDT · Last</div>
+                            <div class="h3 fw-bold mb-0 d-flex align-items-center gap-2">
+                                <span x-text="formatPrice(btc.last)">$65,420.00</span>
+                                <span class="pulse-dot" :class="btc.chgPct >= 0 ? 'pulse-success' : 'pulse-danger'"></span>
+                            </div>
+                            <div class="small d-flex align-items-center gap-1" :class="btc.chgPct >= 0 ? 'text-success' : 'text-danger'">
+                                <svg width="12" height="12" :class="btc.chgPct >= 0 ? '' : 'rotate-180'">
+                                    <path d="M6 2 L10 8 L2 8 Z" :fill="btc.chgPct >= 0 ? 'currentColor' : 'currentColor'" />
+                                </svg>
+                                <span x-text="signed(btc.chg) + ' (' + signed(btc.chgPct) + '%)'">+1,250.00 (+1.95%)</span>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="small" style="color: var(--muted-foreground);">24h Range</div>
+                            <div class="fw-semibold">
+                                <span x-text="formatPrice(btc.low)">$64,200.00</span>
+                                <span class="text-secondary"> → </span>
+                                <span x-text="formatPrice(btc.high)">$66,800.00</span>
+                            </div>
+                            <div class="progress mt-1" style="height: 4px;">
+                                <div class="progress-bar bg-primary" role="progressbar" :style="'width: ' + ((btc.last - btc.low) / (btc.high - btc.low) * 100) + '%'"></div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="small" style="color: var(--muted-foreground);">24h Volume</div>
+                            <div class="fw-semibold" x-text="formatVolume(btc.volume)">28.5B</div>
+                            <div class="sparkline-mini" x-html="renderSparkline(volumeHistory)"></div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="small" style="color: var(--muted-foreground);">Dominance</div>
+                            <div class="fw-semibold">
+                                <span x-text="btc.dominance.toFixed(1) + '%'">54.2%</span>
+                            </div>
+                            <div class="small text-secondary" x-text="'Updated ' + lastUpdate">2s ago</div>
+                        </div>
                     </div>
-                </div>
-                <div class="col-6 col-lg-3">
-                    <div class="small" style="color: var(--muted-foreground);">24h Range</div>
-                    <div class="fw-semibold">
-                        <span x-text="formatPrice(btc.low)">$64,200.00</span>
-                        <span class="text-secondary"> → </span>
-                        <span x-text="formatPrice(btc.high)">$66,800.00</span>
-                    </div>
-                </div>
-                <div class="col-6 col-lg-3">
-                    <div class="small" style="color: var(--muted-foreground);">24h Volume</div>
-                    <div class="fw-semibold" x-text="formatVolume(btc.volume)">28.5B</div>
-                </div>
-                <div class="col-6 col-lg-3">
-                    <div class="small" style="color: var(--muted-foreground);">Dominance · Fear & Greed</div>
-                    <div class="fw-semibold">
-                        <span x-text="btc.dominance.toFixed(1) + '%'">54.2%</span>
-                        <span class="text-secondary"> · </span>
-                        <span x-text="fgIndex">Neutral (53)</span>
-                    </div>
-                </div>
+                </section>
             </div>
-        </section>
+            <div class="col-lg-4">
+                <!-- Market Regime Gauge -->
+                <section class="df-panel p-3 h-100 d-flex flex-column justify-content-center"
+                         x-data="{ gauge: 65 }"
+                         :style="'background: linear-gradient(135deg, ' + getRegimeGradient(marketRegime) + ')'">
+                    <div class="text-center">
+                        <div class="small text-white-50 mb-1">MARKET REGIME</div>
+                        <div class="h2 fw-bold text-white mb-2" x-text="marketRegime">Risk-On</div>
+                        <div class="d-flex justify-content-center align-items-center gap-2 mb-2">
+                            <div class="regime-gauge" style="width: 120px; height: 120px; position: relative;">
+                                <svg viewBox="0 0 100 100" style="transform: rotate(-90deg);">
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="8"/>
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="white" stroke-width="8"
+                                            :stroke-dasharray="(regimeScore / 100 * 283) + ' 283'"
+                                            stroke-linecap="round"/>
+                                </svg>
+                                <div class="position-absolute top-50 start-50 translate-middle text-white">
+                                    <div class="h4 fw-bold mb-0" x-text="regimeScore">65</div>
+                                    <div class="small">Score</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="small text-white" x-text="regimeInsight">
+                            Bullish bias • High leverage • Watch funding
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
 
         <!-- Derivatives + Options + On‑Chain + ETF Tiles -->
         <section class="row g-3">
             <div class="col-lg-3 col-md-6">
-                <a href="/derivatives/funding-rate" class="text-decoration-none" style="color: inherit;">
-                    <div class="df-panel p-3 h-100">
-                        <div class="small" style="color: var(--muted-foreground);">Funding Rate (perp)</div>
-                        <div class="d-flex align-items-baseline gap-2">
+                <a href="/derivatives/funding-rate" class="text-decoration-none metric-card-hover" style="color: inherit;">
+                    <div class="df-panel p-3 h-100 position-relative overflow-hidden">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="small" style="color: var(--muted-foreground);">Funding Rate (perp)</div>
+                            <div class="metric-badge" :class="getFundingBadge(funding)">
+                                <svg width="12" height="12" :class="fundingTrend >= 0 ? '' : 'rotate-180'">
+                                    <path d="M6 2 L10 8 L2 8 Z" fill="currentColor" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-baseline gap-2 mb-2">
                             <div class="h4 mb-0" :class="funding >= 0 ? 'text-success' : 'text-danger'" x-text="signed(funding) + '%'">+0.02%</div>
                             <small class="text-secondary">24h avg</small>
                         </div>
-                        <div class="mt-2 small" :class="fundingTrend >= 0 ? 'text-success' : 'text-danger'">
+                        <div class="sparkline-container mb-2" x-html="renderSparkline(fundingHistory, funding >= 0 ? '#22c55e' : '#ef4444')"></div>
+                        <div class="small" :class="fundingTrend >= 0 ? 'text-success' : 'text-danger'">
                             <span x-text="trendText(fundingTrend)">Rising</span> last 4h
                         </div>
-                    </div>
-                </a>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <a href="/derivatives/open-interest" class="text-decoration-none" style="color: inherit;">
-                    <div class="df-panel p-3 h-100">
-                        <div class="small" style="color: var(--muted-foreground);">Open Interest Δ 24h</div>
-                        <div class="h4 mb-0" :class="oiChange >= 0 ? 'text-success' : 'text-danger'" x-text="signed(oiChange) + 'B'">+0.8B</div>
-                        <div class="small text-secondary">Across major venues</div>
-                    </div>
-                </a>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <a href="/derivatives/liquidations" class="text-decoration-none" style="color: inherit;">
-                    <div class="df-panel p-3 h-100">
-                        <div class="small" style="color: var(--muted-foreground);">Liquidations (24h)</div>
-                        <div class="d-flex align-items-baseline gap-3">
-                            <div>
-                                <div class="small text-secondary">Long</div>
-                                <div class="fw-semibold" x-text="'$' + formatCompact(liq.long)">$120M</div>
-                            </div>
-                            <div>
-                                <div class="small text-secondary">Short</div>
-                                <div class="fw-semibold" x-text="'$' + formatCompact(liq.short)">$98M</div>
-                            </div>
+                        <div class="metric-tooltip">
+                            <template x-if="funding > 0.05">
+                                <span>⚠️ High funding → Longs overheated → Potential short squeeze</span>
+                            </template>
+                            <template x-if="funding < -0.05">
+                                <span>⚠️ Negative funding → Shorts overheated → Potential long squeeze</span>
+                            </template>
+                            <template x-if="Math.abs(funding) <= 0.05">
+                                <span>✓ Neutral funding → Balanced market</span>
+                            </template>
                         </div>
                     </div>
                 </a>
             </div>
             <div class="col-lg-3 col-md-6">
-                <a href="/etf-basis/perp-basis" class="text-decoration-none" style="color: inherit;">
-                    <div class="df-panel p-3 h-100">
-                        <div class="small" style="color: var(--muted-foreground);">Perp Basis vs Spot</div>
+                <a href="/derivatives/open-interest" class="text-decoration-none metric-card-hover" style="color: inherit;">
+                    <div class="df-panel p-3 h-100 position-relative overflow-hidden">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="small" style="color: var(--muted-foreground);">Open Interest Δ 24h</div>
+                            <div class="metric-badge" :class="oiChange >= 0 ? 'badge-success' : 'badge-danger'">
+                                <svg width="12" height="12" :class="oiChange >= 0 ? '' : 'rotate-180'">
+                                    <path d="M6 2 L10 8 L2 8 Z" fill="currentColor" />
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="h4 mb-0" :class="oiChange >= 0 ? 'text-success' : 'text-danger'" x-text="signed(oiChange) + 'B'">+0.8B</div>
+                        <div class="sparkline-container mb-2" x-html="renderSparkline(oiHistory, oiChange >= 0 ? '#22c55e' : '#ef4444')"></div>
+                        <div class="small text-secondary">Across major venues</div>
+                        <div class="metric-tooltip">
+                            <template x-if="oiChange > 0 && btc.chgPct > 0">
+                                <span>✓ OI + Price UP → Strong bullish trend</span>
+                            </template>
+                            <template x-if="oiChange > 0 && btc.chgPct < 0">
+                                <span>⚠️ OI UP but Price DOWN → Potential short buildup</span>
+                            </template>
+                            <template x-if="oiChange < 0">
+                                <span>📉 OI declining → Position unwinding</span>
+                            </template>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <a href="/derivatives/liquidations" class="text-decoration-none metric-card-hover" style="color: inherit;">
+                    <div class="df-panel p-3 h-100 position-relative overflow-hidden">
+                        <div class="small mb-2" style="color: var(--muted-foreground);">Liquidations (24h)</div>
+                        <div class="d-flex align-items-center gap-3 mb-2">
+                            <div class="flex-fill">
+                                <div class="small text-secondary">Long</div>
+                                <div class="fw-semibold text-danger" x-text="'$' + formatCompact(liq.long)">$120M</div>
+                                <div class="progress mt-1" style="height: 3px;">
+                                    <div class="progress-bar bg-danger" :style="'width: ' + (liq.long / (liq.long + liq.short) * 100) + '%'"></div>
+                                </div>
+                            </div>
+                            <div class="flex-fill">
+                                <div class="small text-secondary">Short</div>
+                                <div class="fw-semibold text-success" x-text="'$' + formatCompact(liq.short)">$98M</div>
+                                <div class="progress mt-1" style="height: 3px;">
+                                    <div class="progress-bar bg-success" :style="'width: ' + (liq.short / (liq.long + liq.short) * 100) + '%'"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="small" :class="liq.long > liq.short ? 'text-danger' : 'text-success'" x-text="liq.long > liq.short ? 'Long squeeze active' : 'Short squeeze active'">
+                            Long squeeze active
+                        </div>
+                        <div class="metric-tooltip">
+                            <span x-text="'Ratio: ' + (liq.long / liq.short).toFixed(2) + 'x • ' + (liq.long > liq.short * 1.5 ? 'Heavy long liquidations' : 'Balanced')">
+                                Ratio: 1.22x • Balanced
+                            </span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <a href="/etf-basis/perp-basis" class="text-decoration-none metric-card-hover" style="color: inherit;">
+                    <div class="df-panel p-3 h-100 position-relative overflow-hidden">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="small" style="color: var(--muted-foreground);">Perp Basis vs Spot</div>
+                            <div class="metric-badge" :class="basis >= 0 ? 'badge-success' : 'badge-danger'">
+                                <span x-text="Math.abs(basis * 100).toFixed(0) + 'bp'">35bp</span>
+                            </div>
+                        </div>
                         <div class="h4 mb-0" :class="basis >= 0 ? 'text-success' : 'text-danger'" x-text="signed(basis) + '%'">+0.35%</div>
+                        <div class="sparkline-container mb-2" x-html="renderSparkline(basisHistory, basis >= 0 ? '#22c55e' : '#ef4444')"></div>
                         <div class="small text-secondary">Indicative carry</div>
+                        <div class="metric-tooltip">
+                            <template x-if="basis > 0.5">
+                                <span>💰 High premium → Strong demand for longs</span>
+                            </template>
+                            <template x-if="basis < -0.5">
+                                <span>⚠️ Discount → Bearish sentiment on perps</span>
+                            </template>
+                            <template x-if="Math.abs(basis) <= 0.5">
+                                <span>⚖️ Fair value → Aligned spot & perp</span>
+                            </template>
+                        </div>
                     </div>
                 </a>
             </div>
@@ -150,7 +259,7 @@
                         <div class="small text-secondary">US ETFs aggregated</div>
                     </div>
                 </a>
-            </div>
+                </div>
         </section>
 
         <!-- Risk + Positioning -->
@@ -162,11 +271,11 @@
                             <div class="small" style="color: var(--muted-foreground);">Volatility Regime</div>
                             <div class="h4 mb-0" x-text="volRegime">Expanding</div>
                             <div class="small text-secondary">σ pendek vs σ panjang</div>
-                        </div>
+                </div>
                         <div>
                             <span class="badge text-bg-primary" x-text="regimeBadge">Risk‑on</span>
-                        </div>
-                    </div>
+                </div>
+                </div>
                 </a>
             </div>
             <div class="col-lg-6">
@@ -180,7 +289,7 @@
                         <div class="small" x-text="'Suggested risk per trade: ' + riskPerTrade + '%'">Suggested risk per trade: 0.75%</div>
                     </div>
                 </a>
-            </div>
+        </div>
         </section>
     </div>
 
@@ -203,12 +312,21 @@
                 regimeBadge: 'Risk‑on',
                 atrMultiple: 1.75,
                 riskPerTrade: 0.75,
+                lastUpdate: '2s ago',
+                marketRegime: 'Risk-On',
+                regimeScore: 65,
+                regimeInsight: 'Bullish bias • High leverage • Watch funding',
                 watchlist: [
                     { symbol: 'BTC', last: 65420, chgPct: 2.1 },
                     { symbol: 'ETH', last: 3420, chgPct: -1.3 },
                     { symbol: 'SOL', last: 185.2, chgPct: 3.8 },
                     { symbol: 'DOGE', last: 0.18, chgPct: -4.2 }
-                ]
+                ],
+                // Mock historical data for sparklines (24 data points = 1 hour intervals)
+                volumeHistory: Array.from({length: 24}, () => 25e9 + Math.random() * 8e9),
+                fundingHistory: Array.from({length: 24}, (_, i) => 0.01 + Math.sin(i/4) * 0.03),
+                oiHistory: Array.from({length: 24}, (_, i) => 0.5 + Math.sin(i/3) * 0.5),
+                basisHistory: Array.from({length: 24}, (_, i) => 0.25 + Math.sin(i/5) * 0.2)
             };
 
             // Helpers
@@ -228,13 +346,131 @@
             state.signed = (v) => (v >= 0 ? '+' : '') + Number(v).toFixed(typeof v === 'number' && Math.abs(v) < 10 ? 2 : 2);
             state.trendText = (v) => v > 0 ? 'Rising' : v < 0 ? 'Falling' : 'Flat';
 
+            // Sparkline renderer (SVG-based for performance)
+            state.renderSparkline = (data, color = '#3b82f6') => {
+                if (!data || data.length === 0) return '';
+                const width = 100;
+                const height = 24;
+                const min = Math.min(...data);
+                const max = Math.max(...data);
+                const range = max - min || 1;
+
+                const points = data.map((v, i) => {
+                    const x = (i / (data.length - 1)) * width;
+                    const y = height - ((v - min) / range) * height;
+                    return `${x},${y}`;
+                }).join(' ');
+
+                return `
+                    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="display: block;">
+                        <polyline points="${points}"
+                                  fill="none"
+                                  stroke="${color}"
+                                  stroke-width="1.5"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  opacity="0.8"/>
+                    </svg>
+                `;
+            };
+
+            // Market regime color gradient
+            state.getRegimeGradient = (regime) => {
+                const gradients = {
+                    'Risk-On': 'rgba(34, 197, 94, 0.8), rgba(34, 197, 94, 0.4)',
+                    'Risk-Off': 'rgba(239, 68, 68, 0.8), rgba(239, 68, 68, 0.4)',
+                    'Neutral': 'rgba(100, 116, 139, 0.8), rgba(100, 116, 139, 0.4)',
+                    'Expanding': 'rgba(59, 130, 246, 0.8), rgba(59, 130, 246, 0.4)'
+                };
+                return gradients[regime] || gradients['Neutral'];
+            };
+
+            // Funding badge helper
+            state.getFundingBadge = (funding) => {
+                if (Math.abs(funding) < 0.02) return 'badge-neutral';
+                return funding > 0 ? 'badge-success' : 'badge-danger';
+            };
+
+            // Calculate market regime based on multiple factors
+            state.calculateRegime = () => {
+                // Aggregate: funding + OI + liquidations + basis
+                let score = 50; // baseline neutral
+
+                // Funding contribution (±15 points)
+                if (state.funding > 0.05) score += 15;
+                else if (state.funding > 0.02) score += 8;
+                else if (state.funding < -0.05) score -= 15;
+                else if (state.funding < -0.02) score -= 8;
+
+                // OI contribution (±10 points)
+                if (state.oiChange > 1) score += 10;
+                else if (state.oiChange < -1) score -= 10;
+
+                // Liquidations (±10 points)
+                const liqRatio = state.liq.long / state.liq.short;
+                if (liqRatio > 1.5) score -= 10; // heavy long liqs = bearish
+                else if (liqRatio < 0.67) score += 10; // heavy short liqs = bullish
+
+                // Basis (±10 points)
+                if (state.basis > 0.5) score += 10;
+                else if (state.basis < -0.5) score -= 10;
+
+                // Price momentum (±5 points)
+                if (state.btc.chgPct > 2) score += 5;
+                else if (state.btc.chgPct < -2) score -= 5;
+
+                state.regimeScore = Math.max(0, Math.min(100, score));
+
+                // Determine regime label
+                if (state.regimeScore >= 70) {
+                    state.marketRegime = 'Risk-On';
+                    state.regimeInsight = 'Strong bullish bias • High leverage • Watch funding spikes';
+                } else if (state.regimeScore >= 55) {
+                    state.marketRegime = 'Neutral';
+                    state.regimeInsight = 'Balanced market • Mixed signals • Wait for confirmation';
+                } else if (state.regimeScore >= 30) {
+                    state.marketRegime = 'Risk-Off';
+                    state.regimeInsight = 'Bearish pressure • Reduce exposure • Tight stops';
+                } else {
+                    state.marketRegime = 'Risk-Off';
+                    state.regimeInsight = 'High risk • Heavy selling • Consider sidelines';
+                }
+            };
+
+            // Update last updated timestamp
+            let secondsAgo = 0;
+            setInterval(() => {
+                secondsAgo++;
+                if (secondsAgo < 60) state.lastUpdate = secondsAgo + 's ago';
+                else if (secondsAgo < 3600) state.lastUpdate = Math.floor(secondsAgo / 60) + 'm ago';
+                else state.lastUpdate = Math.floor(secondsAgo / 3600) + 'h ago';
+            }, 1000);
+
             // Simulate light real‑time updates
             setInterval(() => {
                 const drift = (Math.random() - 0.5) * 150;
                 state.btc.last = Math.max(1000, state.btc.last + drift);
                 state.btc.chg = drift;
                 state.btc.chgPct = (drift / (state.btc.last - drift)) * 100;
-            }, 3000);
+
+                // Update funding slightly
+                state.funding += (Math.random() - 0.5) * 0.005;
+                state.fundingTrend = Math.random() > 0.5 ? 1 : -1;
+
+                // Shift sparkline data (simulate real-time)
+                state.fundingHistory.shift();
+                state.fundingHistory.push(state.funding);
+                state.oiHistory.shift();
+                state.oiHistory.push(state.oiChange);
+
+                // Recalculate regime
+                state.calculateRegime();
+
+                secondsAgo = 0; // reset update timer
+            }, 5000);
+
+            // Initial calculation
+            state.calculateRegime();
 
             return state;
         }
