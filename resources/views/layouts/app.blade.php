@@ -42,7 +42,6 @@
                             </div>
                             <div class="d-flex flex-column text-start flex-grow-1" x-show="!sidebarCollapsed">
                                 <span class="fw-semibold small">Dragonfortune</span>
-                                <span class="small" style="color: var(--muted-foreground);">Pro</span>
                             </div>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" x-show="!sidebarCollapsed">
                                 <path d="M7 13l3 3 7-7"/>
@@ -91,6 +90,115 @@
                             </div>
                         </li>
                         <li class="df-sidebar-menu-item">
+                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('spot-microstructure')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 3v18h18"/>
+                                    <path d="M7 12l3-3 3 3 5-5"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
+                                </svg>
+                                <span>Spot Microstructure</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['spot-microstructure'] }">
+                                    <path d="M9 18l6-6-6-6"/>
+                                </svg>
+                            </button>
+                            <div class="df-submenu" :class="{ 'show': openSubmenus['spot-microstructure'] }">
+                                <a href="/spot-microstructure/cvd" class="df-submenu-item" style="color: var(--foreground);">CVD Analysis</a>
+                                <a href="/spot-microstructure/orderbook-depth" class="df-submenu-item" style="color: var(--foreground);">Orderbook Depth</a>
+                                <a href="/spot-microstructure/absorption" class="df-submenu-item" style="color: var(--foreground);">Absorption</a>
+                                <a href="/spot-microstructure/spoofing" class="df-submenu-item" style="color: var(--foreground);">Spoofing Detection</a>
+                                <a href="/spot-microstructure/vwap" class="df-submenu-item" style="color: var(--foreground);">VWAP + Bands</a>
+                                <a href="/spot-microstructure/liquidity-cluster" class="df-submenu-item" style="color: var(--foreground);">Liquidity Cluster</a>
+                            </div>
+                        </li>
+                        <li class="df-sidebar-menu-item">
+                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('onchain-metrics')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    <path d="M8 12h8"/>
+                                    <path d="M12 8v8"/>
+                                </svg>
+                                <span>On‑Chain Metrics</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['onchain-metrics'] }">
+                                    <path d="M9 18l6-6-6-6"/>
+                                </svg>
+                            </button>
+                            <div class="df-submenu" :class="{ 'show': openSubmenus['onchain-metrics'] }">
+                                <a href="/onchain-metrics/exchange-netflow" class="df-submenu-item" style="color: var(--foreground);">Exchange Netflow (BTC in‑out)</a>
+                                <a href="/onchain-metrics/whale-activity" class="df-submenu-item" style="color: var(--foreground);">Whale Wallet Activity</a>
+                                <a href="/onchain-metrics/stablecoin-supply" class="df-submenu-item" style="color: var(--foreground);">Stablecoin Supply / Netflow</a>
+                                <a href="/onchain-metrics/miner-flow" class="df-submenu-item" style="color: var(--foreground);">Miner Flow</a>
+                            </div>
+                        </li>
+                        <li class="df-sidebar-menu-item">
+                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('options-metrics')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    <path d="M8 12h8"/>
+                                    <path d="M12 8v8"/>
+                                </svg>
+                                <span>Options Metrics</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['options-metrics'] }">
+                                    <path d="M9 18l6-6-6-6"/>
+                                </svg>
+                            </button>
+                            <div class="df-submenu" :class="{ 'show': openSubmenus['options-metrics'] }">
+                                <a href="/options-metrics/implied-volatility" class="df-submenu-item" style="color: var(--foreground);">Implied Volatility (IV)</a>
+                                <a href="/options-metrics/put-call-ratio" class="df-submenu-item" style="color: var(--foreground);">Put/Call Ratio</a>
+                                <a href="/options-metrics/options-skew" class="df-submenu-item" style="color: var(--foreground);">Options Skew (25d RR)</a>
+                                <a href="/options-metrics/gamma-exposure" class="df-submenu-item" style="color: var(--foreground);">Gamma Exposure (GEX)</a>
+                            </div>
+                        </li>
+                        <li class="df-sidebar-menu-item">
+                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('etf-basis')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    <path d="M8 12h8"/>
+                                    <path d="M12 8v8"/>
+                                </svg>
+                                <span>ETF & Basis</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['etf-basis'] }">
+                                    <path d="M9 18l6-6-6-6"/>
+                                </svg>
+                            </button>
+                            <div class="df-submenu" :class="{ 'show': openSubmenus['etf-basis'] }">
+                                <a href="/etf-basis/spot-etf-netflow" class="df-submenu-item" style="color: var(--foreground);">Spot BTC ETF Netflow (daily)</a>
+                                <a href="/etf-basis/perp-basis" class="df-submenu-item" style="color: var(--foreground);">Perp Basis vs Spot Index</a>
+                            </div>
+                        </li>
+                        <li class="df-sidebar-menu-item">
+                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('volatility-regime')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    <path d="M8 12h8"/>
+                                    <path d="M12 8v8"/>
+                                </svg>
+                                <span>Volatility Regime Detector</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['volatility-regime'] }">
+                                    <path d="M9 18l6-6-6-6"/>
+                                </svg>
+                            </button>
+                            <div class="df-submenu" :class="{ 'show': openSubmenus['volatility-regime'] }">
+                                <a href="/volatility-regime/detector" class="df-submenu-item" style="color: var(--foreground);">σ pendek vs σ panjang</a>
+                            </div>
+                        </li>
+                        <li class="df-sidebar-menu-item">
+                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('atr')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    <path d="M8 12h8"/>
+                                    <path d="M12 8v8"/>
+                                </svg>
+                                <span>ATR (Average True Range)</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['atr'] }">
+                                    <path d="M9 18l6-6-6-6"/>
+                                </svg>
+                            </button>
+                            <div class="df-submenu" :class="{ 'show': openSubmenus['atr'] }">
+                                <a href="/atr/detector" class="df-submenu-item" style="color: var(--foreground);">Stop & Position Sizing adaptif</a>
+                            </div>
+                        </li>
+                        {{-- <li class="df-sidebar-menu-item">
                             <button class="df-sidebar-menu-button" @click="toggleSubmenu('watchlists')">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <rect x="3" y="3" width="7" height="7"/>
@@ -108,8 +216,8 @@
                                 <a href="#" class="df-submenu-item" style="color: var(--foreground);">Stocks</a>
                                 <a href="#" class="df-submenu-item" style="color: var(--foreground);">Forex</a>
                             </div>
-                        </li>
-                        <li class="df-sidebar-menu-item">
+                        </li> --}}
+                        {{-- <li class="df-sidebar-menu-item">
                             <button class="df-sidebar-menu-button" @click="toggleSubmenu('screeners')">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M3 6h18"/>
@@ -126,8 +234,8 @@
                                 <a href="#" class="df-submenu-item" style="color: var(--foreground);">Stock Screener</a>
                                 <a href="#" class="df-submenu-item" style="color: var(--foreground);">Strategy Builder</a>
                             </div>
-                        </li>
-                        <li class="df-sidebar-menu-item">
+                        </li> --}}
+                        {{-- <li class="df-sidebar-menu-item">
                             <button class="df-sidebar-menu-button" @click="toggleSubmenu('activity')">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
@@ -141,8 +249,8 @@
                                 <a href="#" class="df-submenu-item" style="color: var(--foreground);">Alerts</a>
                                 <a href="#" class="df-submenu-item" style="color: var(--foreground);">Orders</a>
                             </div>
-                        </li>
-                        <li class="df-sidebar-menu-item">
+                        </li> --}}
+                        {{-- <li class="df-sidebar-menu-item">
                             <button class="df-sidebar-menu-button" @click="toggleSubmenu('settings')">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <circle cx="12" cy="12" r="3"/>
@@ -158,11 +266,11 @@
                                 <a href="#" class="df-submenu-item" style="color: var(--foreground);">Appearance</a>
                                 <a href="#" class="df-submenu-item" style="color: var(--foreground);">Billing</a>
                             </div>
-                        </li>
+                        </li> --}}
                     </ul>
                 </div>
 
-                <!-- Watchlist Section -->
+                {{-- <!-- Watchlist Section -->
                 <div class="df-sidebar-group">
                     <div class="df-sidebar-group-label" x-show="!sidebarCollapsed">Watchlist</div>
                     <ul class="df-sidebar-menu">
@@ -204,7 +312,7 @@
                             </button>
                         </li>
                     </ul>
-                </div>
+                </div> --}}
             </div>
 
             <!-- Sidebar Footer -->
@@ -212,15 +320,17 @@
                 <div class="df-sidebar-menu">
                     <div class="df-sidebar-menu-item position-relative">
                         <button class="df-sidebar-menu-button df-sidebar-menu-button-lg" @click="profileDropdownOpen = !profileDropdownOpen">
-                            <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                                <span class="fw-semibold small text-dark">AA</span>
+                            <div class="bg-secondary d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; border-radius: 50%; overflow: hidden;">
+                                <span class="fw-semibold small text-dark" style="line-height: 1;">AA</span>
                             </div>
                             <div class="d-flex flex-column text-start flex-grow-1" x-show="!sidebarCollapsed">
                                 <span class="fw-semibold small">Abdul Aziz</span>
                                 <span class="small" style="color: var(--muted-foreground);">abdulaziz@dragonfortune.ai</span>
                             </div>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" x-show="!sidebarCollapsed">
-                                <path d="M7 13l3 3 7-7"/>
+                                <circle cx="12" cy="12" r="1"/>
+                                <circle cx="19" cy="12" r="1"/>
+                                <circle cx="5" cy="12" r="1"/>
                             </svg>
                         </button>
 
@@ -228,8 +338,8 @@
                         <div class="df-profile-dropdown" x-show="profileDropdownOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" @click.away="profileDropdownOpen = false">
                             <!-- Profile Header -->
                             <div class="df-profile-dropdown-header">
-                                <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                                    <span class="fw-semibold text-dark">AA</span>
+                                <div class="bg-secondary d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden;">
+                                    <span class="fw-semibold text-dark" style="line-height: 1;">AA</span>
                                 </div>
                                 <div>
                                     <div class="fw-semibold">Abdul Aziz</div>
@@ -241,33 +351,10 @@
                             <div class="df-profile-dropdown-menu">
                                 <a href="#" class="df-profile-dropdown-item">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
-                                    </svg>
-                                    Upgrade to Pro
-                                </a>
-                                <a href="#" class="df-profile-dropdown-item">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                                         <circle cx="12" cy="7" r="4"/>
                                     </svg>
                                     Account
-                                </a>
-                                <a href="#" class="df-profile-dropdown-item">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                        <polyline points="14,2 14,8 20,8"/>
-                                        <line x1="16" y1="13" x2="8" y2="13"/>
-                                        <line x1="16" y1="17" x2="8" y2="17"/>
-                                        <polyline points="10,9 9,9 8,9"/>
-                                    </svg>
-                                    Billing
-                                </a>
-                                <a href="#" class="df-profile-dropdown-item">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                                    </svg>
-                                    Notifications
                                 </a>
                                 <a href="#" class="df-profile-dropdown-item">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -320,30 +407,6 @@
                             <circle cx="12" cy="12" r="5"/>
                             <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
                         </svg>
-                    </button>
-
-                    <button class="btn-df-outline">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2">
-                            <path d="M3 6h18"/>
-                            <path d="M3 12h18"/>
-                            <path d="M3 18h18"/>
-                        </svg>
-                        Indicators
-                    </button>
-
-                    <button class="btn-df-outline">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2">
-                            <circle cx="12" cy="12" r="3"/>
-                            <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
-                        </svg>
-                        Settings
-                    </button>
-
-                    <button class="btn-df-primary">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2">
-                            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
-                        </svg>
-                        Fullscreen
                     </button>
                 </div>
             </header>
