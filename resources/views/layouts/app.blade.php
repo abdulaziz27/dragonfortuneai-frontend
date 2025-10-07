@@ -462,6 +462,9 @@
     </div>
 
     @livewireScripts
+
+    {{-- Additional Scripts from Views --}}
+    @yield('scripts')
 </body>
 
 </html>

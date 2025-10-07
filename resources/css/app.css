@@ -47,6 +47,16 @@
 
     /* Border radius */
     --radius: 0.5rem;
+
+    /* Funding Rate Colors */
+    --funding-extreme-positive: #16a34a;
+    --funding-high-positive: #22c55e;
+    --funding-medium-positive: #86efac;
+    --funding-low-positive: #dcfce7;
+    --funding-low-negative: #fecaca;
+    --funding-medium-negative: #f87171;
+    --funding-high-negative: #ef4444;
+    --funding-extreme-negative: #dc2626;
 }
 
 .dark {
@@ -1672,5 +1682,332 @@ body {
 
     .whale-feed {
         max-height: 200px !important;
+    }
+}
+
+/* Enhanced Funding Rate Dashboard Styles */
+
+/* Bias Gauge Styles */
+.bias-gauge {
+    position: relative;
+    display: inline-block;
+}
+
+.bias-gauge svg {
+    width: 100%;
+    height: 100%;
+}
+
+.bias-gauge svg circle {
+    transition: stroke-dasharray 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Funding Rate Badge Styles */
+.badge-funding-long {
+    background: linear-gradient(
+        135deg,
+        var(--funding-high-positive),
+        var(--funding-extreme-positive)
+    );
+    color: white;
+}
+
+.badge-funding-short {
+    background: linear-gradient(
+        135deg,
+        var(--funding-high-negative),
+        var(--funding-extreme-negative)
+    );
+    color: white;
+}
+
+.badge-funding-neutral {
+    background: var(--muted);
+    color: var(--muted-foreground);
+}
+
+/* Enhanced Heatmap Styles */
+.funding-heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-top: 1rem;
+}
+
+.heatmap-cell {
+    position: relative;
+    padding: 16px;
+    border-radius: 12px;
+    text-align: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    border: 1px solid transparent;
+    backdrop-filter: blur(8px);
+}
+
+.heatmap-cell:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.heatmap-exchange {
+    font-weight: 700;
+    font-size: 0.8rem;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.heatmap-value {
+    font-weight: 800;
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.heatmap-trend {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    opacity: 0.8;
+}
+
+/* Funding Rate Color Classes with Enhanced Gradients */
+.heatmap-extreme-positive {
+    background: linear-gradient(
+        135deg,
+        var(--funding-extreme-positive),
+        var(--funding-high-positive)
+    );
+    color: white;
+    box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+}
+
+.heatmap-high-positive {
+    background: linear-gradient(
+        135deg,
+        var(--funding-high-positive),
+        var(--funding-medium-positive)
+    );
+    color: white;
+    box-shadow: 0 4px 15px rgba(34, 197, 94, 0.2);
+}
+
+.heatmap-medium-positive {
+    background: linear-gradient(
+        135deg,
+        var(--funding-medium-positive),
+        var(--funding-low-positive)
+    );
+    color: #065f46;
+    box-shadow: 0 4px 15px rgba(134, 239, 172, 0.3);
+}
+
+.heatmap-low-positive {
+    background: linear-gradient(135deg, var(--funding-low-positive), #f0fdf4);
+    color: #065f46;
+    box-shadow: 0 4px 15px rgba(220, 252, 231, 0.4);
+}
+
+.heatmap-low-negative {
+    background: linear-gradient(135deg, var(--funding-low-negative), #fef2f2);
+    color: #7f1d1d;
+    box-shadow: 0 4px 15px rgba(254, 202, 202, 0.4);
+}
+
+.heatmap-medium-negative {
+    background: linear-gradient(
+        135deg,
+        var(--funding-medium-negative),
+        var(--funding-low-negative)
+    );
+    color: white;
+    box-shadow: 0 4px 15px rgba(248, 113, 113, 0.3);
+}
+
+.heatmap-high-negative {
+    background: linear-gradient(
+        135deg,
+        var(--funding-high-negative),
+        var(--funding-medium-negative)
+    );
+    color: white;
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.2);
+}
+
+.heatmap-extreme-negative {
+    background: linear-gradient(
+        135deg,
+        var(--funding-extreme-negative),
+        var(--funding-high-negative)
+    );
+    color: white;
+    box-shadow: 0 4px 15px rgba(220, 38, 38, 0.3);
+}
+
+/* Funding Insights & Alerts */
+.funding-insights {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.funding-alert {
+    animation: slideInLeft 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.funding-alert:hover {
+    transform: translateX(4px);
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Enhanced Statistics Cards */
+.funding-stats-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.funding-stats-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(
+        90deg,
+        var(--chart-1),
+        var(--chart-2),
+        var(--chart-3)
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.funding-stats-card:hover::before {
+    opacity: 1;
+}
+
+.funding-stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Chart Toggle Buttons */
+.chart-toggle-group {
+    background: var(--muted);
+    border-radius: 8px;
+    padding: 4px;
+    display: inline-flex;
+}
+
+.chart-toggle-btn {
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.chart-toggle-btn.active {
+    background: var(--background);
+    color: var(--foreground);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.chart-toggle-btn:hover:not(.active) {
+    color: var(--foreground);
+}
+
+/* Loading States */
+.loading-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Dark Mode Enhancements */
+.dark .heatmap-cell {
+    backdrop-filter: blur(12px);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .heatmap-cell:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.dark .funding-stats-card {
+    background: rgba(30, 41, 59, 0.5);
+    backdrop-filter: blur(8px);
+}
+
+.dark .funding-stats-card:hover {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+/* Mobile Responsive Enhancements */
+@media (max-width: 768px) {
+    .funding-heatmap-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .heatmap-cell {
+        padding: 12px;
+    }
+
+    .heatmap-value {
+        font-size: 0.95rem;
+    }
+
+    .heatmap-exchange {
+        font-size: 0.7rem;
+    }
+
+    .funding-stats-card {
+        padding: 1rem;
+    }
+
+    .chart-toggle-btn {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .funding-heatmap-grid {
+        grid-template-columns: 1fr;
     }
 }
