@@ -173,9 +173,11 @@ GET /api/funding-rate/history?symbol=BTC&interval=4h&limit=100
 
 -   **Frontend:** Laravel Blade + Bootstrap 5
 -   **JS Framework:** Alpine.js (reactive state)
--   **Charts:** Chart.js v4
+-   **Charts:** Chart.js v4 (DOM-based storage)
 -   **HTTP:** Fetch API
 -   **Styling:** Bootstrap 5 + Custom CSS
+-   **State Management:** Event-driven communication
+-   **Chart Storage:** DOM elements (non-reactive)
 
 ---
 
@@ -318,20 +320,30 @@ Global Controller: funding-rate-controller.js
     - Setiap komponen self-contained
     - Props untuk configurability
     - Alpine.js untuk reactive state
+    - **Chart storage di DOM elements (bukan Alpine data)**
 
 2. **API Calls**
 
     - Error handling dengan try-catch
     - Loading states untuk UX
     - Auto-refresh setiap 30 detik
+    - Proper parameter validation
 
 3. **Performance**
 
     - Chart updates menggunakan `update('none')` untuk smooth animation
     - Debouncing untuk frequent updates
     - LocalStorage untuk caching preferences
+    - **queueMicrotask() untuk break Alpine reactivity**
 
-4. **Trading Insights**
+4. **Alpine + Chart.js Integration**
+
+    - **NEVER store Chart instances in Alpine data**
+    - Use `getChart()` dan `setChart()` helpers
+    - Create gradients outside reactive callbacks
+    - Deep clone data dengan `JSON.parse(JSON.stringify())`
+
+5. **Trading Insights**
     - Color coding untuk quick decisions
     - Tooltips dengan detailed info
     - Alert panels untuk critical conditions

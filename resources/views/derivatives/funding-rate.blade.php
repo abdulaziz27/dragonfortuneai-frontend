@@ -27,19 +27,31 @@
                 </div>
 
                 <!-- Global Controls -->
-                <div class="d-flex gap-2 align-items-center">
+                <div class="d-flex gap-2 align-items-center flex-wrap">
                     <select class="form-select" style="width: 120px;" x-model="globalSymbol" @change="updateSymbol()">
                         <option value="BTC">Bitcoin</option>
                         <option value="ETH">Ethereum</option>
                         <option value="SOL">Solana</option>
                         <option value="BNB">BNB</option>
                         <option value="XRP">XRP</option>
+                        <option value="ADA">Cardano</option>
+                        <option value="DOGE">Dogecoin</option>
+                        <option value="MATIC">Polygon</option>
+                        <option value="DOT">Polkadot</option>
+                        <option value="AVAX">Avalanche</option>
                     </select>
 
-                    <select class="form-select" style="width: 140px;" x-model="globalMarginType">
+                    <select class="form-select" style="width: 140px;" x-model="globalMarginType" @change="updateMarginType()">
                         <option value="">All Margin Types</option>
                         <option value="stablecoin">Stablecoin</option>
                         <option value="token">Token</option>
+                    </select>
+
+                    <select class="form-select" style="width: 120px;" x-model="globalInterval" @change="updateInterval()">
+                        <option value="1h">1 Hour</option>
+                        <option value="4h" disabled>4 Hours (soon)</option>
+                        <option value="8h" disabled>8 Hours (soon)</option>
+                        <option value="1d" disabled>1 Day (soon)</option>
                     </select>
 
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
@@ -66,18 +78,27 @@
 
             <!-- Quick Stats Panel -->
             <div class="col-lg-4">
-                <div class="df-panel p-3 h-100">
+                <div class="df-panel p-3 h-100" x-data="quickStatsPanel()" x-init="init()">
                     <h5 class="mb-3">📈 Quick Stats</h5>
 
                     <div class="d-flex flex-column gap-3">
-                        <!-- Funding Trend -->
+                        <!-- Funding Trend (Window) -->
                         <div class="stat-item">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small text-secondary">Funding Trend</span>
-                                <span class="badge text-bg-success">Bullish</span>
+                                <span class="small text-secondary">Funding Trend (Window)</span>
+                                <span class="badge" :class="getTrendBadgeClass(windowAvgFunding)" x-text="getTrendText(windowAvgFunding)">Loading...</span>
                             </div>
-                            <div class="h4 mb-0 text-success">+0.0125%</div>
-                            <div class="small text-secondary">Avg across exchanges</div>
+                            <div class="h4 mb-0" :class="getTrendClass(windowAvgFunding)" x-text="formatRate(windowAvgFunding)">--</div>
+                            <div class="small text-secondary">Window avg based on Bias (interval/limit)</div>
+                        </div>
+
+                        <!-- Snapshot Avg Across Exchanges -->
+                        <div class="stat-item">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small text-secondary">Snapshot Avg Across Exchanges</span>
+                            </div>
+                            <div class="h5 mb-0" :class="snapshotAvgFunding >= 0 ? 'text-success' : 'text-danger'" x-text="formatRate(snapshotAvgFunding)">--</div>
+                            <div class="small text-secondary">Current avg across exchanges</div>
                         </div>
 
                         <hr class="my-2">
@@ -86,11 +107,13 @@
                         <div class="stat-item">
                             <div class="small text-secondary mb-2">Market Sentiment</div>
                             <div class="progress" style="height: 25px;">
-                                <div class="progress-bar bg-success" role="progressbar" style="width: 65%" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100">
-                                    <span class="fw-semibold">Long 65%</span>
+                                <div class="progress-bar bg-success" role="progressbar"
+                                    :style="'width: ' + positivePercentage + '%'" :aria-valuenow="positivePercentage">
+                                    <span class="fw-semibold" x-text="'Long ' + positivePercentage + '%'">Long 0%</span>
                                 </div>
-                                <div class="progress-bar bg-danger" role="progressbar" style="width: 35%" aria-valuenow="35" aria-valuemin="0" aria-valuemax="100">
-                                    <span class="fw-semibold">Short 35%</span>
+                                <div class="progress-bar bg-danger" role="progressbar"
+                                    :style="'width: ' + negativePercentage + '%'" :aria-valuenow="negativePercentage">
+                                    <span class="fw-semibold" x-text="'Short ' + negativePercentage + '%'">Short 0%</span>
                                 </div>
                             </div>
                             <div class="small text-secondary mt-1">Based on positive vs negative rates</div>
@@ -101,19 +124,17 @@
                         <!-- Next Funding -->
                         <div class="stat-item">
                             <div class="small text-secondary mb-2">Next Major Funding</div>
-                            <div class="h3 mb-0 fw-bold">2h 15m</div>
-                            <div class="small text-secondary">14:00 UTC • Most exchanges</div>
+                            <div class="h3 mb-0 fw-bold" x-text="nextFundingTime">--</div>
+                            <div class="small text-secondary" x-text="nextFundingDetails">Loading...</div>
                         </div>
 
                         <hr class="my-2">
 
                         <!-- Trading Insight -->
-                        <div class="alert alert-info mb-0">
-                            <div class="fw-semibold small mb-1">💡 Trading Insight</div>
-                            <div class="small">
-                                Positive funding indicates long dominance. Watch for potential long squeeze if price fails to break resistance.
-                            </div>
-                                            </div>
+                        <div class="alert mb-0" :class="getInsightAlertClass()">
+                            <div class="fw-semibold small mb-1" x-text="getInsightIcon() + ' ' + getInsightTitle()">💡 Trading Insight</div>
+                            <div class="small" x-text="getInsightMessage()">Loading market analysis...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -130,12 +151,12 @@
         <div class="row g-3">
             <!-- Historical Chart -->
             <div class="col-lg-6">
-                @include('components.funding.history-chart', ['symbol' => 'BTC', 'interval' => '4h'])
+                @include('components.funding.history-chart', ['symbol' => 'BTC', 'interval' => '1h'])
             </div>
 
             <!-- Weighted Chart -->
             <div class="col-lg-6">
-                @include('components.funding.weighted-chart', ['symbol' => 'BTC', 'interval' => '4h'])
+                @include('components.funding.weighted-chart', ['symbol' => 'BTC', 'interval' => '1h'])
             </div>
                     </div>
 
@@ -213,6 +234,242 @@
 
     <!-- Load funding controller BEFORE Alpine processes x-data -->
     <script src="{{ asset('js/funding-rate-controller.js') }}"></script>
+
+    <!-- Quick Stats Panel Component -->
+    <script>
+        function quickStatsPanel() {
+            return {
+                symbol: 'BTC',
+                marginType: '',
+                snapshotAvgFunding: 0,
+                windowAvgFunding: 0,
+                positivePercentage: 0,
+                negativePercentage: 0,
+                nextFundingTime: '--',
+                nextFundingDetails: 'Loading...',
+                exchangeData: [],
+                biasData: null,
+                loading: false,
+
+                init() {
+                    // Get initial from parent
+                    this.symbol = this.$root?.globalSymbol || 'BTC';
+                    this.marginType = this.$root?.globalMarginType || '';
+
+                    this.loadData();
+                    // Auto refresh every 30 seconds
+                    setInterval(() => this.loadData(), 30000);
+
+                    // Listen for filter changes
+                    window.addEventListener('symbol-changed', (e) => {
+                        this.symbol = e.detail?.symbol || this.symbol;
+                        this.marginType = e.detail?.marginType ?? this.marginType;
+                        this.loadData();
+                    });
+                    window.addEventListener('margin-type-changed', (e) => {
+                        this.marginType = e.detail?.marginType ?? '';
+                        this.loadData();
+                    });
+                },
+
+                async loadData() {
+                    this.loading = true;
+                    try {
+                        // Use stored symbol and marginType
+                        const symbol = this.symbol;
+
+                        // Load exchange data for calculations
+                        await this.loadExchangeData(symbol);
+
+                        // Load bias data for insights
+                        await this.loadBiasData(symbol);
+
+                        this.calculateStats();
+                    } catch (error) {
+                        console.error('❌ Error loading quick stats:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async loadExchangeData(symbol) {
+                    try {
+                        const params = new URLSearchParams({
+                            symbol: symbol,
+                            limit: '50',
+                            ...(this.marginType && { margin_type: this.marginType })
+                        });
+                        const response = await fetch(
+                            `http://202.155.90.20:8000/api/funding-rate/exchanges?${params}`);
+                        const data = await response.json();
+                        this.exchangeData = data.data || [];
+                    } catch (error) {
+                        console.error('❌ Error loading exchange data:', error);
+                        this.exchangeData = [];
+                    }
+                },
+
+                async loadBiasData(symbol) {
+                    try {
+                        const response = await fetch(
+                            `http://202.155.90.20:8000/api/funding-rate/bias?symbol=${symbol}USDT&limit=1000&with_price=true`);
+                        const data = await response.json();
+                        this.biasData = data;
+                    } catch (error) {
+                        console.error('❌ Error loading bias data:', error);
+                        this.biasData = null;
+                    }
+                },
+
+                calculateStats() {
+                    if (this.exchangeData.length > 0) {
+                        const validRates = this.exchangeData
+                            .map(e => parseFloat(e.funding_rate))
+                            .filter(r => !isNaN(r));
+                        this.snapshotAvgFunding = validRates.length ? (validRates.reduce((sum, r) => sum + r, 0) / validRates.length) : 0;
+                    }
+
+                    // window average from bias
+                    this.windowAvgFunding = this.biasData?.avg_funding_close ?? 0;
+
+                    // Calculate sentiment percentages
+                    const positiveCount = this.exchangeData.filter(e => parseFloat(e.funding_rate) > 0).length;
+                    const negativeCount = this.exchangeData.filter(e => parseFloat(e.funding_rate) < 0).length;
+                    const total = positiveCount + negativeCount;
+
+                    if (total > 0) {
+                        this.positivePercentage = Math.round((positiveCount / total) * 100);
+                        this.negativePercentage = Math.round((negativeCount / total) * 100);
+                    }
+
+                    // Calculate next funding time
+                    this.calculateNextFunding();
+                },
+
+                calculateNextFunding() {
+                    if (this.exchangeData.length === 0) return;
+
+                    // Find the nearest funding time
+                    const now = Date.now();
+                    let nearestTime = null;
+                    let nearestExchange = '';
+
+                    this.exchangeData.forEach(exchange => {
+                        if (exchange.next_funding_time && exchange.next_funding_time > now) {
+                            if (!nearestTime || exchange.next_funding_time < nearestTime) {
+                                nearestTime = exchange.next_funding_time;
+                                nearestExchange = exchange.exchange;
+                            }
+                        }
+                    });
+
+                    if (nearestTime) {
+                        const diff = nearestTime - now;
+                        const hours = Math.floor(diff / (1000 * 60 * 60));
+                        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+                        this.nextFundingTime = `${hours}h ${minutes}m`;
+
+                        const time = new Date(nearestTime);
+                        this.nextFundingDetails = `${time.toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                        })} UTC • ${nearestExchange}`;
+                    } else {
+                        this.nextFundingTime = 'N/A';
+                        this.nextFundingDetails = 'No upcoming funding times available';
+                    }
+                },
+
+                getTrendBadgeClass(val) {
+                    if (val > 0.0001) return 'text-bg-success';
+                    if (val < -0.0001) return 'text-bg-danger';
+                    return 'text-bg-secondary';
+                },
+
+                getTrendText(val) {
+                    if (val > 0.0001) return 'Bullish';
+                    if (val < -0.0001) return 'Bearish';
+                    return 'Neutral';
+                },
+
+                getTrendClass(val) {
+                    if (val > 0) return 'text-success';
+                    if (val < 0) return 'text-danger';
+                    return 'text-secondary';
+                },
+
+                getInsightAlertClass() {
+                    if (!this.biasData) return 'alert-info';
+
+                    const bias = (this.biasData.bias || '').toLowerCase();
+                    const strength = this.biasData.strength || 0;
+
+                    if (strength > 70) return 'alert-danger';
+                    if (strength > 40) return 'alert-warning';
+                    if (bias.includes('long') || bias.includes('short')) return 'alert-info';
+                    return 'alert-secondary';
+                },
+
+                getInsightIcon() {
+                    if (!this.biasData) return '💡';
+
+                    const bias = (this.biasData.bias || '').toLowerCase();
+                    const strength = this.biasData.strength || 0;
+
+                    if (strength > 70) return '🚨';
+                    if (bias.includes('long')) return '📈';
+                    if (bias.includes('short')) return '📉';
+                    return '💡';
+                },
+
+                getInsightTitle() {
+                    if (!this.biasData) return 'Market Analysis';
+
+                    const bias = (this.biasData.bias || '').toLowerCase();
+                    const strength = this.biasData.strength || 0;
+
+                    if (strength > 70) return 'High Risk Alert';
+                    if (bias.includes('long')) return 'Long Dominance';
+                    if (bias.includes('short')) return 'Short Pressure';
+                    return 'Balanced Market';
+                },
+
+                getInsightMessage() {
+                    if (!this.biasData) return 'Loading market analysis...';
+
+                    const bias = (this.biasData.bias || '').toLowerCase();
+                    const strength = this.biasData.strength || 0;
+                    const avgFunding = this.biasData.avg_funding_close || 0;
+
+                    if (strength > 70 && bias.includes('long')) {
+                        return `Extreme long positioning detected (${strength.toFixed(0)}% strength). Funding rate at ${this.formatRate(avgFunding)}. High risk of long squeeze - consider taking profits.`;
+                    }
+
+                    if (strength > 70 && bias.includes('short')) {
+                        return `Heavy short accumulation (${strength.toFixed(0)}% strength). Negative funding at ${this.formatRate(avgFunding)}. Watch for short squeeze on positive catalysts.`;
+                    }
+
+                    if (bias.includes('long')) {
+                        return `Long positions building up with positive funding (${this.formatRate(avgFunding)}). Monitor for funding rate spikes as potential squeeze indicator.`;
+                    }
+
+                    if (bias.includes('short')) {
+                        return `Short interest increasing with negative funding (${this.formatRate(avgFunding)}). Potential short squeeze setup if price bounces.`;
+                    }
+
+                    return `Market showing neutral bias with funding rate at ${this.formatRate(avgFunding)}. No extreme positioning detected - normal trading conditions.`;
+                },
+
+                formatRate(value) {
+                    if (value === null || value === undefined || isNaN(value)) return 'N/A';
+                    const percent = (parseFloat(value) * 100).toFixed(4);
+                    return (parseFloat(value) >= 0 ? '+' : '') + percent + '%';
+                }
+            };
+        }
+    </script>
 
     <style>
         /* Pulse animation for live indicator */

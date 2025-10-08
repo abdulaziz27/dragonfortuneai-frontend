@@ -24,6 +24,7 @@ function fundingRateController() {
         // Global state
         globalSymbol: "BTC",
         globalMarginType: "",
+        globalInterval: "1h",
         globalLoading: false,
 
         // Component references
@@ -91,14 +92,61 @@ function fundingRateController() {
             // Dispatch event to all components
             window.dispatchEvent(
                 new CustomEvent("symbol-changed", {
-                    detail: { symbol: this.globalSymbol },
+                    detail: {
+                        symbol: this.globalSymbol,
+                        marginType: this.globalMarginType,
+                        interval: this.globalInterval,
+                    },
                 })
             );
 
             // Update browser URL (optional, for bookmarking)
+            this.updateURL();
+        },
+
+        // Update margin type globally
+        updateMarginType() {
+            console.log("🔄 Updating margin type to:", this.globalMarginType);
+
+            // Dispatch event to all components
+            window.dispatchEvent(
+                new CustomEvent("margin-type-changed", {
+                    detail: {
+                        symbol: this.globalSymbol,
+                        marginType: this.globalMarginType,
+                        interval: this.globalInterval,
+                    },
+                })
+            );
+
+            this.updateURL();
+        },
+
+        // Update interval globally
+        updateInterval() {
+            console.log("🔄 Updating interval to:", this.globalInterval);
+
+            // Dispatch event to all components
+            window.dispatchEvent(
+                new CustomEvent("interval-changed", {
+                    detail: {
+                        symbol: this.globalSymbol,
+                        marginType: this.globalMarginType,
+                        interval: this.globalInterval,
+                    },
+                })
+            );
+
+            this.updateURL();
+        },
+
+        // Update URL with all filters
+        updateURL() {
             if (window.history && window.history.pushState) {
                 const url = new URL(window.location);
                 url.searchParams.set("symbol", this.globalSymbol);
+                url.searchParams.set("marginType", this.globalMarginType || "");
+                url.searchParams.set("interval", this.globalInterval || "1h");
                 window.history.pushState({}, "", url);
             }
         },

@@ -106,6 +106,7 @@
 function fundingBiasCard(initialSymbol = 'BTC') {
     return {
         symbol: initialSymbol,
+        marginType: '',
         loading: false,
         bias: null,
         strength: 0,
@@ -114,15 +115,32 @@ function fundingBiasCard(initialSymbol = 'BTC') {
         lastUpdate: '--',
 
         init() {
-            this.loadBiasData();
+            // Delay untuk memastikan layout stabil
+            setTimeout(() => {
+                this.loadBiasData();
+            }, 500);
+
             // Auto refresh every 30 seconds
             setInterval(() => this.loadBiasData(), 30000);
+
+            // Listen to global filter changes
+            window.addEventListener('symbol-changed', (e) => {
+                this.symbol = e.detail?.symbol || this.symbol;
+                this.marginType = e.detail?.marginType ?? this.marginType;
+                this.loadBiasData();
+            });
+            window.addEventListener('margin-type-changed', (e) => {
+                this.marginType = e.detail?.marginType ?? '';
+                this.loadBiasData();
+            });
         },
 
         async loadBiasData() {
             this.loading = true;
             try {
-                const response = await fetch(`http://202.155.90.20:8000/api/funding-rate/bias?symbol=${this.symbol}&limit=1000`);
+                // API membutuhkan pasangan simbol penuh (contoh: BTCUSDT)
+                const pair = `${this.symbol}USDT`;
+                const response = await fetch(`http://202.155.90.20:8000/api/funding-rate/bias?symbol=${pair}&limit=1000&with_price=true`);
                 const data = await response.json();
 
                 this.bias = data.bias || 'neutral';
@@ -134,8 +152,7 @@ function fundingBiasCard(initialSymbol = 'BTC') {
                 console.log('✅ Bias data loaded:', data);
             } catch (error) {
                 console.error('❌ Error loading bias:', error);
-                // Fallback data
-                this.bias = 'neutral';
+                this.bias = null;
                 this.strength = 0;
                 this.avgFundingClose = 0;
             } finally {

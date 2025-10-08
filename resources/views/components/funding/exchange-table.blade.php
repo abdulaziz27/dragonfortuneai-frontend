@@ -191,6 +191,7 @@ function exchangeFundingTable(initialSymbol = 'BTC', initialLimit = 20) {
     return {
         symbol: initialSymbol,
         limit: initialLimit,
+        marginType: '',
         loading: false,
         exchanges: [],
         sortColumn: 'funding_rate',
@@ -252,6 +253,17 @@ function exchangeFundingTable(initialSymbol = 'BTC', initialLimit = 20) {
                 // Force Alpine to re-evaluate computed properties
                 this.exchanges = [...this.exchanges];
             }, 1000);
+
+            // Listen to global filter changes
+            window.addEventListener('symbol-changed', (e) => {
+                this.symbol = e.detail?.symbol || this.symbol;
+                this.marginType = e.detail?.marginType ?? this.marginType;
+                this.loadExchangeData();
+            });
+            window.addEventListener('margin-type-changed', (e) => {
+                this.marginType = e.detail?.marginType ?? '';
+                this.loadExchangeData();
+            });
         },
 
         async loadExchangeData() {
@@ -259,7 +271,8 @@ function exchangeFundingTable(initialSymbol = 'BTC', initialLimit = 20) {
             try {
                 const params = new URLSearchParams({
                     limit: this.limit,
-                    ...(this.symbol && { symbol: this.symbol })
+                    ...(this.symbol && { symbol: this.symbol }),
+                    ...(this.marginType && { margin_type: this.marginType })
                 });
 
                 const response = await fetch(`http://202.155.90.20:8000/api/funding-rate/exchanges?${params}`);

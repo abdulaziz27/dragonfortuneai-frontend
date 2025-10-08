@@ -21,11 +21,8 @@
             <span class="badge text-bg-secondary" x-text="chartData.length + ' periods'">0 periods</span>
         </div>
         <div class="d-flex gap-2">
-            <select class="form-select form-select-sm" style="width: auto;" x-model="interval" @change="loadData()">
-                <option value="1h">1 Hour</option>
-                <option value="4h">4 Hours</option>
-                <option value="8h">8 Hours</option>
-                <option value="1d">1 Day</option>
+            <select class="form-select form-select-sm" style="width: auto;" x-model="interval" @change="loadData()" disabled>
+                <option value="1h">1 Hour (API only)</option>
             </select>
             <button class="btn btn-sm btn-outline-secondary" @click="refresh()" :disabled="loading">
                 <span x-show="!loading">🔄</span>
@@ -35,8 +32,8 @@
     </div>
 
     <!-- Chart Canvas -->
-    <div style="position: relative; height: 280px;">
-        <canvas :id="chartId"></canvas>
+    <div style="position: relative; height: 280px; min-width: 100px;">
+        <canvas :id="chartId" style="display: block; box-sizing: border-box; height: 280px; width: 100%;"></canvas>
     </div>
 
     <!-- OHLC Stats -->
@@ -69,16 +66,29 @@
 </div>
 
 <script>
-function historyFundingChart(initialSymbol = 'BTC', initialInterval = '4h') {
+function historyFundingChart(initialSymbol = 'BTC', initialInterval = '1h') {
     return {
         symbol: initialSymbol,
-        interval: initialInterval,
+        interval: '1h', // API only supports 1h currently
+        marginType: '',
         loading: false,
-        chart: null,
+        // DO NOT store chart here - Alpine will track it!
+        // chart: null,
         chartId: 'historyChart_' + Math.random().toString(36).substr(2, 9),
         chartData: [],
         lastOHLC: { open: 0, high: 0, low: 0, close: 0 },
         updatePending: false,
+
+        // Helper to get chart from DOM storage (non-reactive)
+        getChart() {
+            const canvas = document.getElementById(this.chartId);
+            return canvas ? canvas._chartInstance : null;
+        },
+
+        setChart(chartInstance) {
+            const canvas = document.getElementById(this.chartId);
+            if (canvas) canvas._chartInstance = chartInstance;
+        },
 
         async init() {
             // Wait for Chart.js to be loaded
@@ -87,13 +97,91 @@ function historyFundingChart(initialSymbol = 'BTC', initialInterval = '4h') {
                 await window.chartJsReady;
             }
 
-            setTimeout(() => {
+            // Multiple retry strategy untuk memastikan chart init dengan proper width
+            this.initChartWithRetry();
+
+            // Listen for global refresh and symbol change
+            this.$watch('symbol', () => this.loadData());
+            window.addEventListener('symbol-changed', (e) => {
+                this.symbol = e.detail?.symbol || this.symbol;
+                this.marginType = e.detail?.marginType ?? this.marginType;
+                this.interval = e.detail?.interval || this.interval;
+                this.loadData();
+            });
+            window.addEventListener('margin-type-changed', (e) => {
+                this.marginType = e.detail?.marginType ?? '';
+                this.loadData();
+            });
+            window.addEventListener('interval-changed', (e) => {
+                this.interval = e.detail?.interval || this.interval;
+                this.loadData();
+            });
+
+            // Setup observer untuk detect visibility changes
+            this.setupVisibilityObserver();
+        },
+
+        initChartWithRetry() {
+            let attempts = 0;
+            const maxAttempts = 5;
+
+            const tryInit = () => {
+                attempts++;
+                const canvas = document.getElementById(this.chartId);
+
+                if (!canvas) {
+                    if (attempts < maxAttempts) {
+                        setTimeout(tryInit, 500);
+                    }
+                    return;
+                }
+
+                const parent = canvas.parentElement;
+                const parentWidth = parent ? parent.offsetWidth : 0;
+
+                console.log(`📉 History Chart Init Attempt ${attempts}: Canvas found, Parent width: ${parentWidth}px`);
+
+                // Jika parent width masih 0 atau terlalu kecil, retry
+                if (parentWidth < 100 && attempts < maxAttempts) {
+                    console.warn(`⚠️ Parent width too small (${parentWidth}px), retrying in 500ms...`);
+                    setTimeout(tryInit, 500);
+                    return;
+                }
+
+                // Width cukup, init chart
                 this.initChart();
                 this.loadData();
-            }, 1000);
+            };
 
-            // Listen for global refresh
-            this.$watch('symbol', () => this.loadData());
+            // Start first attempt after 500ms
+            setTimeout(tryInit, 500);
+        },
+
+        setupVisibilityObserver() {
+            const canvas = document.getElementById(this.chartId);
+            if (!canvas) return;
+
+            const observer = new ResizeObserver(() => {
+                const chart = this.getChart();
+                if (chart && canvas.offsetParent !== null) {
+                    // Canvas visible, resize chart
+                    chart.resize();
+                }
+            });
+
+            observer.observe(canvas.parentElement);
+
+            // Also listen for sidebar toggle
+            document.addEventListener('click', (e) => {
+                if (e.target.closest('[data-bs-toggle="collapse"]')) {
+                    setTimeout(() => {
+                        const chart = this.getChart();
+                        if (chart) {
+                            chart.resize();
+                        }
+                    }, 350); // Bootstrap collapse animation = 350ms
+                }
+            });
         },
 
         initChart() {
@@ -110,7 +198,14 @@ function historyFundingChart(initialSymbol = 'BTC', initialInterval = '4h') {
 
             const ctx = canvas.getContext('2d');
 
-            this.chart = new Chart(ctx, {
+            // CRITICAL: Create chart OUTSIDE Alpine reactivity scope
+            queueMicrotask(() => {
+                // Create gradient outside Alpine reactivity to prevent infinite loop
+                const gradient = ctx.createLinearGradient(0, 0, 0, 280);
+                gradient.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
+                gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
+
+                const chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: [],
@@ -118,13 +213,7 @@ function historyFundingChart(initialSymbol = 'BTC', initialInterval = '4h') {
                         label: 'Funding Rate',
                         data: [],
                         borderColor: '#3b82f6',
-                        backgroundColor: (context) => {
-                            const ctx = context.chart.ctx;
-                            const gradient = ctx.createLinearGradient(0, 0, 0, 280);
-                            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
-                            gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
-                            return gradient;
-                        },
+                        backgroundColor: gradient,
                         fill: true,
                         tension: 0.4,
                         borderWidth: 2,
@@ -152,14 +241,21 @@ function historyFundingChart(initialSymbol = 'BTC', initialInterval = '4h') {
                                     return 'Time: ' + items[0].label;
                                 },
                                 label: (context) => {
-                                    const dataPoint = this.chartData[context.dataIndex];
+                                    // Access raw data from chart to avoid Alpine reactivity
+                                    const rawData = context.chart.data.datasets[0]._rawData || [];
+                                    const dataPoint = rawData[context.dataIndex];
                                     if (!dataPoint) return '';
 
+                                    const formatRate = (val) => {
+                                        if (isNaN(val)) return '--';
+                                        return (val >= 0 ? '+' : '') + (val * 100).toFixed(4) + '%';
+                                    };
+
                                     return [
-                                        `Close: ${this.formatRate(parseFloat(dataPoint.close))}`,
-                                        `High: ${this.formatRate(parseFloat(dataPoint.high))}`,
-                                        `Low: ${this.formatRate(parseFloat(dataPoint.low))}`,
-                                        `Open: ${this.formatRate(parseFloat(dataPoint.open))}`
+                                        `Close: ${formatRate(parseFloat(dataPoint.close))}`,
+                                        `High: ${formatRate(parseFloat(dataPoint.high))}`,
+                                        `Low: ${formatRate(parseFloat(dataPoint.low))}`,
+                                        `Open: ${formatRate(parseFloat(dataPoint.open))}`
                                     ];
                                 }
                             }
@@ -192,15 +288,19 @@ function historyFundingChart(initialSymbol = 'BTC', initialInterval = '4h') {
                 }
             });
 
-            console.log('✅ History chart initialized');
+                // Store in DOM, NOT in Alpine reactive this
+                this.setChart(chartInstance);
+                console.log('✅ History chart initialized');
+            });
         },
 
         async loadData() {
             this.loading = true;
             try {
+                // API hanya support interval 1h saat ini
                 const params = new URLSearchParams({
-                    symbol: this.symbol,
-                    interval: this.interval,
+                    symbol: `${this.symbol}USDT`,
+                    interval: '1h',
                     limit: '100'
                 });
 
@@ -208,6 +308,7 @@ function historyFundingChart(initialSymbol = 'BTC', initialInterval = '4h') {
                 const data = await response.json();
 
                 this.chartData = data.data || [];
+                console.log('📊 History data received:', this.chartData.length, 'items');
 
                 if (this.chartData.length > 0) {
                     const last = this.chartData[this.chartData.length - 1];
@@ -217,26 +318,6 @@ function historyFundingChart(initialSymbol = 'BTC', initialInterval = '4h') {
                         low: parseFloat(last.low || 0),
                         close: parseFloat(last.close || 0)
                     };
-                } else {
-                    console.warn('⚠️ No history data available, using fallback');
-                    try {
-                        // Use fallback mock data for development
-                        this.chartData = this.generateMockData();
-                        if (this.chartData.length > 0) {
-                            const last = this.chartData[this.chartData.length - 1];
-                            this.lastOHLC = {
-                                open: parseFloat(last.open || 0),
-                                high: parseFloat(last.high || 0),
-                                low: parseFloat(last.low || 0),
-                                close: parseFloat(last.close || 0)
-                            };
-                        }
-                        console.log('✅ Mock history data generated:', this.chartData.length, 'candles');
-                    } catch (mockError) {
-                        console.error('❌ Error generating mock history data:', mockError);
-                        this.chartData = [];
-                        this.lastOHLC = { open: 0, high: 0, low: 0, close: 0 };
-                    }
                 }
 
                 this.updateChart();
@@ -250,7 +331,9 @@ function historyFundingChart(initialSymbol = 'BTC', initialInterval = '4h') {
         },
 
         updateChart() {
-            if (!this.chart || !this.chartData || this.chartData.length === 0) {
+            const chart = this.getChart();
+
+            if (!chart || !this.chartData || this.chartData.length === 0) {
                 console.warn('⚠️ Cannot update history chart: missing chart or data');
                 return;
             }
@@ -277,15 +360,17 @@ function historyFundingChart(initialSymbol = 'BTC', initialInterval = '4h') {
                 });
 
                 // Safely update chart data
-                if (this.chart.data && this.chart.data.datasets[0]) {
-                    this.chart.data.labels = labels;
-                    this.chart.data.datasets[0].data = values;
+                if (chart.data && chart.data.datasets[0]) {
+                    chart.data.labels = labels;
+                    chart.data.datasets[0].data = values;
+                    // Store raw data for tooltip (deep clone to avoid Alpine reactivity)
+                    chart.data.datasets[0]._rawData = JSON.parse(JSON.stringify(this.chartData));
 
-                    // Use requestAnimationFrame to prevent stack overflow
-                    requestAnimationFrame(() => {
+                    // CRITICAL: Use queueMicrotask to break Alpine reactivity cycle
+                    queueMicrotask(() => {
                         try {
-                            if (this.chart && this.chart.update && typeof this.chart.update === 'function') {
-                                this.chart.update('none');
+                            if (chart && chart.update && typeof chart.update === 'function') {
+                                chart.update('none');
                             }
                         } catch (updateError) {
                             console.error('❌ History chart update error:', updateError);
@@ -306,43 +391,7 @@ function historyFundingChart(initialSymbol = 'BTC', initialInterval = '4h') {
             this.loadData();
         },
 
-        generateMockData() {
-            // Generate mock history funding data for development
-            const mockData = [];
-            const now = Date.now();
-            const baseRate = 0.000125;
-            let currentRate = baseRate;
-
-            for (let i = 100; i >= 0; i--) {
-                const intervalMs = this.interval === '1h' ? 60 * 60 * 1000 :
-                                 this.interval === '4h' ? 4 * 60 * 60 * 1000 :
-                                 this.interval === '8h' ? 8 * 60 * 60 * 1000 :
-                                 24 * 60 * 60 * 1000; // 1d
-
-                const time = now - (i * intervalMs);
-                const variation = (Math.random() - 0.5) * 0.00005;
-                currentRate += variation;
-
-                const open = currentRate;
-                const high = currentRate + Math.random() * 0.00002;
-                const low = currentRate - Math.random() * 0.00002;
-                const close = low + Math.random() * (high - low);
-
-                mockData.push({
-                    time: time,
-                    open: open,
-                    high: high,
-                    low: low,
-                    close: close,
-                    interval: this.interval,
-                    symbol: this.symbol
-                });
-
-                currentRate = close; // Use close as next open
-            }
-
-            return mockData;
-        },
+        // remove mock generator: all data must come from API
 
         formatRate(value) {
             if (value === null || value === undefined || isNaN(value)) return 'N/A';

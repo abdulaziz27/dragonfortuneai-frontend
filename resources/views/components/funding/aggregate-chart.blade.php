@@ -33,8 +33,8 @@
     </div>
 
     <!-- Chart Canvas -->
-    <div style="position: relative; height: 380px;">
-        <canvas id="aggregateChart"></canvas>
+    <div style="position: relative; height: 380px; min-width: 100px;">
+        <canvas :id="chartId" style="display: block; box-sizing: border-box; height: 380px; width: 100%;"></canvas>
     </div>
 
     <!-- Exchange Spread Alert -->
@@ -81,13 +81,27 @@ function aggregateFundingChart(initialSymbol = 'BTC', initialRangeStr = '7d') {
     return {
         symbol: initialSymbol,
         rangeStr: initialRangeStr,
+        marginType: '',
         loading: false,
         aggregateData: [],
-        chart: null,
+        // DO NOT store chart here - Alpine will track it!
+        // chart: null,
+        chartId: 'aggregateChart_' + Math.random().toString(36).substr(2, 9),
         highestExchange: '--',
         highestRate: 0,
         lowestExchange: '--',
         lowestRate: 0,
+
+        // Helper to get chart from DOM storage (non-reactive)
+        getChart() {
+            const canvas = document.getElementById(this.chartId);
+            return canvas ? canvas._chartInstance : null;
+        },
+
+        setChart(chartInstance) {
+            const canvas = document.getElementById(this.chartId);
+            if (canvas) canvas._chartInstance = chartInstance;
+        },
 
         get spreadRate() {
             return this.highestRate - this.lowestRate;
@@ -113,16 +127,103 @@ function aggregateFundingChart(initialSymbol = 'BTC', initialRangeStr = '7d') {
                 await window.chartJsReady;
             }
 
-            setTimeout(() => {
+            // Multiple retry strategy untuk memastikan chart init dengan proper width
+            this.initChartWithRetry();
+
+            // Listen to global filter changes
+            window.addEventListener('symbol-changed', (e) => {
+                this.symbol = e.detail?.symbol || this.symbol;
+                this.marginType = e.detail?.marginType ?? this.marginType;
+                this.loadData();
+            });
+            window.addEventListener('margin-type-changed', (e) => {
+                this.marginType = e.detail?.marginType ?? '';
+                this.loadData();
+            });
+
+            // Setup observer untuk detect visibility changes
+            this.setupVisibilityObserver();
+        },
+
+        initChartWithRetry() {
+            let attempts = 0;
+            const maxAttempts = 5;
+
+            const tryInit = () => {
+                attempts++;
+                const canvas = document.getElementById(this.chartId);
+
+                if (!canvas) {
+                    if (attempts < maxAttempts) {
+                        setTimeout(tryInit, 500);
+                    }
+                    return;
+                }
+
+                const parent = canvas.parentElement;
+                const parentWidth = parent ? parent.offsetWidth : 0;
+
+                console.log(`🎨 Aggregate Chart Init Attempt ${attempts}: Canvas found, Parent width: ${parentWidth}px`);
+
+                // Jika parent width masih 0 atau terlalu kecil, retry
+                if (parentWidth < 100 && attempts < maxAttempts) {
+                    console.warn(`⚠️ Parent width too small (${parentWidth}px), retrying in 500ms...`);
+                    setTimeout(tryInit, 500);
+                    return;
+                }
+
+                // Width cukup, init chart
                 this.initChart();
                 this.loadData();
-            }, 500);
+            };
+
+            // Start first attempt after 500ms
+            setTimeout(tryInit, 500);
+        },
+
+        setupVisibilityObserver() {
+            const canvas = document.getElementById(this.chartId);
+            if (!canvas) return;
+
+            const observer = new ResizeObserver(() => {
+                const chart = this.getChart();
+                if (chart && canvas.offsetParent !== null) {
+                    // Canvas visible, resize chart
+                    chart.resize();
+                }
+            });
+
+            observer.observe(canvas.parentElement);
+
+            // Window resize dengan debounce
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const chart = this.getChart();
+                    if (chart) {
+                        chart.resize();
+                    }
+                }, 250);
+            });
+
+            // Listen untuk sidebar toggle
+            document.addEventListener('click', (e) => {
+                if (e.target.closest('[data-bs-toggle="collapse"]')) {
+                    setTimeout(() => {
+                        const chart = this.getChart();
+                        if (chart) {
+                            chart.resize();
+                        }
+                    }, 350); // Bootstrap collapse animation = 350ms
+                }
+            });
         },
 
         initChart() {
-            const canvas = document.getElementById('aggregateChart');
+            const canvas = document.getElementById(this.chartId);
             if (!canvas) {
-                console.warn('⚠️ Canvas not found for aggregate chart');
+                console.warn('⚠️ Canvas not found for aggregate chart:', this.chartId);
                 return;
             }
 
@@ -133,7 +234,7 @@ function aggregateFundingChart(initialSymbol = 'BTC', initialRangeStr = '7d') {
 
             const ctx = canvas.getContext('2d');
 
-            this.chart = new Chart(ctx, {
+            const chartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: [],
@@ -160,11 +261,14 @@ function aggregateFundingChart(initialSymbol = 'BTC', initialRangeStr = '7d') {
                                     return `Funding Rate: ${(value >= 0 ? '+' : '')}${value.toFixed(4)}%`;
                                 },
                                 afterLabel: (context) => {
-                                    const item = this.aggregateData[context.dataIndex];
+                                    // Access data directly from chart to avoid Alpine reactivity
+                                    const datasets = context.chart.data.datasets[0];
+                                    const rawData = datasets._rawData || [];
+                                    const item = rawData[context.dataIndex];
                                     if (!item) return '';
                                     return [
-                                        `Margin: ${item.margin_type}`,
-                                        `Period: ${item.range_str}`
+                                        `Margin: ${item.margin_type || 'N/A'}`,
+                                        `Period: ${item.range_str || 'N/A'}`
                                     ];
                                 }
                             }
@@ -196,6 +300,8 @@ function aggregateFundingChart(initialSymbol = 'BTC', initialRangeStr = '7d') {
                 }
             });
 
+            // Store in DOM, NOT in Alpine reactive this
+            this.setChart(chartInstance);
             console.log('✅ Aggregate chart initialized');
         },
 
@@ -205,7 +311,8 @@ function aggregateFundingChart(initialSymbol = 'BTC', initialRangeStr = '7d') {
                 const params = new URLSearchParams({
                     limit: '2000',
                     ...(this.symbol && { symbol: this.symbol }),
-                    ...(this.rangeStr && { range_str: this.rangeStr })
+                    ...(this.rangeStr && { range_str: this.rangeStr }),
+                    ...(this.marginType && { margin_type: this.marginType })
                 });
 
                 const response = await fetch(`http://202.155.90.20:8000/api/funding-rate/aggregate?${params}`);
@@ -243,7 +350,9 @@ function aggregateFundingChart(initialSymbol = 'BTC', initialRangeStr = '7d') {
         },
 
         updateChart(latestData) {
-            if (!this.chart || !latestData || latestData.length === 0) {
+            const chart = this.getChart();
+
+            if (!chart || !latestData || latestData.length === 0) {
                 console.warn('⚠️ Cannot update chart: missing chart or data');
                 return;
             }
@@ -269,19 +378,21 @@ function aggregateFundingChart(initialSymbol = 'BTC', initialRangeStr = '7d') {
                 });
 
                 // Safely update chart data
-                if (this.chart.data) {
-                    this.chart.data.labels = labels;
-                    if (this.chart.data.datasets[0]) {
-                        this.chart.data.datasets[0].data = values;
-                        this.chart.data.datasets[0].backgroundColor = backgroundColors;
-                        this.chart.data.datasets[0].borderColor = borderColors;
+                if (chart.data) {
+                    chart.data.labels = labels;
+                    if (chart.data.datasets[0]) {
+                        chart.data.datasets[0].data = values;
+                        chart.data.datasets[0].backgroundColor = backgroundColors;
+                        chart.data.datasets[0].borderColor = borderColors;
+                        // Store raw data for tooltip (deep clone to avoid Alpine reactivity)
+                        chart.data.datasets[0]._rawData = JSON.parse(JSON.stringify(latestData));
                     }
 
-                    // Use requestAnimationFrame to prevent stack overflow
-                    requestAnimationFrame(() => {
+                    // CRITICAL: Use queueMicrotask to break Alpine reactivity cycle
+                    queueMicrotask(() => {
                         try {
-                            if (this.chart && this.chart.update && typeof this.chart.update === 'function') {
-                                this.chart.update('none');
+                            if (chart && chart.update && typeof chart.update === 'function') {
+                                chart.update('none');
                             }
                         } catch (updateError) {
                             console.error('❌ Chart update error:', updateError);
