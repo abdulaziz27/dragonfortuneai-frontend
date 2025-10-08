@@ -36,7 +36,7 @@ Route: Already configured in web.php
 All components use backend API:
 
 ```
-Base URL: http://202.155.90.20:8000/api/funding-rate/
+Base Path: /api/funding-rate/
 ```
 
 **Available Endpoints:**

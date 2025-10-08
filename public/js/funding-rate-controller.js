@@ -179,10 +179,7 @@ function fundingRateController() {
             console.log("Symbol:", this.globalSymbol);
             console.log("Margin Type:", this.globalMarginType || "All");
             console.log("Components loaded:", this.components.count || 0);
-            console.log(
-                "API Base:",
-                "http://202.155.90.20:8000/api/funding-rate"
-            );
+            console.log("API Base:", "/api/funding-rate");
             console.groupEnd();
         },
 
@@ -289,7 +286,7 @@ function fundingRateController() {
         // API Helper: Fetch with error handling
         async fetchAPI(endpoint, params = {}) {
             const queryString = new URLSearchParams(params).toString();
-            const url = `http://202.155.90.20:8000/api/funding-rate/${endpoint}?${queryString}`;
+            const url = `/api/funding-rate/${endpoint}?${queryString}`;
 
             try {
                 console.log("📡 Fetching:", endpoint, params);

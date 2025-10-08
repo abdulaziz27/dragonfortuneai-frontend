@@ -275,7 +275,7 @@ function exchangeFundingTable(initialSymbol = 'BTC', initialLimit = 20) {
                     ...(this.marginType && { margin_type: this.marginType })
                 });
 
-                const response = await fetch(`http://202.155.90.20:8000/api/funding-rate/exchanges?${params}`);
+                const response = await fetch(`/api/funding-rate/exchanges?${params}`);
                 const data = await response.json();
 
                 this.exchanges = data.data || [];

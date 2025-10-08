@@ -304,7 +304,7 @@ function historyFundingChart(initialSymbol = 'BTC', initialInterval = '1h') {
                     limit: '100'
                 });
 
-                const response = await fetch(`http://202.155.90.20:8000/api/funding-rate/history?${params}`);
+                const response = await fetch(`/api/funding-rate/history?${params}`);
                 const data = await response.json();
 
                 this.chartData = data.data || [];

@@ -315,7 +315,7 @@ function aggregateFundingChart(initialSymbol = 'BTC', initialRangeStr = '7d') {
                     ...(this.marginType && { margin_type: this.marginType })
                 });
 
-                const response = await fetch(`http://202.155.90.20:8000/api/funding-rate/aggregate?${params}`);
+                const response = await fetch(`/api/funding-rate/aggregate?${params}`);
                 const data = await response.json();
 
                 this.aggregateData = (data.data || []).filter(item => item.funding_rate !== null);

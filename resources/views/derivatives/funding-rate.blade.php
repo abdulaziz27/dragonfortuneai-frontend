@@ -300,7 +300,7 @@
                             ...(this.marginType && { margin_type: this.marginType })
                         });
                         const response = await fetch(
-                            `http://202.155.90.20:8000/api/funding-rate/exchanges?${params}`);
+                            `/api/funding-rate/exchanges?${params}`);
                         const data = await response.json();
                         this.exchangeData = data.data || [];
                     } catch (error) {
@@ -312,7 +312,7 @@
                 async loadBiasData(symbol) {
                     try {
                         const response = await fetch(
-                            `http://202.155.90.20:8000/api/funding-rate/bias?symbol=${symbol}USDT&limit=1000&with_price=true`);
+                            `/api/funding-rate/bias?symbol=${symbol}USDT&limit=1000&with_price=true`);
                         const data = await response.json();
                         this.biasData = data;
                     } catch (error) {

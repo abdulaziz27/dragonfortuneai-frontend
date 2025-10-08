@@ -21,7 +21,7 @@ Funding Rate Analytics adalah dashboard komprehensif untuk monitoring funding ra
 
 ### Backend API
 
--   **Base URL**: `http://202.155.90.20:8000/api/funding-rate`
+-   **Base Path**: `/api/funding-rate`
 -   **Endpoints**: `/exchanges`, `/bias`, `/aggregate`, `/history`, `/weighted`
 
 ## 📁 File Structure
@@ -301,7 +301,7 @@ async loadData() {
             ...(this.marginType && { margin_type: this.marginType })
         });
 
-        const response = await fetch(`http://202.155.90.20:8000/api/funding-rate/endpoint?${params}`);
+        const response = await fetch(`/api/funding-rate/endpoint?${params}`);
         const data = await response.json();
 
         this.chartData = data.data || [];

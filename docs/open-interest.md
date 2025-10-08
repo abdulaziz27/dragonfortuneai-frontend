@@ -160,7 +160,7 @@ Open Interest Analytics adalah halaman dashboard yang menyediakan analisis menda
 
 ```javascript
 // Base URL
-API_BASE: 'http://202.155.90.20:8000/api/open-interest'
+API_BASE: '/api/open-interest'
 
 // Endpoints dengan parameters
 /aggregate?symbol=${symbol}&interval=${interval}&limit=2000

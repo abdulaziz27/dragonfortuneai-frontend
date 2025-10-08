@@ -415,7 +415,7 @@
         function openInterestData() {
             return {
                 // API Configuration
-                API_BASE: 'http://202.155.90.20:8000/api/open-interest',
+                API_BASE: '/api/open-interest',
 
                 // Data State
                 selectedSymbol: 'BTC',
