@@ -140,7 +140,11 @@ function fundingBiasCard(initialSymbol = 'BTC') {
             try {
                 // API membutuhkan pasangan simbol penuh (contoh: BTCUSDT)
                 const pair = `${this.symbol}USDT`;
-                const response = await fetch(`/api/funding-rate/bias?symbol=${pair}&limit=1000&with_price=true`);
+                const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                const configuredBase = (baseMeta?.content || '').trim();
+                const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
+                const url = base ? `${base}/api/funding-rate/bias?symbol=${pair}&limit=1000&with_price=true` : `/api/funding-rate/bias?symbol=${pair}&limit=1000&with_price=true`;
+                const response = await fetch(url);
                 const data = await response.json();
 
                 this.bias = data.bias || 'neutral';

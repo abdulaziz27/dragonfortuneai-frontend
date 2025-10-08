@@ -275,7 +275,11 @@ function exchangeFundingTable(initialSymbol = 'BTC', initialLimit = 20) {
                     ...(this.marginType && { margin_type: this.marginType })
                 });
 
-                const response = await fetch(`/api/funding-rate/exchanges?${params}`);
+                const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                const configuredBase = (baseMeta?.content || '').trim();
+                const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
+                const url = base ? `${base}/api/funding-rate/exchanges?${params}` : `/api/funding-rate/exchanges?${params}`;
+                const response = await fetch(url);
                 const data = await response.json();
 
                 this.exchanges = data.data || [];

@@ -315,7 +315,11 @@ function aggregateFundingChart(initialSymbol = 'BTC', initialRangeStr = '7d') {
                     ...(this.marginType && { margin_type: this.marginType })
                 });
 
-                const response = await fetch(`/api/funding-rate/aggregate?${params}`);
+                const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                const configuredBase = (baseMeta?.content || '').trim();
+                const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
+                const url = base ? `${base}/api/funding-rate/aggregate?${params}` : `/api/funding-rate/aggregate?${params}`;
+                const response = await fetch(url);
                 const data = await response.json();
 
                 this.aggregateData = (data.data || []).filter(item => item.funding_rate !== null);

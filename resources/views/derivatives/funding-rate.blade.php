@@ -300,7 +300,13 @@
                             ...(this.marginType && { margin_type: this.marginType })
                         });
                         const response = await fetch(
-                            `/api/funding-rate/exchanges?${params}`);
+                            (function(){
+                                const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                                const configuredBase = (baseMeta?.content || '').trim();
+                                const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
+                                const url = base ? `${base}/api/funding-rate/exchanges?${params}` : `/api/funding-rate/exchanges?${params}`;
+                                return url;
+                            })());
                         const data = await response.json();
                         this.exchangeData = data.data || [];
                     } catch (error) {
@@ -312,7 +318,13 @@
                 async loadBiasData(symbol) {
                     try {
                         const response = await fetch(
-                            `/api/funding-rate/bias?symbol=${symbol}USDT&limit=1000&with_price=true`);
+                            (function(){
+                                const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                                const configuredBase = (baseMeta?.content || '').trim();
+                                const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
+                                const url = base ? `${base}/api/funding-rate/bias?symbol=${symbol}USDT&limit=1000&with_price=true` : `/api/funding-rate/bias?symbol=${symbol}USDT&limit=1000&with_price=true`;
+                                return url;
+                            })());
                         const data = await response.json();
                         this.biasData = data;
                     } catch (error) {

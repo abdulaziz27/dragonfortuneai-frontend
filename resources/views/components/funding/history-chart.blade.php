@@ -304,7 +304,11 @@ function historyFundingChart(initialSymbol = 'BTC', initialInterval = '1h') {
                     limit: '100'
                 });
 
-                const response = await fetch(`/api/funding-rate/history?${params}`);
+                const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                const configuredBase = (baseMeta?.content || '').trim();
+                const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
+                const url = base ? `${base}/api/funding-rate/history?${params}` : `/api/funding-rate/history?${params}`;
+                const response = await fetch(url);
                 const data = await response.json();
 
                 this.chartData = data.data || [];
