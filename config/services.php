@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    // Custom API base URL for frontend fetches (used by deployment envs)
+    'api' => [
+        'base_url' => env('API_BASE_URL', ''),
+    ],
+
 ];

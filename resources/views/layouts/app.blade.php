@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ config('app.name', 'DragonFortune AI') }}</title>
 
+    <meta name="api-base-url" content="{{ config('services.api.base_url') }}">
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>

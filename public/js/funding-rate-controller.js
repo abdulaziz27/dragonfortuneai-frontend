@@ -179,7 +179,9 @@ function fundingRateController() {
             console.log("Symbol:", this.globalSymbol);
             console.log("Margin Type:", this.globalMarginType || "All");
             console.log("Components loaded:", this.components.count || 0);
-            console.log("API Base:", "/api/funding-rate");
+            const baseMeta = document.querySelector('meta[name="api-base-url"]');
+            const baseUrl = (baseMeta?.content || '').trim() || '(relative)';
+            console.log("API Base:", baseUrl);
             console.groupEnd();
         },
 
@@ -286,7 +288,16 @@ function fundingRateController() {
         // API Helper: Fetch with error handling
         async fetchAPI(endpoint, params = {}) {
             const queryString = new URLSearchParams(params).toString();
-            const url = `/api/funding-rate/${endpoint}?${queryString}`;
+            const baseMeta = document.querySelector('meta[name="api-base-url"]');
+            const configuredBase = (baseMeta?.content || '').trim();
+
+            let url = `/api/funding-rate/${endpoint}?${queryString}`; // default relative
+            if (configuredBase) {
+                const normalizedBase = configuredBase.endsWith('/')
+                    ? configuredBase.slice(0, -1)
+                    : configuredBase;
+                url = `${normalizedBase}/api/funding-rate/${endpoint}?${queryString}`;
+            }
 
             try {
                 console.log("📡 Fetching:", endpoint, params);
