@@ -38,7 +38,7 @@ Route::view('/etf-basis/spot-etf-netflow', 'etf-basis.spot-etf-netflow')->name('
 Route::view('/etf-basis/perp-basis', 'etf-basis.perp-basis')->name('etf-basis.perp-basis');
 
 // Volatility Regime Routes
-Route::view('/volatility-regime/detector', 'volatility-regime.detector')->name('volatility-regime.detector');
+Route::view('/volatility-regime/dashboard', 'volatility-regime.dashboard')->name('volatility-regime.dashboard');
 
 // Macro Overlay Routes
 Route::view('/macro-overlay/dashboard', 'macro-overlay.dashboard')->name('macro-overlay.dashboard');

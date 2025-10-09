@@ -224,7 +224,7 @@
                                 </svg>
                             </button>
                             <div class="df-submenu{{ request()->routeIs('volatility-regime.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['volatility-regime'] }">
-                                <a href="/volatility-regime/detector" class="df-submenu-item {{ request()->routeIs('volatility-regime.detector') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">σ pendek vs σ panjang</a>
+                                <a href="/volatility-regime/dashboard" class="df-submenu-item {{ request()->routeIs('volatility-regime.dashboard') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">HV/RV, Spot Prices & Regime</a>
                             </div>
                         </li>
                         <li class="df-sidebar-menu-item">
