@@ -136,7 +136,8 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-x: hidden; /* Prevent horizontal overflow */
+    overflow-y: auto; /* Allow vertical scrolling */
     background-color: var(--background);
 }
 
@@ -150,6 +151,10 @@ body {
     justify-content: space-between;
     gap: 1rem;
     min-height: 60px;
+    position: sticky; /* Sticky positioning to stay at top */
+    top: 0;
+    z-index: 1040; /* Ensure toolbar is above other content */
+    overflow: visible; /* Allow dropdown to overflow */
 }
 
 .dark .df-toolbar {
@@ -162,7 +167,7 @@ body {
     border-radius: var(--radius);
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
     position: relative; /* create stacking context for inner overlays */
-    z-index: 0;
+    z-index: auto; /* Changed from 0 to auto - prevents interfering with dropdown z-index */
     overflow: hidden; /* prevent inner elements from exceeding card bounds */
 }
 
@@ -391,7 +396,164 @@ body {
     display: none !important;
 }
 
-/* Profile Dropdown Styles */
+/* ============================================
+   NAVBAR PROFILE DROPDOWN STYLES
+   ============================================ */
+
+/* Profile Dropdown Container - ensure dropdown is not clipped */
+.profile-dropdown-container {
+    position: relative; /* Needed for absolute positioning of dropdown */
+}
+
+/* Avatar Button */
+.profile-avatar-btn {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    overflow: hidden;
+}
+
+.profile-avatar-btn:hover {
+    border-color: var(--primary);
+    transform: scale(1.05);
+}
+
+.profile-avatar-btn:active {
+    transform: scale(0.95);
+}
+
+.avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.avatar-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--secondary);
+    color: var(--foreground);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+/* Profile Dropdown Menu */
+.profile-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 200px;
+    max-height: calc(100vh - 80px); /* Prevent dropdown from going off-screen */
+    overflow-y: auto; /* Allow scrolling if content is too long */
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+        0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    z-index: 1050; /* Higher than toolbar (1040) to appear above all elements */
+    padding: 0.5rem 0;
+}
+
+.dark .profile-dropdown-menu {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3),
+        0 10px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 0.625rem 1rem;
+    color: var(--foreground);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    text-align: left;
+}
+
+.dropdown-item:hover {
+    background-color: var(--accent);
+    color: var(--foreground);
+}
+
+.dropdown-item svg {
+    flex-shrink: 0;
+    margin-right: 0.75rem;
+    opacity: 0.7;
+}
+
+.dropdown-item:hover svg {
+    opacity: 1;
+}
+
+.dropdown-divider {
+    height: 1px;
+    background-color: var(--border);
+    margin: 0.5rem 0;
+}
+
+/* Dropdown Animation Classes */
+.profile-dropdown-enter {
+    transition: all 0.2s ease-out;
+}
+
+.profile-dropdown-enter-start {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+}
+
+.profile-dropdown-enter-end {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.profile-dropdown-leave {
+    transition: all 0.15s ease-in;
+}
+
+.profile-dropdown-leave-start {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.profile-dropdown-leave-end {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+}
+
+/* Mobile Responsive for Profile Dropdown */
+@media (max-width: 768px) {
+    .profile-avatar-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .avatar-fallback {
+        font-size: 0.75rem;
+    }
+
+    .profile-dropdown-menu {
+        min-width: 180px;
+        right: -8px;
+        max-height: calc(100vh - 100px); /* More padding on mobile */
+    }
+}
+
+/* OLD Profile Dropdown Styles (kept for compatibility) */
 .df-profile-dropdown {
     position: absolute;
     bottom: 100%;

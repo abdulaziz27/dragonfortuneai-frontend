@@ -17,7 +17,6 @@
         sidebarOpen: window.innerWidth >= 768,
         sidebarCollapsed: false,
         openSubmenus: {},
-        profileDropdownOpen: false,
         isMobile: window.innerWidth < 768,
 
         init() {
@@ -97,7 +96,7 @@
             </div>
 
             <!-- Sidebar Content -->
-            <div class="df-sidebar-content df-scrollbar">
+            <div class="df-sidebar-content df-scrollbar flex-grow-1">
                 <!-- Navigation Section -->
                 <div class="df-sidebar-group">
                     <div class="df-sidebar-group-label" x-show="!sidebarCollapsed">Navigation</div>
@@ -374,61 +373,6 @@
                     </ul>
                 </div> --}}
             </div>
-
-            <!-- Sidebar Footer -->
-            <div class="df-sidebar-footer">
-                <div class="df-sidebar-menu">
-                    <div class="df-sidebar-menu-item position-relative">
-                        <button class="df-sidebar-menu-button df-sidebar-menu-button-lg" @click="profileDropdownOpen = !profileDropdownOpen">
-                            <div class="bg-secondary d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; border-radius: 50%; overflow: hidden;">
-                                <span class="fw-semibold small text-dark" style="line-height: 1;">AA</span>
-                            </div>
-                            <div class="d-flex flex-column text-start flex-grow-1" x-show="!sidebarCollapsed">
-                                <span class="fw-semibold small">Abdul Aziz</span>
-                                <span class="small" style="color: var(--muted-foreground);">abdulaziz@dragonfortune.ai</span>
-                            </div>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" x-show="!sidebarCollapsed">
-                                <circle cx="12" cy="12" r="1"/>
-                                <circle cx="19" cy="12" r="1"/>
-                                <circle cx="5" cy="12" r="1"/>
-                            </svg>
-                        </button>
-
-                        <!-- Profile Dropdown -->
-                        <div class="df-profile-dropdown" x-show="profileDropdownOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" @click.away="profileDropdownOpen = false">
-                            <!-- Profile Header -->
-                            <div class="df-profile-dropdown-header">
-                                <div class="bg-secondary d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden;">
-                                    <span class="fw-semibold text-dark" style="line-height: 1;">AA</span>
-                                </div>
-                                <div>
-                                    <div class="fw-semibold">Abdul Aziz</div>
-                                    <div class="small" style="color: var(--muted-foreground);">abdulaziz@dragonfortune.ai</div>
-                                </div>
-                            </div>
-
-                            <!-- Dropdown Menu -->
-                            <div class="df-profile-dropdown-menu">
-                                <a href="#" class="df-profile-dropdown-item">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                        <circle cx="12" cy="7" r="4"/>
-                                    </svg>
-                                    Account
-                                </a>
-                                <a href="#" class="df-profile-dropdown-item">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                                        <polyline points="16,17 21,12 16,7"/>
-                                        <line x1="21" y1="12" x2="9" y2="12"/>
-                                    </svg>
-                                    Log out
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </aside>
 
         <!-- Main Content Area -->
@@ -468,6 +412,57 @@
                             <path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
                         </svg>
                     </button>
+
+                    <!-- Profile Dropdown -->
+                    <div class="profile-dropdown-container" x-data="{ profileDropdownOpen: false }">
+                        <!-- Avatar Button -->
+                        <button class="profile-avatar-btn" @click="profileDropdownOpen = !profileDropdownOpen">
+                            <img src="/images/avatar.svg"
+                                 alt="User Avatar"
+                                 class="avatar-image"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="avatar-fallback" style="display: none;">
+                                <span>AA</span>
+                            </div>
+                        </button>
+
+                        <!-- Dropdown Menu -->
+                        <div class="profile-dropdown-menu"
+                             x-show="profileDropdownOpen"
+                             x-transition:enter="profile-dropdown-enter"
+                             x-transition:enter-start="profile-dropdown-enter-start"
+                             x-transition:enter-end="profile-dropdown-enter-end"
+                             x-transition:leave="profile-dropdown-leave"
+                             x-transition:leave-start="profile-dropdown-leave-start"
+                             x-transition:leave-end="profile-dropdown-leave-end"
+                             @click.away="profileDropdownOpen = false"
+                             style="display: none;">
+                            <!-- Profile Link -->
+                            <a href="{{ route('profile.show') }}" class="dropdown-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="12" cy="7" r="4"/>
+                                </svg>
+                                Profile
+                            </a>
+
+                            <!-- Divider -->
+                            <div class="dropdown-divider"></div>
+
+                            <!-- Logout Link -->
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit" class="dropdown-item">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                                        <polyline points="16,17 21,12 16,7"/>
+                                        <line x1="21" y1="12" x2="9" y2="12"/>
+                                    </svg>
+                                    Logout
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </header>
 

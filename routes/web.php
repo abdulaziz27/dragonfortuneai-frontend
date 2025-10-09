@@ -5,6 +5,13 @@ use Illuminate\Support\Facades\Route;
 Route::view('/', 'workspace')->name('workspace');
 Route::view('/login', 'auth.login')->name('login');
 
+// Profile & Auth Routes
+Route::view('/profile', 'profile.show')->name('profile.show');
+Route::post('/logout', function () {
+    // Logout logic akan ditambahkan nanti
+    return redirect()->route('login');
+})->name('logout');
+
 // Derivatives Core Routes
 Route::view('/derivatives/funding-rate', 'derivatives.funding-rate')->name('derivatives.funding-rate');
 Route::view('/derivatives/open-interest', 'derivatives.open-interest')->name('derivatives.open-interest');
