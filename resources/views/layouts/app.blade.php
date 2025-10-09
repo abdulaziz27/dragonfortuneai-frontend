@@ -218,7 +218,7 @@
                                     <path d="M8 12h8"/>
                                     <path d="M12 8v8"/>
                                 </svg>
-                                <span>Volatility Regime Detector</span>
+                                <span>Volatility & Regime</span>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['volatility-regime'] }">
                                     <path d="M9 18l6-6-6-6"/>
                                 </svg>
@@ -228,19 +228,34 @@
                             </div>
                         </li>
                         <li class="df-sidebar-menu-item">
-                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('atr')">
+                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('macro-overlay')">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                    <path d="M8 12h8"/>
-                                    <path d="M12 8v8"/>
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M2 12h20"/>
+                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                                 </svg>
-                                <span>ATR (Average True Range)</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['atr'] }">
+                                <span>Macro Overlay</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['macro-overlay'] }">
                                     <path d="M9 18l6-6-6-6"/>
                                 </svg>
                             </button>
-                            <div class="df-submenu{{ request()->routeIs('atr.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['atr'] }">
-                                <a href="/atr/detector" class="df-submenu-item {{ request()->routeIs('atr.detector') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Stop & Position Sizing adaptif</a>
+                            <div class="df-submenu{{ request()->routeIs('macro-overlay.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['macro-overlay'] }">
+                                <a href="/macro-overlay/dashboard" class="df-submenu-item {{ request()->routeIs('macro-overlay.dashboard') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">DXY, Yields, Fed & Liquidity</a>
+                            </div>
+                        </li>
+                        <li class="df-sidebar-menu-item">
+                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('sentiment-flow')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                    <path d="M8 10h.01M12 10h.01M16 10h.01"/>
+                                </svg>
+                                <span>Sentiment & Flow</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['sentiment-flow'] }">
+                                    <path d="M9 18l6-6-6-6"/>
+                                </svg>
+                            </button>
+                            <div class="df-submenu{{ request()->routeIs('sentiment-flow.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['sentiment-flow'] }">
+                                <a href="/sentiment-flow/dashboard" class="df-submenu-item {{ request()->routeIs('sentiment-flow.dashboard') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Fear & Greed, Social & Whales</a>
                             </div>
                         </li>
                         {{-- <li class="df-sidebar-menu-item">

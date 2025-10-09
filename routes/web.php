@@ -40,5 +40,8 @@ Route::view('/etf-basis/perp-basis', 'etf-basis.perp-basis')->name('etf-basis.pe
 // Volatility Regime Routes
 Route::view('/volatility-regime/detector', 'volatility-regime.detector')->name('volatility-regime.detector');
 
-// ATR Routes
-Route::view('/atr/detector', 'atr.detector')->name('atr.detector');
+// Macro Overlay Routes
+Route::view('/macro-overlay/dashboard', 'macro-overlay.dashboard')->name('macro-overlay.dashboard');
+
+// Sentiment & Flow Routes
+Route::view('/sentiment-flow/dashboard', 'sentiment-flow.dashboard')->name('sentiment-flow.dashboard');
