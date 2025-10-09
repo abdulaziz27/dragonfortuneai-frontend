@@ -33,15 +33,15 @@
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                     <select class="form-select" style="width: 150px;" x-model="selectedTimeframe" @change="refreshAll()">
-                        <option value="1M">1 Bulan</option>
-                        <option value="3M" selected>3 Bulan</option>
-                        <option value="6M">6 Bulan</option>
-                        <option value="1Y">1 Tahun</option>
-                        <option value="YTD">Tahun Berjalan</option>
+                        <option value="1M">1 Month</option>
+                        <option value="3M" selected>3 Months</option>
+                        <option value="6M">6 Months</option>
+                        <option value="1Y">1 Year</option>
+                        <option value="YTD">Year to Date</option>
                     </select>
 
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
-                        <span x-show="!loading">Refresh</span>
+                        <span x-show="!loading">Refresh Data</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
                 </div>
@@ -64,11 +64,11 @@
                         </div>
                     </div>
                     <div class="small" :class="metrics.dxy.change >= 0 ? 'text-success' : 'text-danger'">
-                        <span x-show="metrics.dxy.change >= 0">USD Menguat</span>
-                        <span x-show="metrics.dxy.change < 0">USD Melemah</span>
+                        <span x-show="metrics.dxy.change >= 0">USD Strengthening</span>
+                        <span x-show="metrics.dxy.change < 0">USD Weakening</span>
                     </div>
                     <div class="mt-2 small text-secondary">
-                        Korelasi dengan BTC: -0.72
+                        Correlation with BTC: -0.72
                     </div>
                 </div>
             </div>
@@ -87,8 +87,8 @@
                         </div>
                     </div>
                     <div class="small text-secondary">
-                        <span x-show="metrics.yield10y.value > 4.5">Yield tinggi - Risk-off</span>
-                        <span x-show="metrics.yield10y.value <= 4.5">Yield moderat</span>
+                        <span x-show="metrics.yield10y.value > 4.5">High yields - Risk-off</span>
+                        <span x-show="metrics.yield10y.value <= 4.5">Moderate yields</span>
                     </div>
                     <div class="mt-2 small text-secondary">
                         Correlation with BTC: -0.65
@@ -156,8 +156,8 @@
                         </div>
                     </div>
                     <div class="small text-secondary">
-                        <span x-show="metrics.yieldSpread.value < 0">Sinyal resesi terdeteksi</span>
-                        <span x-show="metrics.yieldSpread.value >= 0">Kurva yield sehat</span>
+                        <span x-show="metrics.yieldSpread.value < 0">Recession signal detected</span>
+                        <span x-show="metrics.yieldSpread.value >= 0">Healthy yield curve</span>
                     </div>
                 </div>
             </div>
@@ -176,10 +176,10 @@
                         </div>
                     </div>
                     <div class="small text-secondary">
-                        Ekspektasi: <span class="fw-semibold" x-text="metrics.nfp.expected + 'K'">--</span>
+                        Expected: <span class="fw-semibold" x-text="metrics.nfp.expected + 'K'">--</span>
                     </div>
                     <div class="mt-2 small text-secondary">
-                        Pengangguran: <span class="fw-semibold" x-text="metrics.nfp.unemployment + '%'">--</span>
+                        Unemployment: <span class="fw-semibold" x-text="metrics.nfp.unemployment + '%'">--</span>
                     </div>
                 </div>
             </div>

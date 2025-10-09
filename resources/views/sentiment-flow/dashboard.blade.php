@@ -32,11 +32,11 @@
                     <select class="form-select" style="width: 120px;" x-model="selectedAsset" @change="refreshAll()">
                         <option value="BTC">Bitcoin</option>
                         <option value="ETH">Ethereum</option>
-                        <option value="CRYPTO">Semua Crypto</option>
+                        <option value="CRYPTO">All Crypto</option>
                     </select>
 
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
-                        <span x-show="!loading">Refresh</span>
+                        <span x-show="!loading">Refresh All</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
                 </div>
@@ -113,8 +113,8 @@
                         </div>
 
                         <div class="d-flex justify-content-between small text-secondary">
-                            <span>Ketakutan</span>
-                            <span>Keserakahan</span>
+                            <span>Fear</span>
+                            <span>Greed</span>
                         </div>
                     </div>
                 </div>
@@ -125,7 +125,7 @@
                 <div class="df-panel p-3 h-100 d-flex flex-column">
                     <div class="mb-3 flex-shrink-0">
                         <h5 class="mb-1">Social Media Sentiment - Daily Mentions</h5>
-                        <small class="text-secondary">Sentimen Media Sosial - Penyebutan Harian</small>
+                        <small class="text-secondary">Analisis sentimen dari penyebutan harian di media sosial</small>
                     </div>
                     <div class="flex-grow-1" style="min-height: 280px;">
                         <canvas id="socialChart"></canvas>
@@ -140,7 +140,7 @@
                 <div class="df-panel p-3">
                     <div class="mb-3">
                         <h5 class="mb-1">Social Platform Breakdown - Last 24h</h5>
-                        <small class="text-secondary">Rincian Platform Sosial - 24 Jam Terakhir</small>
+                        <small class="text-secondary">Rincian aktivitas per platform dalam 24 jam terakhir</small>
                     </div>
                     <div class="row g-3">
                         <div class="col-md-4">
@@ -148,15 +148,15 @@
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <div>
                                         <div class="fw-bold">Twitter / X</div>
-                                        <div class="h4 mb-0 mt-1" x-text="socialBreakdown.twitter.mentions + ' penyebutan'">--</div>
+                                        <div class="h4 mb-0 mt-1" x-text="socialBreakdown.twitter.mentions + ' mentions'">--</div>
                                     </div>
                                     <div class="text-end">
                                         <div class="badge" :class="socialBreakdown.twitter.sentiment >= 0 ? 'text-bg-success' : 'text-bg-danger'" x-text="socialBreakdown.twitter.sentiment + '%'">--</div>
-                                        <div class="small text-secondary">Sentimen</div>
+                                        <div class="small text-secondary">Sentiment</div>
                                     </div>
                                 </div>
                                 <div class="small text-secondary">
-                                    Kata kunci teratas: <span class="fw-semibold" x-text="socialBreakdown.twitter.keywords">--</span>
+                                    Top keywords: <span class="fw-semibold" x-text="socialBreakdown.twitter.keywords">--</span>
                                 </div>
                             </div>
                         </div>
@@ -165,15 +165,15 @@
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <div>
                                         <div class="fw-bold">Reddit</div>
-                                        <div class="h4 mb-0 mt-1" x-text="socialBreakdown.reddit.mentions + ' postingan'">--</div>
+                                        <div class="h4 mb-0 mt-1" x-text="socialBreakdown.reddit.mentions + ' posts'">--</div>
                                     </div>
                                     <div class="text-end">
                                         <div class="badge" :class="socialBreakdown.reddit.sentiment >= 0 ? 'text-bg-success' : 'text-bg-danger'" x-text="socialBreakdown.reddit.sentiment + '%'">--</div>
-                                        <div class="small text-secondary">Sentimen</div>
+                                        <div class="small text-secondary">Sentiment</div>
                                     </div>
                                 </div>
                                 <div class="small text-secondary">
-                                    Subreddit teratas: <span class="fw-semibold" x-text="socialBreakdown.reddit.keywords">--</span>
+                                    Top subreddits: <span class="fw-semibold" x-text="socialBreakdown.reddit.keywords">--</span>
                                 </div>
                             </div>
                         </div>
@@ -186,11 +186,11 @@
                                     </div>
                                     <div class="text-end">
                                         <div class="badge" :class="socialBreakdown.google.change >= 0 ? 'text-bg-success' : 'text-bg-danger'" x-text="formatChange(socialBreakdown.google.change) + '%'">--</div>
-                                        <div class="small text-secondary">Perubahan 24j</div>
+                                        <div class="small text-secondary">24h Change</div>
                                     </div>
                                 </div>
                                 <div class="small text-secondary">
-                                    Minat pencarian: <span class="fw-semibold" x-text="socialBreakdown.google.region">--</span>
+                                    Search interest: <span class="fw-semibold" x-text="socialBreakdown.google.region">--</span>
                                 </div>
                             </div>
                         </div>
@@ -208,9 +208,9 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h5 class="mb-0">Funding Rate Dominance</h5>
-                                <small class="text-secondary">Dominasi Tingkat Pendanaan</small>
+                                <small class="text-secondary">Tracking posisi leverage dominan antar exchange</small>
                             </div>
-                            <span class="badge text-bg-info">Interval 8 jam</span>
+                            <span class="badge text-bg-info">8h intervals</span>
                         </div>
                     </div>
 
@@ -220,8 +220,8 @@
                                 <tr>
                                     <th>Exchange</th>
                                     <th>Funding Rate</th>
-                                    <th>Tren</th>
-                                    <th>Sinyal</th>
+                                    <th>Trend</th>
+                                    <th>Signal</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -232,9 +232,9 @@
                                             <span :class="item.rate >= 0 ? 'text-success' : 'text-danger'" x-text="formatFundingRate(item.rate)">--</span>
                                         </td>
                                         <td>
-                                            <span x-show="item.trend === 'up'">Naik</span>
-                                            <span x-show="item.trend === 'down'">Turun</span>
-                                            <span x-show="item.trend === 'stable'">Stabil</span>
+                                            <span x-show="item.trend === 'up'">Trending Up</span>
+                                            <span x-show="item.trend === 'down'">Trending Down</span>
+                                            <span x-show="item.trend === 'stable'">Stable</span>
                                         </td>
                                         <td>
                                             <span class="badge" :class="getFundingActionBadge(item.rate)" x-text="getFundingAction(item.rate)">--</span>
@@ -247,7 +247,7 @@
 
                     <!-- Funding Rate Heatmap Visual -->
                     <div class="mt-3 flex-shrink-0">
-                        <div class="small text-secondary mb-2 fw-semibold">Heatmap Visual</div>
+                        <div class="small text-secondary mb-2 fw-semibold">Visual Heatmap</div>
                         <div style="height: 140px;">
                             <canvas id="fundingHeatmap"></canvas>
                         </div>
@@ -271,7 +271,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h5 class="mb-0">Whale Flow Balance</h5>
-                                <small class="text-secondary">Keseimbangan Aliran Whale</small>
+                                <small class="text-secondary">Memantau posisi smart money melalui whale movements</small>
                             </div>
                             <span class="badge text-bg-warning">Real-time</span>
                         </div>
@@ -286,16 +286,16 @@
                         <div class="row g-2">
                             <div class="col-6">
                                 <div class="p-2 rounded" style="background: rgba(239, 68, 68, 0.1);">
-                                    <div class="small text-secondary">Inflow ke Exchange</div>
+                                    <div class="small text-secondary">Inflow to Exchanges</div>
                                     <div class="h5 mb-0 fw-bold text-danger" x-text="'$' + whaleFlow.inflow + 'M'">--</div>
-                                    <div class="small text-secondary">24 Jam Terakhir</div>
+                                    <div class="small text-secondary">Last 24h</div>
                                 </div>
                             </div>
                             <div class="col-6">
                                 <div class="p-2 rounded" style="background: rgba(34, 197, 94, 0.1);">
-                                    <div class="small text-secondary">Outflow dari Exchange</div>
+                                    <div class="small text-secondary">Outflow from Exchanges</div>
                                     <div class="h5 mb-0 fw-bold text-success" x-text="'$' + whaleFlow.outflow + 'M'">--</div>
-                                    <div class="small text-secondary">24 Jam Terakhir</div>
+                                    <div class="small text-secondary">Last 24h</div>
                                 </div>
                             </div>
                         </div>
@@ -307,8 +307,8 @@
                             <div class="h5 mb-0 fw-bold" :class="whaleFlow.netFlow >= 0 ? 'text-success' : 'text-danger'" x-text="(whaleFlow.netFlow >= 0 ? '+$' : '-$') + Math.abs(whaleFlow.netFlow) + 'M'">--</div>
                         </div>
                         <div class="mt-2 small text-secondary">
-                            <span x-show="whaleFlow.netFlow >= 0"><strong>Bullish:</strong> Lebih banyak uang whale keluar dari exchange (akumulasi)</span>
-                            <span x-show="whaleFlow.netFlow < 0"><strong>Bearish:</strong> Lebih banyak uang whale masuk ke exchange (distribusi)</span>
+                            <span x-show="whaleFlow.netFlow >= 0"><strong>Bullish:</strong> More whale money leaving exchanges (accumulation)</span>
+                            <span x-show="whaleFlow.netFlow < 0"><strong>Bearish:</strong> More whale money entering exchanges (distribution)</span>
                         </div>
                     </div>
                 </div>
@@ -323,7 +323,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h5 class="mb-0">Recent Whale Alerts</h5>
-                                <small class="text-secondary">Peringatan Pergerakan Whale Terbaru</small>
+                                <small class="text-secondary">Pelacakan transaksi whale besar secara real-time</small>
                             </div>
                             <span class="badge text-bg-warning">Live Feed</span>
                         </div>
@@ -333,13 +333,13 @@
                         <table class="table table-sm table-hover">
                             <thead>
                                 <tr>
-                                    <th>Waktu</th>
-                                    <th>Arah</th>
-                                    <th>Jumlah</th>
-                                    <th>Aset</th>
-                                    <th>Nilai USD</th>
+                                    <th>Time</th>
+                                    <th>Direction</th>
+                                    <th>Amount</th>
+                                    <th>Asset</th>
+                                    <th>USD Value</th>
                                     <th>Exchange</th>
-                                    <th>Sinyal</th>
+                                    <th>Signal</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -364,7 +364,7 @@
 
                     <div class="mt-2 p-2 rounded" style="background: rgba(245, 158, 11, 0.1);">
                         <div class="small text-secondary">
-                            <strong>Perilaku Whale:</strong> Transfer IN exchange → Potensi sell pressure (Bearish). Transfer OUT → Holding/accumulation (Bullish). Monitor untuk confirm trend.
+                            <strong>Whale Behavior:</strong> Transfer IN exchange → Potensi sell pressure (Bearish). Transfer OUT → Holding/accumulation (Bullish). Monitor untuk confirm trend.
                         </div>
                     </div>
                 </div>
@@ -377,7 +377,7 @@
                 <div class="df-panel p-3">
                     <div class="mb-3">
                         <h5 class="mb-1">Social Mentions Trend (Twitter, Reddit, Google)</h5>
-                        <small class="text-secondary">Tren Penyebutan di Media Sosial</small>
+                        <small class="text-secondary">Tracking volume penyebutan untuk detect FOMO atau kapitulasi</small>
                     </div>
                     <div style="height: 300px;">
                         <canvas id="mentionsChart"></canvas>
@@ -397,7 +397,7 @@
                 <div class="df-panel p-4">
                     <div class="mb-3">
                         <h5 class="mb-1">Trading Insights dari Sentiment</h5>
-                        <small class="text-secondary">Insight Trading Berdasarkan Analisis Sentimen</small>
+                        <small class="text-secondary">Panduan interpretasi signal untuk entry & exit timing</small>
                     </div>
                     <div class="row g-3">
                         <div class="col-md-4">
@@ -406,9 +406,9 @@
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
                                         <li>Fear & Greed < 20 (Extreme Fear)</li>
-                                        <li>Social mentions mencapai titik terendah</li>
-                                        <li>Funding negatif di semua exchange</li>
-                                        <li>Net outflow whale positif</li>
+                                        <li>Social mentions bottom out</li>
+                                        <li>Negative funding across exchanges</li>
+                                        <li>Whale net outflow positive</li>
                                     </ul>
                                 </div>
                             </div>
@@ -419,9 +419,9 @@
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
                                         <li>Fear & Greed > 80 (Extreme Greed)</li>
-                                        <li>Social mentions melonjak drastis</li>
-                                        <li>Funding positif tinggi (longs crowded)</li>
-                                        <li>Net inflow whale negatif</li>
+                                        <li>Social mentions spike dramatically</li>
+                                        <li>High positive funding (longs crowded)</li>
+                                        <li>Whale net inflow negative</li>
                                     </ul>
                                 </div>
                             </div>
@@ -432,9 +432,9 @@
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
                                         <li>Fear & Greed 40-60 (Neutral → Greed)</li>
-                                        <li>Volume sosial meningkat bertahap</li>
-                                        <li>Funding seimbang antar exchange</li>
-                                        <li>Aktivitas whale sejalan dengan tren</li>
+                                        <li>Gradual increase social volume</li>
+                                        <li>Balanced funding across exchanges</li>
+                                        <li>Whale activity aligned with trend</li>
                                     </ul>
                                 </div>
                             </div>
@@ -781,9 +781,9 @@
                 },
 
                 getFearGreedTitle() {
-                    if (this.fearGreedScore <= 25) return 'Peluang Buy Contrarian';
-                    if (this.fearGreedScore >= 75) return 'Zona Take Profit';
-                    return 'Zona Neutral';
+                    if (this.fearGreedScore <= 25) return 'Contrarian Buy Opportunity';
+                    if (this.fearGreedScore >= 75) return 'Take Profit Zone';
+                    return 'Neutral Zone';
                 },
 
                 getFearGreedMessage() {
@@ -813,9 +813,9 @@
                 },
 
                 getFundingAction(rate) {
-                    if (rate > 0.015) return 'Risiko Long Squeeze';
+                    if (rate > 0.015) return 'Long Squeeze Risk';
                     if (rate > 0.01) return 'Monitor';
-                    if (rate < 0) return 'Setup Short Squeeze';
+                    if (rate < 0) return 'Short Squeeze Setup';
                     return 'Neutral';
                 },
 
