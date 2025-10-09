@@ -4,10 +4,8 @@ import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import jQuery from "jquery";
 window.$ = window.jQuery = jQuery;
 
-import Alpine from "alpinejs";
-window.Alpine = Alpine;
-
 // Alpine.js data and components
+// Note: Alpine.js is already loaded by Livewire
 document.addEventListener("alpine:init", () => {
     Alpine.data("sidebar", () => ({
         open: true,
@@ -153,7 +151,7 @@ document.addEventListener("alpine:init", () => {
     }));
 });
 
-Alpine.start();
+// Note: Alpine.start() is already called by Livewire
 
 // Legacy functions for backward compatibility
 window.initTradingWidget = (element, options = {}) => {
