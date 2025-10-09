@@ -303,23 +303,9 @@ function fundingRateController() {
                 url = `${normalizedBase}/api/funding-rate/${endpoint}?${queryString}`;
             }
 
-            // Fix mixed content issue - force HTTPS if page is HTTPS
-            if (window.location.protocol === 'https:' && url.startsWith('http:')) {
-                url = url.replace('http:', 'https:');
-            }
-
             try {
                 console.log("📡 Fetching:", endpoint, params);
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                    },
-                    // Add CORS mode for cross-origin requests
-                    mode: 'cors',
-                    credentials: 'omit'
-                });
+                const response = await fetch(url);
 
                 if (!response.ok) {
                     throw new Error(
@@ -337,56 +323,8 @@ function fundingRateController() {
                 return data;
             } catch (error) {
                 console.error("❌ API Error:", endpoint, error);
-                // Return mock data for development/testing
-                return this.getMockData(endpoint);
+                throw error;
             }
-        },
-
-        // Mock data for development when API is not available
-        getMockData(endpoint) {
-            const mockData = {
-                bias: {
-                    data: {
-                        bias: "neutral",
-                        strength: 50,
-                        avg_funding_close: 0.0001
-                    }
-                },
-                exchanges: {
-                    data: [
-                        {
-                            exchange: "binance",
-                            funding_rate: 0.0001,
-                            next_funding_time: Date.now() + 3600000
-                        },
-                        {
-                            exchange: "okx",
-                            funding_rate: -0.0001,
-                            next_funding_time: Date.now() + 3600000
-                        }
-                    ]
-                },
-                aggregate: {
-                    data: [
-                        { exchange: "binance", funding_rate: 0.0001 },
-                        { exchange: "okx", funding_rate: -0.0001 }
-                    ]
-                },
-                weighted: {
-                    data: [
-                        { time: Date.now() - 3600000, open: 0.0001, high: 0.0002, low: -0.0001, close: 0.0001 },
-                        { time: Date.now(), open: 0.0001, high: 0.0002, low: -0.0001, close: 0.0001 }
-                    ]
-                },
-                history: {
-                    data: [
-                        { time: Date.now() - 3600000, open: 0.0001, high: 0.0002, low: -0.0001, close: 0.0001 },
-                        { time: Date.now(), open: 0.0001, high: 0.0002, low: -0.0001, close: 0.0001 }
-                    ]
-                }
-            };
-            
-            return mockData[endpoint] || { data: [] };
         },
     };
 }

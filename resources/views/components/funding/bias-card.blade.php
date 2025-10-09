@@ -143,27 +143,8 @@ function fundingBiasCard(initialSymbol = 'BTC') {
                 const baseMeta = document.querySelector('meta[name="api-base-url"]');
                 const configuredBase = (baseMeta?.content || '').trim();
                 const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
-                let url = base ? `${base}/api/funding-rate/bias?symbol=${pair}&limit=1000&with_price=true` : `/api/funding-rate/bias?symbol=${pair}&limit=1000&with_price=true`;
-                
-                // Fix mixed content issue - force HTTPS if page is HTTPS
-                if (window.location.protocol === 'https:' && url.startsWith('http:')) {
-                    url = url.replace('http:', 'https:');
-                }
-                
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                    },
-                    mode: 'cors',
-                    credentials: 'omit'
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
+                const url = base ? `${base}/api/funding-rate/bias?symbol=${pair}&limit=1000&with_price=true` : `/api/funding-rate/bias?symbol=${pair}&limit=1000&with_price=true`;
+                const response = await fetch(url);
                 const data = await response.json();
 
                 this.bias = data.bias || 'neutral';
@@ -175,12 +156,9 @@ function fundingBiasCard(initialSymbol = 'BTC') {
                 console.log('✅ Bias data loaded:', data);
             } catch (error) {
                 console.error('❌ Error loading bias:', error);
-                // Use mock data when API fails
-                this.bias = 'neutral';
-                this.strength = 50;
-                this.avgFundingClose = 0.0001;
-                this.sampleSize = 100;
-                this.lastUpdate = new Date().toLocaleTimeString();
+                this.bias = null;
+                this.strength = 0;
+                this.avgFundingClose = 0;
             } finally {
                 this.loading = false;
             }
