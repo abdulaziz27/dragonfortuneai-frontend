@@ -194,68 +194,43 @@
                             </div>
                         </li>
                         <li class="df-sidebar-menu-item">
-                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('etf-basis')">
+                            <a href="/etf-institutional/dashboard" class="df-sidebar-menu-button {{ request()->routeIs('etf-institutional.*') || request()->routeIs('etf-basis.*') ? 'active' : '' }}" @click="closeSidebar()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                    <path d="M8 12h8"/>
-                                    <path d="M12 8v8"/>
+                                    <rect x="3" y="4" width="18" height="4"/>
+                                    <rect x="3" y="10" width="18" height="10"/>
+                                    <path d="M7 14h10M7 17h6"/>
                                 </svg>
-                                <span>ETF & Basis</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['etf-basis'] }">
-                                    <path d="M9 18l6-6-6-6"/>
-                                </svg>
-                            </button>
-                            <div class="df-submenu{{ request()->routeIs('etf-basis.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['etf-basis'] }">
-                                <a href="/etf-basis/spot-etf-netflow" class="df-submenu-item {{ request()->routeIs('etf-basis.spot-etf-netflow') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Spot BTC ETF Netflow (daily)</a>
-                                <a href="/etf-basis/perp-basis" class="df-submenu-item {{ request()->routeIs('etf-basis.perp-basis') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Perp Basis vs Spot Index</a>
-                            </div>
+                                <span>ETF & Institutional</span>
+                            </a>
                         </li>
                         <li class="df-sidebar-menu-item">
-                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('volatility-regime')">
+                            <a href="/volatility-regime/dashboard" class="df-sidebar-menu-button {{ request()->routeIs('volatility-regime.*') ? 'active' : '' }}" @click="closeSidebar()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                                     <path d="M8 12h8"/>
                                     <path d="M12 8v8"/>
                                 </svg>
                                 <span>Volatility & Regime</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['volatility-regime'] }">
-                                    <path d="M9 18l6-6-6-6"/>
-                                </svg>
-                            </button>
-                            <div class="df-submenu{{ request()->routeIs('volatility-regime.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['volatility-regime'] }">
-                                <a href="/volatility-regime/dashboard" class="df-submenu-item {{ request()->routeIs('volatility-regime.dashboard') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">HV/RV, Spot Prices & Regime</a>
-                            </div>
+                            </a>
                         </li>
                         <li class="df-sidebar-menu-item">
-                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('macro-overlay')">
+                            <a href="/macro-overlay/dashboard" class="df-sidebar-menu-button {{ request()->routeIs('macro-overlay.*') ? 'active' : '' }}" @click="closeSidebar()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <circle cx="12" cy="12" r="10"/>
                                     <path d="M2 12h20"/>
                                     <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                                 </svg>
                                 <span>Macro Overlay</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['macro-overlay'] }">
-                                    <path d="M9 18l6-6-6-6"/>
-                                </svg>
-                            </button>
-                            <div class="df-submenu{{ request()->routeIs('macro-overlay.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['macro-overlay'] }">
-                                <a href="/macro-overlay/dashboard" class="df-submenu-item {{ request()->routeIs('macro-overlay.dashboard') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">DXY, Yields, Fed & Liquidity</a>
-                            </div>
+                            </a>
                         </li>
                         <li class="df-sidebar-menu-item">
-                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('sentiment-flow')">
+                            <a href="/sentiment-flow/dashboard" class="df-sidebar-menu-button {{ request()->routeIs('sentiment-flow.*') ? 'active' : '' }}" @click="closeSidebar()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                                     <path d="M8 10h.01M12 10h.01M16 10h.01"/>
                                 </svg>
                                 <span>Sentiment & Flow</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['sentiment-flow'] }">
-                                    <path d="M9 18l6-6-6-6"/>
-                                </svg>
-                            </button>
-                            <div class="df-submenu{{ request()->routeIs('sentiment-flow.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['sentiment-flow'] }">
-                                <a href="/sentiment-flow/dashboard" class="df-submenu-item {{ request()->routeIs('sentiment-flow.dashboard') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Fear & Greed, Social & Whales</a>
-                            </div>
+                            </a>
                         </li>
                         {{-- <li class="df-sidebar-menu-item">
                             <button class="df-sidebar-menu-button" @click="toggleSubmenu('watchlists')">

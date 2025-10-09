@@ -40,9 +40,8 @@ Route::view('/options-metrics/put-call-ratio', 'options-metrics.put-call-ratio')
 Route::view('/options-metrics/options-skew', 'options-metrics.options-skew')->name('options-metrics.options-skew');
 Route::view('/options-metrics/gamma-exposure', 'options-metrics.gamma-exposure')->name('options-metrics.gamma-exposure');
 
-// ETF & Basis Routes
-Route::view('/etf-basis/spot-etf-netflow', 'etf-basis.spot-etf-netflow')->name('etf-basis.spot-etf-netflow');
-Route::view('/etf-basis/perp-basis', 'etf-basis.perp-basis')->name('etf-basis.perp-basis');
+// ETF & Institutional Routes
+Route::view('/etf-institutional/dashboard', 'etf-institutional.dashboard')->name('etf-institutional.dashboard');
 
 // Volatility Regime Routes
 Route::view('/volatility-regime/dashboard', 'volatility-regime.dashboard')->name('volatility-regime.dashboard');
