@@ -207,7 +207,7 @@
 
                     <!-- Signals List -->
                     <div x-show="signals && signals.length > 0">
-                        <template x-for="signal in signals" :key="signal.type">
+                        <template x-for="(signal, index) in signals" :key="'signal-' + index + '-' + signal.type">
                             <div class="alert" :class="getSignalClass(signal.severity)" role="alert">
                                 <div class="d-flex align-items-start">
                                     <div class="me-2">
@@ -256,7 +256,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="account in topAccounts" :key="account.ts">
+                                <template x-for="(account, index) in topAccounts" :key="'account-' + index + '-' + account.ts">
                                     <tr>
                                         <td x-text="formatTimestamp(account.ts)">--</td>
                                         <td x-text="account.exchange">--</td>
@@ -300,7 +300,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="position in topPositions" :key="position.ts">
+                                <template x-for="(position, index) in topPositions" :key="'position-' + index + '-' + position.ts">
                                     <tr>
                                         <td x-text="formatTimestamp(position.ts)">--</td>
                                         <td x-text="position.exchange">--</td>
@@ -332,10 +332,36 @@
                             <small class="text-secondary">Multi-exchange positioning analysis</small>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
+                            <!-- Exchange Comparison Filters -->
+                            <div class="d-flex gap-2 align-items-center">
+                                <select class="form-select form-select-sm" style="width: 120px;" x-model="comparisonSymbol" @change="updateComparisonSymbol()">
+                                    <option value="BTC">BTC</option>
+                                    <option value="ETH">ETH</option>
+                                    <option value="SOL">SOL</option>
+                                    <option value="BNB">BNB</option>
+                                    <option value="XRP">XRP</option>
+                                </select>
+
+                                <select class="form-select form-select-sm" style="width: 140px;" x-model="comparisonRatioType" @change="updateComparisonRatioType()">
+                                    <option value="accounts">Accounts</option>
+                                    <option value="positions">Positions</option>
+                                </select>
+
+                                <select class="form-select form-select-sm" style="width: 120px;" x-model="comparisonInterval" @change="updateComparisonInterval()">
+                                    <option value="15m">15m</option>
+                                    <option value="30m">30m</option>
+                                    <option value="1h">1h</option>
+                                    <option value="4h">4h</option>
+                                    <option value="1d">1d</option>
+                                </select>
+
+                                <button class="btn btn-sm btn-primary" @click="loadComparisonData()" :disabled="loading">
+                                    <span x-show="!loading">🔄 Load</span>
+                                    <span x-show="loading" class="spinner-border spinner-border-sm"></span>
+                                </button>
+                            </div>
+
                             <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
-                            <button class="btn btn-sm btn-outline-primary" @click="loadData()">
-                                <i class="bi bi-arrow-clockwise"></i>
-                            </button>
                         </div>
                     </div>
 
@@ -353,7 +379,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="(data, exchangeName) in exchangeData" :key="exchangeName">
+                                <template x-for="(data, exchangeName) in exchangeData" :key="'exchange-' + exchangeName">
                                     <tr>
                                         <td class="fw-semibold" x-text="exchangeName">--</td>
                                         <td x-text="data?.pair || '-'">--</td>
@@ -518,6 +544,8 @@
                         // Fetch overview data first, then detailed data
                         const [overview, analytics, topAccounts, topPositions] = await Promise.all([
                             this.fetchAPI("overview", {
+                                symbol: pair,
+                                interval: interval,
                                 limit: limit,
                             }),
                             this.fetchAPI("analytics", {
@@ -1249,44 +1277,23 @@
                 loading: false,
                 exchangeData: {},
 
+                // Comparison-specific filters
+                comparisonSymbol: "BTC",
+                comparisonRatioType: "accounts",
+                comparisonInterval: "1h",
+
+                // Available exchanges for comparison
+                availableExchanges: ["Binance", "Bybit", "OKX", "Bitget", "Gate.io"],
+
                 async init() {
                     // Listen for overview ready
                     window.addEventListener('long-short-ratio-overview-ready', (e) => {
                         this.applyOverview(e.detail);
                     });
 
-                    // Listen for filter changes
-                    window.addEventListener('symbol-changed', () => {
-                        this.loadData();
-                    });
-
-                    window.addEventListener('ratio-type-changed', () => {
-                        this.loadData();
-                    });
-
-                    window.addEventListener('exchange-changed', () => {
-                        this.loadData();
-                    });
-
-                    window.addEventListener('interval-changed', () => {
-                        this.loadData();
-                    });
-
-                    window.addEventListener('limit-changed', () => {
-                        this.loadData();
-                    });
-
-                    window.addEventListener('refresh-all', () => {
-                        this.loadData();
-                    });
-
                     // Initial load with delay to ensure DOM is ready
                     setTimeout(() => {
-                        if (this.$root?.overview) {
-                            this.applyOverview(this.$root.overview);
-                        } else {
-                            this.loadData();
-                        }
+                        this.loadComparisonData();
                     }, 100);
                 },
 
@@ -1295,11 +1302,99 @@
                     this.exchangeData = overview.exchangeData;
                 },
 
-                async loadData() {
+                async loadComparisonData() {
                     this.loading = true;
-                    setTimeout(() => {
+                    try {
+                        const pair = `${this.comparisonSymbol}USDT`;
+                        const exchangeData = {};
+
+                        // Fetch data for each exchange
+                        const exchangePromises = this.availableExchanges.map(async (exchange) => {
+                            try {
+                                const endpoint = this.comparisonRatioType === "accounts" ? "top-accounts" : "top-positions";
+                                const response = await this.fetchAPI(endpoint, {
+                                    symbol: pair,
+                                    exchange: exchange,
+                                    interval: this.comparisonInterval,
+                                    limit: 1, // Get latest data only
+                                });
+
+                                if (response?.data && response.data.length > 0) {
+                                    const latest = response.data[response.data.length - 1];
+                                    return {
+                                        exchange: exchange,
+                                        data: {
+                                            ratio: parseFloat(this.comparisonRatioType === "accounts" ? latest.ls_ratio_accounts : latest.ls_ratio_positions),
+                                            longPct: parseFloat(this.comparisonRatioType === "accounts" ? latest.long_accounts : latest.long_positions_percent),
+                                            shortPct: parseFloat(this.comparisonRatioType === "accounts" ? latest.short_accounts : latest.short_positions_percent),
+                                            pair: latest.pair,
+                                            timestamp: latest.ts,
+                                        }
+                                    };
+                                }
+                                return null;
+                            } catch (error) {
+                                console.log(`No data for ${exchange}:`, error.message);
+                                return null;
+                            }
+                        });
+
+                        const results = await Promise.all(exchangePromises);
+
+                        // Process results
+                        results.forEach(result => {
+                            if (result) {
+                                exchangeData[result.exchange] = result.data;
+                            }
+                        });
+
+                        this.exchangeData = exchangeData;
+                        console.log("✅ Exchange comparison data loaded:", this.exchangeData);
+
+                    } catch (error) {
+                        console.error("❌ Error loading comparison data:", error);
+                        this.exchangeData = {};
+                    } finally {
                         this.loading = false;
-                    }, 1000);
+                    }
+                },
+
+                // Filter update methods
+                updateComparisonSymbol() {
+                    this.loadComparisonData();
+                },
+
+                updateComparisonRatioType() {
+                    this.loadComparisonData();
+                },
+
+                updateComparisonInterval() {
+                    this.loadComparisonData();
+                },
+
+                // API helper method
+                async fetchAPI(endpoint, params = {}) {
+                    const queryString = new URLSearchParams(params).toString();
+                    const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                    const configuredBase = (baseMeta?.content || "").trim();
+
+                    let url = `/api/long-short-ratio/${endpoint}?${queryString}`;
+                    if (configuredBase) {
+                        const normalizedBase = configuredBase.endsWith("/")
+                            ? configuredBase.slice(0, -1)
+                            : configuredBase;
+                        url = `${normalizedBase}/api/long-short-ratio/${endpoint}?${queryString}`;
+                    }
+
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return await response.json();
+                    } catch (error) {
+                        throw error;
+                    }
                 },
 
                 formatRatio(value) {

@@ -8,10 +8,10 @@
         <div class="row g-3 align-items-center">
             <div class="col-md-6">
                 <div class="d-flex align-items-center gap-3">
-                    <div>
+                <div>
                         <h4 class="mb-1">📊 Open Interest Analytics</h4>
                         <p class="text-secondary mb-0 small">Track leverage buildup & liquidation zones • OI rising = more contracts at risk</p>
-                    </div>
+                </div>
                 </div>
             </div>
             <div class="col-md-6">
@@ -21,8 +21,8 @@
                         <div class="df-panel p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
                             <div class="small text-secondary mb-1">Current OI</div>
                             <div class="fw-bold" x-text="formatOI(currentOI)">--</div>
-                        </div>
-                    </div>
+                </div>
+            </div>
                     <!-- OI Change Card -->
                     <div class="col-md-6">
                         <div class="df-panel p-3 h-100 d-flex flex-column justify-content-center align-items-center text-center">
@@ -30,9 +30,9 @@
                             <div class="fw-bold" :class="getChangeClass(oiChange)" x-text="formatChange(oiChange)">--</div>
                         </div>
                     </div>
+                    </div>
                 </div>
             </div>
-        </div>
 
         <!-- Filters -->
         <div class="df-panel p-3">
@@ -82,7 +82,7 @@
                             <option value="4h">4 Hours</option>
                             <option value="1d">1 Day</option>
                         </select>
-                    </div>
+        </div>
 
                     <div class="d-flex align-items-center gap-2">
                         <label class="small text-secondary mb-0">Limit:</label>
@@ -93,18 +93,18 @@
                             <option value="2000">2000</option>
                             <option value="5000">5000</option>
                         </select>
-                    </div>
+        </div>
 
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
                         <span x-show="!globalLoading">🔄 Refresh All</span>
                         <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
                     </button>
-                </div>
-            </div>
+                        </div>
+                    </div>
         </div>
 
         <!-- Analytics Summary -->
-        <div class="row g-3">
+            <div class="row g-3">
             <!-- Analytics Data -->
             <div class="col-lg-6">
                 <div class="df-panel p-4 h-100" x-data="analyticsPanel()" x-init="init()">
@@ -112,9 +112,9 @@
                         <div>
                             <h5 class="mb-0">📊 Analytics Summary</h5>
                             <small class="text-secondary">Open Interest analytics and insights</small>
-                        </div>
-                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
                     </div>
+                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+                </div>
 
                     <!-- Analytics Table -->
                     <div class="table-responsive">
@@ -154,9 +154,9 @@
                                 </tr>
                             </tbody>
                         </table>
-                    </div>
                 </div>
             </div>
+        </div>
 
             <!-- Insights Panel -->
             <div class="col-lg-6">
@@ -165,9 +165,9 @@
                         <div>
                             <h5 class="mb-0">🚨 Insights & Alerts</h5>
                             <small class="text-secondary">Market insights and alerts</small>
-                        </div>
-                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
                     </div>
+                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+            </div>
 
                     <!-- Insights List -->
                     <div x-show="insights && insights.length > 0">
@@ -176,15 +176,15 @@
                                 <div class="d-flex align-items-start">
                                     <div class="me-2">
                                         <span x-text="getInsightIcon(insight.severity)">⚠️</span>
-                                    </div>
+                    </div>
                                     <div>
                                         <strong x-text="insight.type">Insight Type</strong>
                                         <p class="mb-0 mt-1" x-text="insight.message">Insight message</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
                     </div>
+                        </div>
+                    </div>
+                        </template>
+            </div>
 
                     <div x-show="!insights || insights.length === 0" class="text-center text-muted py-4">
                         <div>📊</div>
@@ -195,7 +195,7 @@
         </div>
 
         <!-- Data Tables -->
-        <div class="row g-3">
+            <div class="row g-3">
             <!-- Exchange Data Table -->
             <div class="col-lg-6">
                 <div class="df-panel p-3" x-data="exchangeDataTable()" x-init="init()">
@@ -203,9 +203,9 @@
                         <div>
                             <h5 class="mb-0">🏦 Exchange Data</h5>
                             <small class="text-secondary">Open Interest by exchange</small>
-                        </div>
-                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
                     </div>
+                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+                </div>
 
                     <!-- Exchange Table -->
                     <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
@@ -234,9 +234,9 @@
                     <div x-show="!exchangeData || exchangeData.length === 0" class="text-center text-muted py-4">
                         <div>📊</div>
                         <div>No exchange data available</div>
+                </div>
                     </div>
                 </div>
-            </div>
 
             <!-- History Data Table -->
             <div class="col-lg-6">
@@ -245,9 +245,9 @@
                         <div>
                             <h5 class="mb-0">📈 History Data</h5>
                             <small class="text-secondary">Open Interest history by pair</small>
-                        </div>
-                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
                     </div>
+                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+        </div>
 
                     <!-- History Table -->
                     <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
@@ -268,17 +268,17 @@
                                         <td x-text="item.pair">--</td>
                                         <td class="fw-bold" x-text="formatOI(item.oi_usd)">--</td>
                                     </tr>
-                                </template>
+                    </template>
                             </tbody>
                         </table>
-                    </div>
+                </div>
 
                     <div x-show="!historyData || historyData.length === 0" class="text-center text-muted py-4">
                         <div>📊</div>
                         <div>No history data available</div>
-                    </div>
-                </div>
             </div>
+            </div>
+                        </div>
         </div>
 
         <!-- Overview Summary -->
@@ -289,9 +289,9 @@
                         <div>
                             <h5 class="mb-0">📊 Overview Summary</h5>
                             <small class="text-secondary">Overall Open Interest statistics</small>
-                        </div>
-                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
                     </div>
+                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+        </div>
 
                     <!-- Overview Table -->
                     <div class="table-responsive">
@@ -319,23 +319,23 @@
                                 </tr>
                             </tbody>
                         </table>
-                    </div>
+            </div>
 
                     <!-- Top Symbols -->
                     <div x-show="overview && overview.top_symbols && overview.top_symbols.length > 0" class="mt-3">
                         <h6>Top Symbols</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
+                    <div class="table-responsive">
+                <table class="table table-sm">
+                            <thead>
+                                <tr>
                                         <th>Pair</th>
-                                        <th>Exchange</th>
+                                    <th>Exchange</th>
                                         <th>Close OI</th>
                                         <th>High OI</th>
                                         <th>Low OI</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                                </tr>
+                            </thead>
+                            <tbody>
                                     <template x-for="(symbol, index) in (overview?.top_symbols || [])" :key="'symbol-' + index + '-' + symbol.pair + '-' + symbol.exchange">
                                         <tr>
                                             <td x-text="symbol.pair">--</td>
@@ -343,15 +343,15 @@
                                             <td x-text="formatOI(symbol.close)">--</td>
                                             <td x-text="formatOI(symbol.high)">--</td>
                                             <td x-text="formatOI(symbol.low)">--</td>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
+                                </tr>
+                        </template>
+                            </tbody>
+                        </table>
                         </div>
                     </div>
-                </div>
             </div>
         </div>
+    </div>
 
     </div>
 
