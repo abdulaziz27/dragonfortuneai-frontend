@@ -71,9 +71,9 @@
 
         <!-- Charts Row -->
         <div class="row g-3">
-            <!-- Aggregate Chart -->
+            <!-- Exchange Comparison Chart -->
             <div class="col-lg-8">
-                @include('components.funding.aggregate-chart', ['symbol' => 'BTC', 'rangeStr' => '7d'])
+                @include('components.funding.exchange-comparison', ['symbol' => 'BTC'])
             </div>
 
             <!-- Quick Stats Panel -->
@@ -154,9 +154,16 @@
                 @include('components.funding.history-chart', ['symbol' => 'BTC', 'interval' => '1h'])
             </div>
 
-            <!-- Weighted Chart -->
+            <!-- Analytics Insights -->
             <div class="col-lg-6">
-                @include('components.funding.weighted-chart', ['symbol' => 'BTC', 'interval' => '1h'])
+                @include('components.funding.analytics-insights', ['symbol' => 'BTC'])
+            </div>
+        </div>
+
+        <!-- Heatmap Row -->
+        <div class="row g-3">
+            <div class="col-12">
+                @include('components.funding.heatmap', ['title' => 'Exchange × Time Funding Heatmap'])
             </div>
                     </div>
 
@@ -269,6 +276,28 @@
                     window.addEventListener('margin-type-changed', (e) => {
                         this.marginType = e.detail?.marginType ?? '';
                         this.loadData();
+                    });
+
+                    // Listen for overview composite (analytics + exchanges + resampled history)
+                    window.addEventListener('funding-overview-ready', (e) => {
+                        try {
+                            const o = e.detail || {};
+                            if (Array.isArray(o.exchanges)) {
+                                this.exchangeData = o.exchanges;
+                            }
+                            if (o.analytics) {
+                                const avg = o.analytics?.summary?.average ?? 0;
+                                this.biasData = {
+                                    bias: o.analytics?.bias?.direction || 'neutral',
+                                    strength: Math.abs(o.analytics?.bias?.strength || 0),
+                                    avg_funding_close: avg,
+                                };
+                                this.windowAvgFunding = avg;
+                            }
+                            this.calculateStats();
+                        } catch (err) {
+                            console.warn('Overview apply failed:', err);
+                        }
                     });
                 },
 

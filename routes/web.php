@@ -17,28 +17,24 @@ Route::view('/derivatives/funding-rate', 'derivatives.funding-rate')->name('deri
 Route::view('/derivatives/open-interest', 'derivatives.open-interest')->name('derivatives.open-interest');
 Route::view('/derivatives/long-short-ratio', 'derivatives.long-short-ratio')->name('derivatives.long-short-ratio');
 Route::view('/derivatives/liquidations', 'derivatives.liquidations')->name('derivatives.liquidations');
-Route::view('/derivatives/volume-change', 'derivatives.volume-change')->name('derivatives.volume-change');
-Route::view('/derivatives/delta-long-short', 'derivatives.delta-long-short')->name('derivatives.delta-long-short');
+Route::view('/derivatives/basis-term-structure', 'derivatives.basis-term-structure')->name('derivatives.basis-term-structure');
+Route::view('/derivatives/perp-quarterly-spread', 'derivatives.perp-quarterly-spread')->name('derivatives.perp-quarterly-spread');
 
 // Spot Microstructure Routes
-Route::view('/spot-microstructure/cvd', 'spot-microstructure.cvd')->name('spot-microstructure.cvd');
-Route::view('/spot-microstructure/orderbook-depth', 'spot-microstructure.orderbook-depth')->name('spot-microstructure.orderbook-depth');
-Route::view('/spot-microstructure/absorption', 'spot-microstructure.absorption')->name('spot-microstructure.absorption');
-Route::view('/spot-microstructure/spoofing', 'spot-microstructure.spoofing')->name('spot-microstructure.spoofing');
-Route::view('/spot-microstructure/vwap', 'spot-microstructure.vwap')->name('spot-microstructure.vwap');
-Route::view('/spot-microstructure/liquidity-cluster', 'spot-microstructure.liquidity-cluster')->name('spot-microstructure.liquidity-cluster');
+Route::view('/spot-microstructure/trades', 'spot-microstructure.trades')->name('spot-microstructure.trades');
+Route::view('/spot-microstructure/orderbook-snapshots', 'spot-microstructure.orderbook-snapshots')->name('spot-microstructure.orderbook-snapshots');
+Route::view('/spot-microstructure/vwap-twap', 'spot-microstructure.vwap-twap')->name('spot-microstructure.vwap-twap');
+Route::view('/spot-microstructure/volume-trade-stats', 'spot-microstructure.volume-trade-stats')->name('spot-microstructure.volume-trade-stats');
 
 // On-Chain Metrics Routes
-Route::view('/onchain-metrics/exchange-netflow', 'onchain-metrics.exchange-netflow')->name('onchain-metrics.exchange-netflow');
-Route::view('/onchain-metrics/whale-activity', 'onchain-metrics.whale-activity')->name('onchain-metrics.whale-activity');
-Route::view('/onchain-metrics/stablecoin-supply', 'onchain-metrics.stablecoin-supply')->name('onchain-metrics.stablecoin-supply');
-Route::view('/onchain-metrics/miner-flow', 'onchain-metrics.miner-flow')->name('onchain-metrics.miner-flow');
+Route::redirect('/onchain-metrics', '/onchain-metrics/valuation')->name('onchain-metrics.index');
+Route::view('/onchain-metrics/valuation', 'onchain-metrics.valuation')->name('onchain-metrics.valuation');
+Route::view('/onchain-metrics/supply', 'onchain-metrics.supply')->name('onchain-metrics.supply');
+Route::view('/onchain-metrics/flows', 'onchain-metrics.flows')->name('onchain-metrics.flows');
+Route::view('/onchain-metrics/miners-whales', 'onchain-metrics.miners-whales')->name('onchain-metrics.miners-whales');
 
-// Options Metrics Routes
-Route::view('/options-metrics/implied-volatility', 'options-metrics.implied-volatility')->name('options-metrics.implied-volatility');
-Route::view('/options-metrics/put-call-ratio', 'options-metrics.put-call-ratio')->name('options-metrics.put-call-ratio');
-Route::view('/options-metrics/options-skew', 'options-metrics.options-skew')->name('options-metrics.options-skew');
-Route::view('/options-metrics/gamma-exposure', 'options-metrics.gamma-exposure')->name('options-metrics.gamma-exposure');
+// Options Intelligence Route
+Route::view('/options-metrics/dashboard', 'options-metrics.dashboard')->name('options-metrics.dashboard');
 
 // ETF & Institutional Routes
 Route::view('/etf-institutional/dashboard', 'etf-institutional.dashboard')->name('etf-institutional.dashboard');
@@ -51,3 +47,5 @@ Route::view('/macro-overlay/dashboard', 'macro-overlay.dashboard')->name('macro-
 
 // Sentiment & Flow Routes
 Route::view('/sentiment-flow/dashboard', 'sentiment-flow.dashboard')->name('sentiment-flow.dashboard');
+
+// API consumption happens directly from frontend using meta api-base-url

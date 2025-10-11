@@ -129,8 +129,8 @@
                                 <a href="/derivatives/open-interest" class="df-submenu-item {{ request()->routeIs('derivatives.open-interest') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Open Interest</a>
                                 <a href="/derivatives/long-short-ratio" class="df-submenu-item {{ request()->routeIs('derivatives.long-short-ratio') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Long/Short Ratio</a>
                                 <a href="/derivatives/liquidations" class="df-submenu-item {{ request()->routeIs('derivatives.liquidations') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Liquidations</a>
-                                <a href="/derivatives/volume-change" class="df-submenu-item {{ request()->routeIs('derivatives.volume-change') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Volume + Change</a>
-                                <a href="/derivatives/delta-long-short" class="df-submenu-item {{ request()->routeIs('derivatives.delta-long-short') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Delta Long vs Short</a>
+                                <a href="/derivatives/basis-term-structure" class="df-submenu-item {{ request()->routeIs('derivatives.basis-term-structure') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Basis & Term Structure</a>
+                                <a href="/derivatives/perp-quarterly-spread" class="df-submenu-item {{ request()->routeIs('derivatives.perp-quarterly-spread') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Perp–Quarterly Spread</a>
                             </div>
                         </li>
                         <li class="df-sidebar-menu-item">
@@ -147,12 +147,10 @@
                                 </svg>
                             </button>
                             <div class="df-submenu{{ request()->routeIs('spot-microstructure.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['spot-microstructure'] }">
-                                <a href="/spot-microstructure/cvd" class="df-submenu-item {{ request()->routeIs('spot-microstructure.cvd') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">CVD Analysis</a>
-                                <a href="/spot-microstructure/orderbook-depth" class="df-submenu-item {{ request()->routeIs('spot-microstructure.orderbook-depth') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Orderbook Depth</a>
-                                <a href="/spot-microstructure/absorption" class="df-submenu-item {{ request()->routeIs('spot-microstructure.absorption') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Absorption</a>
-                                <a href="/spot-microstructure/spoofing" class="df-submenu-item {{ request()->routeIs('spot-microstructure.spoofing') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Spoofing Detection</a>
-                                <a href="/spot-microstructure/vwap" class="df-submenu-item {{ request()->routeIs('spot-microstructure.vwap') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">VWAP + Bands</a>
-                                <a href="/spot-microstructure/liquidity-cluster" class="df-submenu-item {{ request()->routeIs('spot-microstructure.liquidity-cluster') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Liquidity Cluster</a>
+                                <a href="/spot-microstructure/trades" class="df-submenu-item {{ request()->routeIs('spot-microstructure.trades') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Trades</a>
+                                <a href="/spot-microstructure/orderbook-snapshots" class="df-submenu-item {{ request()->routeIs('spot-microstructure.orderbook-snapshots') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Orderbook Snapshots</a>
+                                <a href="/spot-microstructure/vwap-twap" class="df-submenu-item {{ request()->routeIs('spot-microstructure.vwap-twap') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">VWAP/TWAP</a>
+                                <a href="/spot-microstructure/volume-trade-stats" class="df-submenu-item {{ request()->routeIs('spot-microstructure.volume-trade-stats') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Volume Trade Stats</a>
                             </div>
                         </li>
                         <li class="df-sidebar-menu-item">
@@ -168,30 +166,21 @@
                                 </svg>
                             </button>
                             <div class="df-submenu{{ request()->routeIs('onchain-metrics.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['onchain-metrics'] }">
-                                <a href="/onchain-metrics/exchange-netflow" class="df-submenu-item {{ request()->routeIs('onchain-metrics.exchange-netflow') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Exchange Netflow (BTC in‑out)</a>
-                                <a href="/onchain-metrics/whale-activity" class="df-submenu-item {{ request()->routeIs('onchain-metrics.whale-activity') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Whale Wallet Activity</a>
-                                <a href="/onchain-metrics/stablecoin-supply" class="df-submenu-item {{ request()->routeIs('onchain-metrics.stablecoin-supply') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Stablecoin Supply / Netflow</a>
-                                <a href="/onchain-metrics/miner-flow" class="df-submenu-item {{ request()->routeIs('onchain-metrics.miner-flow') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Miner Flow</a>
+                                <a href="/onchain-metrics/valuation" class="df-submenu-item {{ request()->routeIs('onchain-metrics.valuation') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">On-Chain Valuation</a>
+                                <a href="/onchain-metrics/supply" class="df-submenu-item {{ request()->routeIs('onchain-metrics.supply') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Supply &amp; HODL Behavior</a>
+                                <a href="/onchain-metrics/flows" class="df-submenu-item {{ request()->routeIs('onchain-metrics.flows') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Exchange &amp; Liquidity Flows</a>
+                                <a href="/onchain-metrics/miners-whales" class="df-submenu-item {{ request()->routeIs('onchain-metrics.miners-whales') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Miners &amp; Whales</a>
                             </div>
                         </li>
                         <li class="df-sidebar-menu-item">
-                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('options-metrics')">
+                            <a href="/options-metrics/dashboard" class="df-sidebar-menu-button {{ request()->routeIs('options-metrics.dashboard') ? 'active' : '' }}" @click="closeSidebar()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                                     <path d="M8 12h8"/>
                                     <path d="M12 8v8"/>
                                 </svg>
-                                <span>Options Metrics</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['options-metrics'] }">
-                                    <path d="M9 18l6-6-6-6"/>
-                                </svg>
-                            </button>
-                            <div class="df-submenu{{ request()->routeIs('options-metrics.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['options-metrics'] }">
-                                <a href="/options-metrics/implied-volatility" class="df-submenu-item {{ request()->routeIs('options-metrics.implied-volatility') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Implied Volatility (IV)</a>
-                                <a href="/options-metrics/put-call-ratio" class="df-submenu-item {{ request()->routeIs('options-metrics.put-call-ratio') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Put/Call Ratio</a>
-                                <a href="/options-metrics/options-skew" class="df-submenu-item {{ request()->routeIs('options-metrics.options-skew') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Options Skew (25d RR)</a>
-                                <a href="/options-metrics/gamma-exposure" class="df-submenu-item {{ request()->routeIs('options-metrics.gamma-exposure') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Gamma Exposure (GEX)</a>
-                            </div>
+                                <span>Options Intelligence</span>
+                            </a>
                         </li>
                         <li class="df-sidebar-menu-item">
                             <a href="/etf-institutional/dashboard" class="df-sidebar-menu-button {{ request()->routeIs('etf-institutional.*') || request()->routeIs('etf-basis.*') ? 'active' : '' }}" @click="closeSidebar()">

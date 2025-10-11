@@ -1,225 +1,1232 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="d-flex flex-column h-100">
-        <!-- Header Section -->
+    {{--
+        Long/Short Ratio Analytics Dashboard
+        Think like a trader • Build like an engineer • Visualize like a designer
+
+        Trading Interpretasi:
+        - Long/Short ratio tinggi → Retail bullish → Potensi correction
+        - Long/Short ratio rendah → Retail bearish → Potensi reversal
+        - Accounts vs Positions → Different market segments
+        - Exchange comparison → Market sentiment across venues
+    --}}
+
+    <div class="d-flex flex-column h-100 gap-3" x-data="longShortRatioController()">
+        <!-- Page Header -->
         <div class="derivatives-header">
-            <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
-                    <h1>Long/Short Ratio</h1>
-                    <p>Compare retail vs pro trader positioning</p>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <h1 class="mb-0">📊 Long/Short Ratio</h1>
+                        <span class="pulse-dot pulse-info"></span>
+                    </div>
+                    <p class="mb-0 text-secondary">
+                        Monitor retail vs professional trader positioning and market sentiment
+                    </p>
                 </div>
-                <div class="derivatives-filters">
-                    <select class="form-select">
-                        <option>Accounts</option>
-                        <option>Positions</option>
+
+                <!-- Global Controls -->
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <select class="form-select" style="width: 120px;" x-model="globalSymbol" @change="updateSymbol()">
+                        <option value="BTC">Bitcoin</option>
+                        <option value="ETH">Ethereum</option>
+                        <option value="SOL">Solana</option>
+                        <option value="BNB">BNB</option>
+                        <option value="XRP">XRP</option>
+                        <option value="ADA">Cardano</option>
+                        <option value="DOGE">Dogecoin</option>
+                        <option value="MATIC">Polygon</option>
+                        <option value="DOT">Polkadot</option>
+                        <option value="AVAX">Avalanche</option>
                     </select>
-                    <select class="form-select">
-                        <option>All Exchanges</option>
-                        <option>Binance</option>
-                        <option>Bybit</option>
-                        <option>OKX</option>
+
+                    <select class="form-select" style="width: 140px;" x-model="globalRatioType" @change="updateRatioType()">
+                        <option value="accounts">Accounts</option>
+                        <option value="positions">Positions</option>
                     </select>
+
+                    <select class="form-select" style="width: 140px;" x-model="globalExchange" @change="updateExchange()">
+                        <option value="">All Exchanges</option>
+                        <option value="Binance">Binance</option>
+                        <option value="Bybit">Bybit</option>
+                        <option value="OKX">OKX</option>
+                        <option value="Bitget">Bitget</option>
+                        <option value="Gate.io">Gate.io</option>
+                    </select>
+
+                    <select class="form-select" style="width: 120px;" x-model="globalInterval" @change="updateInterval()">
+                        <option value="15m">15 Minutes</option>
+                        <option value="1h">1 Hour</option>
+                        <option value="4h">4 Hours</option>
+                        <option value="1d">1 Day</option>
+                    </select>
+
+                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
+                        <span x-show="!globalLoading">🔄 Refresh All</span>
+                        <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Main Content -->
-        <div class="row g-3 flex-grow-1">
-            <!-- Long/Short Ratio Chart -->
-            <div class="col-lg-8">
-                <div class="derivatives-chart-container">
-                    <div class="derivatives-chart-header">
-                        <h5 class="derivatives-chart-title">Long/Short Ratio Trend</h5>
-                        <div class="derivatives-timeframe-buttons">
-                            <button class="btn btn-outline-secondary">15m</button>
-                            <button class="btn btn-outline-secondary">1H</button>
-                            <button class="btn btn-primary">4H</button>
-                            <button class="btn btn-outline-secondary">1D</button>
+        <!-- Market Overview Card (Full Width) -->
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="df-panel p-3" x-data="marketOverviewCard()" x-init="init()">
+                    <div class="row g-3">
+                        <!-- Current Ratio -->
+                        <div class="col-md-3">
+                            <div class="stat-card bg-primary bg-opacity-10 p-3 rounded">
+                                <div class="small text-secondary mb-1">Current Ratio</div>
+                                <div class="h4 mb-0 fw-bold text-primary" x-text="formatRatio(currentRatio)">--</div>
+                                <div class="small text-secondary mt-1" x-text="ratioType + ' based'">--</div>
+                            </div>
+                        </div>
+
+                        <!-- Long Percentage -->
+                        <div class="col-md-3">
+                            <div class="stat-card bg-success bg-opacity-10 p-3 rounded">
+                                <div class="small text-secondary mb-1">Long Percentage</div>
+                                <div class="h4 mb-0 fw-bold text-success" x-text="formatPercentage(longPercentage)">--</div>
+                                <div class="small text-secondary mt-1">of total</div>
+                            </div>
+                        </div>
+
+                        <!-- Short Percentage -->
+                        <div class="col-md-3">
+                            <div class="stat-card bg-danger bg-opacity-10 p-3 rounded">
+                                <div class="small text-secondary mb-1">Short Percentage</div>
+                                <div class="h4 mb-0 fw-bold text-danger" x-text="formatPercentage(shortPercentage)">--</div>
+                                <div class="small text-secondary mt-1">of total</div>
+                            </div>
+                        </div>
+
+                        <!-- Market Sentiment -->
+                        <div class="col-md-3">
+                            <div class="stat-card bg-warning bg-opacity-10 p-3 rounded">
+                                <div class="small text-secondary mb-1">Market Sentiment</div>
+                                <div class="h4 mb-0 fw-bold" :class="getSentimentClass()" x-text="getSentimentText()">--</div>
+                                <div class="small text-secondary mt-1" x-text="getSentimentDescription()">--</div>
+                            </div>
                         </div>
                     </div>
-                    <div id="longShortRatioChart" style="height: 400px;">
-                        <!-- Chart will be rendered here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="row g-3">
+            <!-- Main Ratio Chart -->
+            <div class="col-lg-8">
+                <div class="df-panel p-4 h-100" x-data="ratioHistoryChart()" x-init="init()">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div>
+                            <h5 class="mb-0">📈 Long/Short Ratio History</h5>
+                            <small class="text-secondary">Time series analysis</small>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center">
+                            <select class="form-select form-select-sm" style="width: 120px;" x-model="chartType" @change="renderChart()">
+                                <option value="line">Line Chart</option>
+                                <option value="bar">Bar Chart</option>
+                                <option value="area">Area Chart</option>
+                            </select>
+                            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+                        </div>
+                    </div>
+
+                    <!-- Chart Container -->
+                    <div style="height: 400px; position: relative;">
+                        <canvas x-ref="ratioCanvas"></canvas>
+                    </div>
+
+                    <!-- Stats Summary -->
+                    <div class="row g-2 mt-3">
+                        <div class="col-md-3 col-6">
+                            <div class="p-2 rounded bg-primary bg-opacity-10 text-center">
+                                <div class="small text-secondary">Data Points</div>
+                                <div class="fw-bold" x-text="dataPoints">0</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="p-2 rounded bg-success bg-opacity-10 text-center">
+                                <div class="small text-secondary">Avg Ratio</div>
+                                <div class="fw-bold text-success" x-text="formatRatio(avgRatio)">--</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="p-2 rounded bg-warning bg-opacity-10 text-center">
+                                <div class="small text-secondary">Max Ratio</div>
+                                <div class="fw-bold text-warning" x-text="formatRatio(maxRatio)">--</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="p-2 rounded bg-danger bg-opacity-10 text-center">
+                                <div class="small text-secondary">Min Ratio</div>
+                                <div class="fw-bold text-danger" x-text="formatRatio(minRatio)">--</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- No Data State -->
+                    <div x-show="!loading && !hasData"
+                         class="position-absolute top-50 start-50 translate-middle text-center"
+                         style="z-index: 10;">
+                        <div class="text-secondary mb-2" style="font-size: 3rem;">📈</div>
+                        <div class="text-secondary">No ratio data available</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Long/Short Ratio Table -->
+            <!-- Distribution Chart -->
             <div class="col-lg-4">
-                <div class="derivatives-table-container">
-                    <h5 class="derivatives-table-title">Current Ratios</h5>
+                <div class="df-panel p-4 h-100" x-data="distributionChart()" x-init="init()">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div>
+                            <h5 class="mb-0">🥧 Long/Short Distribution</h5>
+                            <small class="text-secondary">Current positioning</small>
+                        </div>
+                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+                    </div>
+
+                    <!-- Chart Container -->
+                    <div style="height: 400px; position: relative;">
+                        <canvas x-ref="distributionCanvas"></canvas>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="mt-3 d-flex justify-content-center gap-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <div style="width: 20px; height: 20px; background: rgba(34, 197, 94, 0.8); border-radius: 4px;"></div>
+                            <span class="small">Long Positions</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <div style="width: 20px; height: 20px; background: rgba(239, 68, 68, 0.8); border-radius: 4px;"></div>
+                            <span class="small">Short Positions</span>
+                        </div>
+                    </div>
+
+                    <!-- No Data State -->
+                    <div x-show="!loading && !hasData"
+                         class="position-absolute top-50 start-50 translate-middle text-center"
+                         style="z-index: 10;">
+                        <div class="text-secondary mb-2" style="font-size: 3rem;">🥧</div>
+                        <div class="text-secondary">No distribution data available</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Exchange Comparison Table -->
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="df-panel p-3" x-data="exchangeComparisonTable()" x-init="init()">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div>
+                            <h5 class="mb-0">🏦 Exchange Comparison</h5>
+                            <small class="text-secondary">Multi-exchange positioning analysis</small>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center">
+                            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+                            <button class="btn btn-sm btn-outline-primary" @click="loadData()">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="table-responsive">
-                        <table class="table derivatives-table">
+                        <table class="table table-sm table-hover">
                             <thead>
                                 <tr>
                                     <th>Exchange</th>
                                     <th>Pair</th>
                                     <th class="text-end">Ratio</th>
+                                    <th class="text-end">Long %</th>
+                                    <th class="text-end">Short %</th>
+                                    <th>Sentiment</th>
+                                    <th>Last Update</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td>Binance</td>
-                                    <td class="fw-semibold">BTCUSDT</td>
-                                    <td class="text-end text-success">1.45</td>
-                                </tr>
-                                <tr>
-                                    <td>Bybit</td>
-                                    <td class="fw-semibold">BTCUSDT</td>
-                                    <td class="text-end text-success">1.32</td>
-                                </tr>
-                                <tr>
-                                    <td>OKX</td>
-                                    <td class="fw-semibold">BTCUSDT</td>
-                                    <td class="text-end text-success">1.28</td>
-                                </tr>
-                                <tr>
-                                    <td>Binance</td>
-                                    <td class="fw-semibold">ETHUSDT</td>
-                                    <td class="text-end text-danger">0.85</td>
-                                </tr>
-                                <tr>
-                                    <td>Bybit</td>
-                                    <td class="fw-semibold">ETHUSDT</td>
-                                    <td class="text-end text-danger">0.92</td>
-                                </tr>
-                                <tr>
-                                    <td>OKX</td>
-                                    <td class="fw-semibold">ETHUSDT</td>
-                                    <td class="text-end text-danger">0.88</td>
-                                </tr>
+                                <template x-for="(data, exchangeName) in exchangeData" :key="exchangeName">
+                                    <tr>
+                                        <td class="fw-semibold" x-text="exchangeName">--</td>
+                                        <td x-text="data?.pair || '-'">--</td>
+                                        <td class="text-end fw-bold"
+                                            :class="parseFloat(data?.ratio) > 1 ? 'text-success' : parseFloat(data?.ratio) < 1 ? 'text-danger' : 'text-muted'"
+                                            x-text="data?.ratio ? formatRatio(data.ratio) : '-'">--</td>
+                                        <td class="text-end" x-text="data?.longPct ? formatPercentage(data.longPct) : '-'">--</td>
+                                        <td class="text-end" x-text="data?.shortPct ? formatPercentage(data.shortPct) : '-'">--</td>
+                                        <td>
+                                            <span class="badge"
+                                                  :class="parseFloat(data?.ratio) > 1.1 ? 'bg-success' : parseFloat(data?.ratio) < 0.9 ? 'bg-danger' : 'bg-secondary'">
+                                                <span x-text="parseFloat(data?.ratio) > 1.1 ? 'Bullish' : parseFloat(data?.ratio) < 0.9 ? 'Bearish' : 'Neutral'">--</span>
+                                            </span>
+                                        </td>
+                                        <td class="small text-secondary" x-text="data?.timestamp ? formatTimestamp(data.timestamp) : '-'">--</td>
+                                    </tr>
+                                </template>
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Statistics Cards -->
-        <div class="derivatives-stats-grid">
-            <div class="derivatives-stat-card">
-                <div class="derivatives-stat-content">
-                    <div class="derivatives-stat-info">
-                        <div class="derivatives-stat-label">Avg Ratio</div>
-                        <div class="derivatives-stat-value">1.15</div>
-                    </div>
-                    <div class="derivatives-stat-icon primary">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            <div class="derivatives-stat-card">
-                <div class="derivatives-stat-content">
-                    <div class="derivatives-stat-info">
-                        <div class="derivatives-stat-label">Long Bias</div>
-                        <div class="derivatives-stat-value text-success">68.5%</div>
-                    </div>
-                    <div class="derivatives-stat-icon success">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M7 17L17 7"/>
-                            <path d="M7 7h10v10"/>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            <div class="derivatives-stat-card">
-                <div class="derivatives-stat-content">
-                    <div class="derivatives-stat-info">
-                        <div class="derivatives-stat-label">Retail vs Pro</div>
-                        <div class="derivatives-stat-value">1.8x</div>
-                    </div>
-                    <div class="derivatives-stat-icon warning">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 9v4"/>
-                            <path d="M12 17h.01"/>
-                            <circle cx="12" cy="12" r="10"/>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            <div class="derivatives-stat-card">
-                <div class="derivatives-stat-content">
-                    <div class="derivatives-stat-info">
-                        <div class="derivatives-stat-label">Positioning Risk</div>
-                        <div class="derivatives-stat-value text-warning">Medium</div>
-                    </div>
-                    <div class="derivatives-stat-icon danger">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <path d="M12 8v4"/>
-                            <path d="M12 16h.01"/>
-                        </svg>
+                    <!-- No Data State -->
+                    <div x-show="!loading && Object.keys(exchangeData).length === 0" class="text-center py-4">
+                        <div class="text-secondary mb-2" style="font-size: 3rem;">🏦</div>
+                        <div class="text-secondary">No exchange data available</div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+@endsection
 
-    <!-- Chart.js for Long/Short Ratio Chart -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+@section('scripts')
+    <!-- Chart.js - Load BEFORE Alpine components -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+    <!-- Wait for Chart.js to load -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Long/Short Ratio Chart
-            const ctx = document.getElementById('longShortRatioChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
-                    datasets: [{
-                        label: 'BTCUSDT L/S Ratio',
-                        data: [1.2, 1.35, 1.4, 1.5, 1.45, 1.35, 1.45],
-                        borderColor: 'rgb(59, 130, 246)',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }, {
-                        label: 'ETHUSDT L/S Ratio',
-                        data: [0.9, 0.85, 0.8, 0.75, 0.85, 0.9, 0.85],
-                        borderColor: 'rgb(239, 68, 68)',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }, {
-                        label: 'Neutral Line',
-                        data: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-                        borderColor: 'rgb(156, 163, 175)',
-                        backgroundColor: 'rgba(156, 163, 175, 0.1)',
-                        borderDash: [5, 5],
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            labels: {
-                                color: getComputedStyle(document.documentElement).getPropertyValue('--foreground')
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            ticks: {
-                                color: getComputedStyle(document.documentElement).getPropertyValue('--muted-foreground')
-                            },
-                            grid: {
-                                color: getComputedStyle(document.documentElement).getPropertyValue('--border')
-                            }
-                        },
-                        y: {
-                            ticks: {
-                                color: getComputedStyle(document.documentElement).getPropertyValue('--muted-foreground')
-                            },
-                            grid: {
-                                color: getComputedStyle(document.documentElement).getPropertyValue('--border')
-                            }
-                        }
-                    }
-                }
-            });
+        window.chartJsReady = new Promise((resolve) => {
+            if (typeof Chart !== 'undefined') {
+                resolve();
+            } else {
+                setTimeout(() => resolve(), 100);
+            }
+        });
+
+        // Fix Chart.js context issues
+        Chart.register({
+            id: 'clipArea',
+            beforeDraw: (chart) => {
+                const { ctx, chartArea } = chart;
+                if (!chartArea) return;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+                ctx.clip();
+            },
+            afterDraw: (chart) => {
+                chart.ctx.restore();
+            }
         });
     </script>
+
+    <!-- Load long-short-ratio controller BEFORE Alpine processes x-data -->
+    <script src="{{ asset('js/long-short-ratio-controller.js') }}"></script>
+
+    <script>
+        // Main Controller - Similar to Funding Rate pattern
+        function longShortRatioController() {
+            return {
+                // Global state
+                globalSymbol: "BTC",
+                globalRatioType: "accounts",
+                globalExchange: "",
+                globalInterval: "1h",
+                globalLoading: false,
+
+                // Overview data
+                overview: null,
+
+                // Initialize dashboard
+                init() {
+                    console.log("🚀 Long/Short Ratio Dashboard initialized");
+                    console.log("📊 Symbol:", this.globalSymbol);
+                    console.log("📈 Ratio Type:", this.globalRatioType);
+                    console.log("🏦 Exchange:", this.globalExchange || "All");
+
+                    // Setup event listeners
+                    this.setupEventListeners();
+
+                    // Load initial overview
+                    this.loadOverview().catch((e) =>
+                        console.warn("Initial overview load failed:", e)
+                    );
+
+                    // Log dashboard ready
+                    setTimeout(() => {
+                        console.log("✅ Long/Short Ratio dashboard loaded");
+                        this.logDashboardStatus();
+                    }, 2000);
+                },
+
+                // Setup global event listeners
+                setupEventListeners() {
+                    // Listen for filter changes
+                    window.addEventListener("symbol-changed", () => {
+                        this.loadOverview().catch((e) =>
+                            console.warn("Overview reload failed:", e)
+                        );
+                    });
+
+                    window.addEventListener("ratio-type-changed", () => {
+                        this.loadOverview().catch((e) =>
+                            console.warn("Overview reload failed:", e)
+                        );
+                    });
+
+                    window.addEventListener("exchange-changed", () => {
+                        this.loadOverview().catch((e) =>
+                            console.warn("Overview reload failed:", e)
+                        );
+                    });
+
+                    window.addEventListener("interval-changed", () => {
+                        this.loadOverview().catch((e) =>
+                            console.warn("Overview reload failed:", e)
+                        );
+                    });
+
+                    window.addEventListener("refresh-all", () => {
+                        this.loadOverview().catch((e) =>
+                            console.warn("Overview reload failed:", e)
+                        );
+                    });
+
+                    // Auto-refresh every 60 seconds
+                    setInterval(() => {
+                        if (!this.globalLoading) {
+                            this.loadOverview().catch((e) =>
+                                console.warn("Auto refresh failed:", e)
+                            );
+                        }
+                    }, 60000);
+                },
+
+                // Load overview data from all endpoints
+                async loadOverview() {
+                    this.globalLoading = true;
+                    console.log("🔄 Loading Long/Short Ratio overview...");
+
+                    try {
+                        const baseSymbol = this.globalSymbol;
+                        const pair = `${baseSymbol}USDT`;
+                        const interval = this.globalInterval;
+                        const ratioType = this.globalRatioType;
+                        const exchange = this.globalExchange || null;
+
+                        // Fetch all data in parallel
+                        const [analytics, topAccounts, topPositions, multiExchange] = await Promise.all([
+                            this.fetchAPI("analytics", {
+                                symbol: pair,
+                                exchange: exchange,
+                                interval: interval,
+                                ratio_type: ratioType,
+                                limit: 2000,
+                            }),
+                            this.fetchAPI("top-accounts", {
+                                symbol: pair,
+                                exchange: exchange,
+                                interval: interval,
+                                limit: 1000,
+                            }),
+                            this.fetchAPI("top-positions", {
+                                symbol: pair,
+                                exchange: exchange,
+                                interval: interval,
+                                limit: 1000,
+                            }),
+                            this.fetchAPI("multi-exchange", {
+                                symbol: baseSymbol,
+                                exchange: exchange,
+                                interval: interval,
+                                ratio_type: ratioType,
+                                limit: 1000,
+                            }),
+                        ]);
+
+                        // Process analytics data
+                        const analyticsData = analytics || {};
+                        const ratioStats = analyticsData.ratio_stats || {};
+                        const positioning = analyticsData.positioning || {};
+                        const trend = analyticsData.trend || {};
+
+                        // Process timeseries data
+                        const timeseries = [];
+                        if (analyticsData.timeseries && Array.isArray(analyticsData.timeseries)) {
+                            timeseries.push(...analyticsData.timeseries.map(item => ({
+                                ts: item.ts,
+                                ratio: parseFloat(item.ratio || 0),
+                                longPct: parseFloat(item.long_percent || 0),
+                                shortPct: parseFloat(item.short_percent || 0),
+                                exchange: item.exchange,
+                                pair: item.pair,
+                            })));
+                        }
+
+                        // Process exchange data
+                        const exchangeData = {};
+                        if (multiExchange && Array.isArray(multiExchange)) {
+                            multiExchange.forEach(item => {
+                                if (item.exchange) {
+                                    exchangeData[item.exchange] = {
+                                        ratio: parseFloat(item.ratio || 0),
+                                        longPct: parseFloat(item.long_percent || 0),
+                                        shortPct: parseFloat(item.short_percent || 0),
+                                        pair: item.pair,
+                                        timestamp: item.ts,
+                                    };
+                                }
+                            });
+                        }
+
+                        this.overview = {
+                            meta: {
+                                symbol: baseSymbol,
+                                pair: pair,
+                                ratioType: ratioType,
+                                exchange: exchange,
+                                interval: interval,
+                                units: { ratio: "ratio", percentage: "percentage" },
+                                last_updated: Date.now(),
+                            },
+                            analytics: analyticsData,
+                            ratioStats: ratioStats,
+                            positioning: positioning,
+                            trend: trend,
+                            timeseries: timeseries,
+                            exchangeData: exchangeData,
+                            topAccounts: topAccounts || [],
+                            topPositions: topPositions || [],
+                        };
+
+                        // Broadcast overview ready event
+                        window.dispatchEvent(
+                            new CustomEvent("long-short-ratio-overview-ready", {
+                                detail: this.overview,
+                            })
+                        );
+
+                        console.log("✅ Overview loaded:", this.overview);
+                        return this.overview;
+                    } catch (error) {
+                        console.error("❌ Error loading overview:", error);
+                        throw error;
+                    } finally {
+                        this.globalLoading = false;
+                    }
+                },
+
+                // Update symbol and reload
+                updateSymbol() {
+                    console.log("📊 Symbol changed to:", this.globalSymbol);
+                    window.dispatchEvent(
+                        new CustomEvent("symbol-changed", {
+                            detail: { symbol: this.globalSymbol },
+                        })
+                    );
+                },
+
+                // Update ratio type and reload
+                updateRatioType() {
+                    console.log("📈 Ratio type changed to:", this.globalRatioType);
+                    window.dispatchEvent(
+                        new CustomEvent("ratio-type-changed", {
+                            detail: { ratioType: this.globalRatioType },
+                        })
+                    );
+                },
+
+                // Update exchange and reload
+                updateExchange() {
+                    console.log("🏦 Exchange changed to:", this.globalExchange || "All");
+                    window.dispatchEvent(
+                        new CustomEvent("exchange-changed", {
+                            detail: { exchange: this.globalExchange },
+                        })
+                    );
+                },
+
+                // Update interval and reload
+                updateInterval() {
+                    console.log("⏰ Interval changed to:", this.globalInterval);
+                    window.dispatchEvent(
+                        new CustomEvent("interval-changed", {
+                            detail: { interval: this.globalInterval },
+                        })
+                    );
+                },
+
+                // Refresh all components
+                refreshAll() {
+                    this.globalLoading = true;
+                    console.log("🔄 Refreshing all components...");
+
+                    // Dispatch refresh event
+                    window.dispatchEvent(
+                        new CustomEvent("refresh-all", {
+                            detail: {
+                                symbol: this.globalSymbol,
+                                ratioType: this.globalRatioType,
+                                exchange: this.globalExchange,
+                                interval: this.globalInterval,
+                            },
+                        })
+                    );
+
+                    // Reload overview
+                    this.loadOverview().catch((e) =>
+                        console.warn("Refresh failed:", e)
+                    );
+                },
+
+                // API Helper: Fetch with error handling
+                async fetchAPI(endpoint, params = {}) {
+                    const queryString = new URLSearchParams(params).toString();
+                    const baseMeta = document.querySelector(
+                        'meta[name="api-base-url"]'
+                    );
+                    const configuredBase = (baseMeta?.content || "").trim();
+
+                    let url = `/api/long-short-ratio/${endpoint}?${queryString}`;
+                    if (configuredBase) {
+                        const normalizedBase = configuredBase.endsWith("/")
+                            ? configuredBase.slice(0, -1)
+                            : configuredBase;
+                        url = `${normalizedBase}/api/long-short-ratio/${endpoint}?${queryString}`;
+                    }
+
+                    try {
+                        console.log("📡 Fetching:", endpoint, params);
+                        const response = await fetch(url);
+
+                        if (!response.ok) {
+                            throw new Error(
+                                `HTTP ${response.status}: ${response.statusText}`
+                            );
+                        }
+
+                        const data = await response.json();
+                        const itemCount = Array.isArray(data?.data)
+                            ? data.data.length
+                            : data?.analytics || data?.ratio_stats || data?.timeseries
+                            ? "summary"
+                            : "N/A";
+                        console.log(
+                            "✅ Received:",
+                            endpoint,
+                            itemCount,
+                            typeof itemCount === "number" ? "items" : ""
+                        );
+                        return data;
+                    } catch (error) {
+                        console.error("❌ API Error:", endpoint, error);
+                        throw error;
+                    }
+                },
+
+                // Log dashboard status
+                logDashboardStatus() {
+                    console.log("📊 Long/Short Ratio Dashboard Status");
+                    console.log("Symbol:", this.globalSymbol);
+                    console.log("Ratio Type:", this.globalRatioType);
+                    console.log("Exchange:", this.globalExchange || "All");
+                    console.log("Interval:", this.globalInterval);
+                    console.log("Loading:", this.globalLoading);
+                    console.log("Overview:", this.overview ? "Loaded" : "Not loaded");
+                },
+            };
+        }
+
+        // Market Overview Card Component
+        function marketOverviewCard() {
+            return {
+                loading: false,
+                hasData: false,
+                currentRatio: 0,
+                longPercentage: 0,
+                shortPercentage: 0,
+                ratioType: 'accounts',
+
+                async init() {
+                    // Listen for overview ready
+                    window.addEventListener('long-short-ratio-overview-ready', (e) => {
+                        this.applyOverview(e.detail);
+                    });
+
+                    // Listen for filter changes
+                    window.addEventListener('symbol-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('ratio-type-changed', (e) => {
+                        this.ratioType = e.detail.ratioType;
+                        this.loadData();
+                    });
+
+                    window.addEventListener('exchange-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('interval-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('refresh-all', () => {
+                        this.loadData();
+                    });
+
+                    // Initial load with delay to ensure DOM is ready
+                    setTimeout(() => {
+                        if (this.$root?.overview) {
+                            this.applyOverview(this.$root.overview);
+                        } else {
+                            this.loadData();
+                        }
+                    }, 100);
+                },
+
+                applyOverview(overview) {
+                    if (!overview?.ratioStats) return;
+
+                    this.ratioType = overview.meta?.ratioType || 'accounts';
+                    this.currentRatio = overview.ratioStats.current || 0;
+
+                    // Calculate percentages based on ratio
+                    if (this.currentRatio > 0) {
+                        this.longPercentage = (this.currentRatio / (1 + this.currentRatio)) * 100;
+                        this.shortPercentage = (1 / (1 + this.currentRatio)) * 100;
+                    } else {
+                        this.longPercentage = 0;
+                        this.shortPercentage = 0;
+                    }
+
+                    this.hasData = true;
+                },
+
+                async loadData() {
+                    this.loading = true;
+                    setTimeout(() => {
+                        this.loading = false;
+                    }, 1000);
+                },
+
+                formatRatio(value) {
+                    if (value === null || value === undefined) return 'N/A';
+                    const num = parseFloat(value);
+                    if (isNaN(num)) return 'N/A';
+                    return num.toFixed(3);
+                },
+
+                formatPercentage(value) {
+                    if (value === null || value === undefined) return 'N/A';
+                    const num = parseFloat(value);
+                    if (isNaN(num)) return 'N/A';
+                    return num.toFixed(1) + '%';
+                },
+
+                getSentimentClass() {
+                    if (this.currentRatio > 1.2) return 'text-success';
+                    if (this.currentRatio < 0.8) return 'text-danger';
+                    return 'text-warning';
+                },
+
+                getSentimentText() {
+                    if (this.currentRatio > 1.2) return 'Bullish';
+                    if (this.currentRatio < 0.8) return 'Bearish';
+                    return 'Neutral';
+                },
+
+                getSentimentDescription() {
+                    if (this.currentRatio > 1.2) return 'Retail bullish bias';
+                    if (this.currentRatio < 0.8) return 'Retail bearish bias';
+                    return 'Balanced positioning';
+                },
+            };
+        }
+
+        // Ratio History Chart Component
+        function ratioHistoryChart() {
+            return {
+                loading: false,
+                hasData: false,
+                chart: null,
+                timeseries: [],
+                chartType: 'line',
+
+                // Stats
+                dataPoints: 0,
+                avgRatio: 0,
+                maxRatio: 0,
+                minRatio: 0,
+
+                async init() {
+                    // Wait for Chart.js
+                    await window.chartJsReady;
+
+                    // Listen for overview ready
+                    window.addEventListener('long-short-ratio-overview-ready', (e) => {
+                        this.applyOverview(e.detail);
+                    });
+
+                    // Listen for filter changes
+                    window.addEventListener('symbol-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('ratio-type-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('exchange-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('interval-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('refresh-all', () => {
+                        this.loadData();
+                    });
+
+                    // Initial load with delay to ensure DOM is ready
+                    setTimeout(() => {
+                        if (this.$root?.overview) {
+                            this.applyOverview(this.$root.overview);
+                        } else {
+                            this.loadData();
+                        }
+                    }, 100);
+                },
+
+                applyOverview(overview) {
+                    if (!overview?.timeseries || !Array.isArray(overview.timeseries)) {
+                        return;
+                    }
+
+                    this.timeseries = overview.timeseries.sort((a, b) => a.ts - b.ts);
+                    this.calculateStats();
+                    this.renderChart();
+                },
+
+                calculateStats() {
+                    if (this.timeseries.length === 0) return;
+
+                    this.dataPoints = this.timeseries.length;
+                    const ratios = this.timeseries.map(d => d.ratio);
+                    this.avgRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+                    this.maxRatio = Math.max(...ratios);
+                    this.minRatio = Math.min(...ratios);
+                },
+
+                renderChart() {
+                    if (!this.timeseries || this.timeseries.length === 0) {
+                        this.hasData = false;
+                        return;
+                    }
+
+                    this.hasData = true;
+
+                    // Prepare data
+                    const labels = this.timeseries.map(d => this.formatTimestamp(d.ts));
+                    const ratioData = this.timeseries.map(d => d.ratio);
+
+                    // Determine chart type config
+                    let chartTypeConfig = 'line';
+                    let fillConfig = false;
+                    let tensionConfig = 0.4;
+
+                    if (this.chartType === 'bar') {
+                        chartTypeConfig = 'bar';
+                    } else if (this.chartType === 'area') {
+                        chartTypeConfig = 'line';
+                        fillConfig = true;
+                        tensionConfig = 0.4;
+                    }
+
+                    // Destroy existing chart
+                    if (this.chart) {
+                        this.chart.destroy();
+                    }
+
+                    // Create new chart
+                    const canvas = this.$refs.ratioCanvas;
+                    if (!canvas) {
+                        console.error('Canvas element not found');
+                        return;
+                    }
+
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        console.error('Canvas context not available');
+                        return;
+                    }
+
+                    this.chart = new Chart(ctx, {
+                        type: chartTypeConfig,
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Long/Short Ratio',
+                                    data: ratioData,
+                                    backgroundColor: fillConfig ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.8)',
+                                    borderColor: 'rgb(59, 130, 246)',
+                                    borderWidth: 2,
+                                    fill: fillConfig,
+                                    tension: tensionConfig,
+                                    pointRadius: this.chartType === 'bar' ? 0 : 2,
+                                    pointHoverRadius: this.chartType === 'bar' ? 0 : 4,
+                                },
+                            ],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false,
+                            },
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top',
+                                    labels: {
+                                        color: '#94a3b8',
+                                        font: { size: 11 },
+                                        usePointStyle: true,
+                                    },
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                    padding: 12,
+                                    callbacks: {
+                                        label: (context) => {
+                                            const label = context.dataset.label || '';
+                                            const value = this.formatRatio(context.parsed.y);
+                                            return `${label}: ${value}`;
+                                        },
+                                    },
+                                },
+                            },
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        font: { size: 9 },
+                                        maxRotation: 45,
+                                        minRotation: 45,
+                                        maxTicksLimit: 15,
+                                    },
+                                    grid: {
+                                        display: false,
+                                    },
+                                },
+                                y: {
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        font: { size: 10 },
+                                        callback: (value) => this.formatRatio(value),
+                                    },
+                                    grid: {
+                                        color: 'rgba(148, 163, 184, 0.1)',
+                                    },
+                                },
+                            },
+                        },
+                    });
+                },
+
+                async loadData() {
+                    this.loading = true;
+                    setTimeout(() => {
+                        this.loading = false;
+                    }, 1000);
+                },
+
+                formatRatio(value) {
+                    if (value === null || value === undefined) return 'N/A';
+                    const num = parseFloat(value);
+                    if (isNaN(num)) return 'N/A';
+                    return num.toFixed(3);
+                },
+
+                formatTimestamp(timestamp) {
+                    if (!timestamp) return 'N/A';
+                    const date = new Date(timestamp);
+                    return date.toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false,
+                    });
+                },
+            };
+        }
+
+        // Distribution Chart Component
+        function distributionChart() {
+            return {
+                loading: false,
+                hasData: false,
+                chart: null,
+                longPercentage: 0,
+                shortPercentage: 0,
+
+                async init() {
+                    // Wait for Chart.js
+                    await window.chartJsReady;
+
+                    // Listen for overview ready
+                    window.addEventListener('long-short-ratio-overview-ready', (e) => {
+                        this.applyOverview(e.detail);
+                    });
+
+                    // Listen for filter changes
+                    window.addEventListener('symbol-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('ratio-type-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('exchange-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('interval-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('refresh-all', () => {
+                        this.loadData();
+                    });
+
+                    // Initial load with delay to ensure DOM is ready
+                    setTimeout(() => {
+                        if (this.$root?.overview) {
+                            this.applyOverview(this.$root.overview);
+                        } else {
+                            this.loadData();
+                        }
+                    }, 100);
+                },
+
+                applyOverview(overview) {
+                    if (!overview?.ratioStats) return;
+
+                    const currentRatio = overview.ratioStats.current || 0;
+
+                    // Calculate percentages based on ratio
+                    if (currentRatio > 0) {
+                        this.longPercentage = (currentRatio / (1 + currentRatio)) * 100;
+                        this.shortPercentage = (1 / (1 + currentRatio)) * 100;
+                    } else {
+                        this.longPercentage = 50;
+                        this.shortPercentage = 50;
+                    }
+
+                    this.hasData = true;
+                    this.renderChart();
+                },
+
+                renderChart() {
+                    if (!this.hasData) {
+                        return;
+                    }
+
+                    // Destroy existing chart
+                    if (this.chart) {
+                        this.chart.destroy();
+                    }
+
+                    // Create new chart
+                    const canvas = this.$refs.distributionCanvas;
+                    if (!canvas) {
+                        console.error('Canvas element not found');
+                        return;
+                    }
+
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        console.error('Canvas context not available');
+                        return;
+                    }
+
+                    this.chart = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Long Positions', 'Short Positions'],
+                            datasets: [
+                                {
+                                    data: [this.longPercentage, this.shortPercentage],
+                                    backgroundColor: [
+                                        'rgba(34, 197, 94, 0.8)',
+                                        'rgba(239, 68, 68, 0.8)',
+                                    ],
+                                    borderColor: [
+                                        'rgb(34, 197, 94)',
+                                        'rgb(239, 68, 68)',
+                                    ],
+                                    borderWidth: 2,
+                                },
+                            ],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false, // We have custom legend
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                    padding: 12,
+                                    callbacks: {
+                                        label: (context) => {
+                                            const label = context.label || '';
+                                            const value = context.parsed.toFixed(1);
+                                            return `${label}: ${value}%`;
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    });
+                },
+
+                async loadData() {
+                    this.loading = true;
+                    setTimeout(() => {
+                        this.loading = false;
+                    }, 1000);
+                },
+            };
+        }
+
+        // Exchange Comparison Table Component
+        function exchangeComparisonTable() {
+            return {
+                loading: false,
+                exchangeData: {},
+
+                async init() {
+                    // Listen for overview ready
+                    window.addEventListener('long-short-ratio-overview-ready', (e) => {
+                        this.applyOverview(e.detail);
+                    });
+
+                    // Listen for filter changes
+                    window.addEventListener('symbol-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('ratio-type-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('exchange-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('interval-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('refresh-all', () => {
+                        this.loadData();
+                    });
+
+                    // Initial load with delay to ensure DOM is ready
+                    setTimeout(() => {
+                        if (this.$root?.overview) {
+                            this.applyOverview(this.$root.overview);
+                        } else {
+                            this.loadData();
+                        }
+                    }, 100);
+                },
+
+                applyOverview(overview) {
+                    if (!overview?.exchangeData) return;
+                    this.exchangeData = overview.exchangeData;
+                },
+
+                async loadData() {
+                    this.loading = true;
+                    setTimeout(() => {
+                        this.loading = false;
+                    }, 1000);
+                },
+
+                formatRatio(value) {
+                    if (value === null || value === undefined) return 'N/A';
+                    const num = parseFloat(value);
+                    if (isNaN(num)) return 'N/A';
+                    return num.toFixed(3);
+                },
+
+                formatPercentage(value) {
+                    if (value === null || value === undefined) return 'N/A';
+                    const num = parseFloat(value);
+                    if (isNaN(num)) return 'N/A';
+                    return num.toFixed(1) + '%';
+                },
+
+                formatTimestamp(timestamp) {
+                    if (!timestamp) return 'N/A';
+                    const date = new Date(timestamp);
+                    return date.toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false,
+                    });
+                },
+            };
+        }
+    </script>
+
+    <style>
+        /* Alpine.js cloaking */
+        [x-cloak] {
+            display: none !important;
+        }
+
+        /* Smooth transitions */
+        .stat-card {
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Loading spinner */
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+            border-width: 0.15em;
+        }
+
+        /* Chart containers */
+        .derivatives-chart-body {
+            position: relative;
+            min-height: 400px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .derivatives-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .derivatives-filters {
+                width: 100%;
+            }
+
+            .derivatives-filters select,
+            .derivatives-filters button {
+                flex: 1;
+            }
+        }
+    </style>
 @endsection

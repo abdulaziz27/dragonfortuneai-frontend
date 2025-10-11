@@ -1,12 +1,13 @@
 /**
- * Funding Rate Dashboard Controller
+ * Basis & Term Structure Dashboard Controller
  *
- * Global controller untuk mengoordinasikan semua komponen funding rate
+ * Global controller untuk mengoordinasikan semua komponen basis & term structure
  *
  * Think like a trader:
- * - Funding rate adalah cost of leverage
- * - Positive funding = longs crowded = potential squeeze down
- * - Negative funding = shorts crowded = potential squeeze up
+ * - Basis positif → Contango → Futures > Spot → Potential arbitrage
+ * - Basis negatif → Backwardation → Spot > Futures → Supply shortage
+ * - Term structure slope → Market expectations untuk masa depan
+ * - Convergence patterns → Expiry approaching → Basis → 0
  *
  * Build like an engineer:
  * - Modular components dengan event communication
@@ -19,21 +20,20 @@
  * - Responsive dan smooth animations
  */
 
-function fundingRateController() {
+function basisTermStructureController() {
     return {
         // Global state
         globalSymbol: "BTC",
-        globalMarginType: "",
+        globalExchange: "Binance",
         globalInterval: "1h",
         globalLoading: false,
 
         // Component references
         components: {
-            biasCard: null,
-            exchangeTable: null,
-            aggregateChart: null,
+            analyticsPanel: null,
             historyChart: null,
-            weightedChart: null,
+            termStructureChart: null,
+            insightsPanel: null,
         },
 
         // Aggregated overview state
@@ -41,9 +41,9 @@ function fundingRateController() {
 
         // Initialize dashboard
         init() {
-            console.log("🚀 Funding Rate Dashboard initialized");
+            console.log("🚀 Basis & Term Structure Dashboard initialized");
             console.log("📊 Symbol:", this.globalSymbol);
-            console.log("💰 Margin Type:", this.globalMarginType || "All");
+            console.log("🏢 Exchange:", this.globalExchange);
 
             // Setup event listeners
             this.setupEventListeners();
@@ -62,23 +62,19 @@ function fundingRateController() {
 
         // Setup global event listeners
         setupEventListeners() {
-            // Simple component counting instead of complex event system
-            // This avoids conflicts with Alpine.js and Livewire
-
             // Count components with multiple attempts
             let attempts = 0;
             const maxAttempts = 5;
 
             const countComponents = () => {
                 attempts++;
-                const componentElements = document.querySelectorAll(
-                    '[x-data*="funding"]'
-                );
+                const componentElements =
+                    document.querySelectorAll('[x-data*="basis"]');
                 console.log(
-                    `📊 Found ${componentElements.length} funding components (attempt ${attempts})`
+                    `📊 Found ${componentElements.length} basis components (attempt ${attempts})`
                 );
 
-                if (componentElements.length >= 5 || attempts >= maxAttempts) {
+                if (componentElements.length >= 3 || attempts >= maxAttempts) {
                     this.components.count = componentElements.length;
                     console.log(
                         `✅ Final component count: ${componentElements.length}`
@@ -94,6 +90,11 @@ function fundingRateController() {
 
             // Reload overview on global filter changes
             window.addEventListener("symbol-changed", () => {
+                this.loadOverview().catch((e) =>
+                    console.warn("Overview reload failed:", e)
+                );
+            });
+            window.addEventListener("exchange-changed", () => {
                 this.loadOverview().catch((e) =>
                     console.warn("Overview reload failed:", e)
                 );
@@ -119,7 +120,7 @@ function fundingRateController() {
                 new CustomEvent("symbol-changed", {
                     detail: {
                         symbol: this.globalSymbol,
-                        marginType: this.globalMarginType,
+                        exchange: this.globalExchange,
                         interval: this.globalInterval,
                     },
                 })
@@ -129,16 +130,16 @@ function fundingRateController() {
             this.updateURL();
         },
 
-        // Update margin type globally
-        updateMarginType() {
-            console.log("🔄 Updating margin type to:", this.globalMarginType);
+        // Update exchange globally
+        updateExchange() {
+            console.log("🔄 Updating exchange to:", this.globalExchange);
 
             // Dispatch event to all components
             window.dispatchEvent(
-                new CustomEvent("margin-type-changed", {
+                new CustomEvent("exchange-changed", {
                     detail: {
                         symbol: this.globalSymbol,
-                        marginType: this.globalMarginType,
+                        exchange: this.globalExchange,
                         interval: this.globalInterval,
                     },
                 })
@@ -156,7 +157,7 @@ function fundingRateController() {
                 new CustomEvent("interval-changed", {
                     detail: {
                         symbol: this.globalSymbol,
-                        marginType: this.globalMarginType,
+                        exchange: this.globalExchange,
                         interval: this.globalInterval,
                     },
                 })
@@ -176,36 +177,74 @@ function fundingRateController() {
             return `${sym}USDT`;
         },
 
+        // Build futures symbol for basis calculation
+        buildFuturesSymbol(baseSymbol) {
+            const sym = (
+                baseSymbol ||
+                this.globalSymbol ||
+                "BTC"
+            ).toUpperCase();
+            // Default to quarterly contract; can be extended later
+            return `${sym}USDT_240628`; // Example quarterly expiry
+        },
+
         // Fetch and compose overview from existing endpoints
         async loadOverview({
-            includePrice = false,
-            granularity = "funding_8h",
-            heatmapExchanges = ["Binance", "Bybit", "OKX", "Bitget"],
-            buckets = 15,
+            includeAnalytics = true,
+            includeHistory = true,
+            includeTermStructure = true,
         } = {}) {
             const baseSymbol = this.globalSymbol;
             const pair = this.buildPair(baseSymbol);
+            const futuresSymbol = this.buildFuturesSymbol(baseSymbol);
+            const exchange = this.globalExchange;
             const interval = this.globalInterval || "1h";
 
             // Prepare request params
             const commonRange = {}; // Placeholder to propagate start_time/end_time if later added
 
             // Execute in parallel
-            const [analytics, exchanges, history] = await Promise.all([
-                this.fetchAPI("analytics", {
-                    symbol: pair,
-                    interval,
-                    limit: 2000,
-                    ...commonRange,
-                }),
-                this.fetchAPI("exchanges", { symbol: baseSymbol, limit: 1000 }),
-                this.fetchAPI("history", {
-                    symbol: pair,
-                    interval,
-                    limit: 2000,
-                    ...commonRange,
-                }),
-            ]);
+            const promises = [];
+
+            if (includeAnalytics) {
+                promises.push(
+                    this.fetchAPI("analytics", {
+                        exchange,
+                        spot_pair: pair,
+                        futures_symbol: futuresSymbol,
+                        interval,
+                        limit: 2000,
+                        ...commonRange,
+                    })
+                );
+            }
+
+            if (includeHistory) {
+                promises.push(
+                    this.fetchAPI("history", {
+                        exchange,
+                        spot_pair: pair,
+                        futures_symbol: futuresSymbol,
+                        interval,
+                        limit: 2000,
+                        ...commonRange,
+                    })
+                );
+            }
+
+            if (includeTermStructure) {
+                promises.push(
+                    this.fetchAPI("term-structure", {
+                        exchange,
+                        spot_pair: pair,
+                        max_contracts: 20,
+                    })
+                );
+            }
+
+            const results = await Promise.all(promises);
+
+            const [analytics, history, termStructure] = results;
 
             const historyRows = Array.isArray(history?.data)
                 ? history.data
@@ -214,142 +253,66 @@ function fundingRateController() {
             // Convert numeric strings to floats and normalize keys
             const normalizedTimeseries = historyRows
                 .map((r) => ({
-                    ts: r.time,
+                    ts: r.ts,
                     exchange: r.exchange,
-                    pair: r.symbol,
-                    funding_rate_open: parseFloat(r.open),
-                    funding_rate_high: parseFloat(r.high),
-                    funding_rate_low: parseFloat(r.low),
-                    funding_rate_close: parseFloat(r.close),
-                    interval: r.interval_name,
-                    symbol_price:
-                        includePrice && r.price ? parseFloat(r.price) : null,
+                    spot_pair: r.spot_pair,
+                    futures_symbol: r.futures_symbol,
+                    price_spot: parseFloat(r.price_spot),
+                    price_futures: parseFloat(r.price_futures),
+                    basis_abs: parseFloat(r.basis_abs),
+                    basis_annualized: r.basis_annualized
+                        ? parseFloat(r.basis_annualized)
+                        : null,
+                    expiry: r.expiry,
                 }))
-                .filter((r) => !Number.isNaN(r.funding_rate_close));
+                .filter((r) => !Number.isNaN(r.basis_abs));
 
-            // Optional resample to 8h buckets aligned on 00/08/16 UTC
-            const resampled = this.resampleToEightHours(normalizedTimeseries);
+            const termStructureData = Array.isArray(termStructure?.data)
+                ? termStructure.data
+                : [];
 
-            // Build series by exchange for heatmap and small multiples
-            const byExchange = {};
-            resampled.forEach((row) => {
-                if (!byExchange[row.exchange]) byExchange[row.exchange] = [];
-                byExchange[row.exchange].push({
-                    ts: row.ts,
-                    funding_rate: row.funding_rate_close,
-                });
-            });
-            // Keep only requested exchanges if provided
-            const filteredByExchange = Object.fromEntries(
-                Object.entries(byExchange).filter(([ex]) =>
-                    heatmapExchanges.includes(ex)
-                )
-            );
-
-            // Limit to last N buckets per exchange for heatmap efficiency
-            const limitedByExchange = Object.fromEntries(
-                Object.entries(filteredByExchange).map(([ex, arr]) => [
-                    ex,
-                    arr.sort((a, b) => a.ts - b.ts).slice(-buckets),
-                ])
-            );
+            // Normalize term structure data
+            const normalizedTermStructure = termStructureData
+                .map((r) => ({
+                    exchange: r.exchange,
+                    spot_pair: r.spot_pair,
+                    futures_symbol: r.futures_symbol,
+                    instrument_id: r.instrument_id,
+                    expiry: r.expiry,
+                    price_spot: parseFloat(r.price_spot),
+                    price_futures: parseFloat(r.price_futures),
+                    basis_abs: parseFloat(r.basis_abs),
+                    basis_annualized: r.basis_annualized
+                        ? parseFloat(r.basis_annualized)
+                        : null,
+                }))
+                .filter((r) => !Number.isNaN(r.basis_abs));
 
             this.overview = {
                 meta: {
                     pair,
+                    futuresSymbol,
+                    exchange,
                     interval,
-                    granularity,
-                    units: { funding_rate: "fraction", price: "USD" },
+                    units: {
+                        basis_abs: "USD",
+                        basis_annualized: "percentage",
+                        price: "USD",
+                    },
                     last_updated: Date.now(),
                 },
                 analytics: analytics || null,
-                exchanges: Array.isArray(exchanges?.data) ? exchanges.data : [],
-                timeseries: resampled,
-                timeseries_by_exchange: limitedByExchange,
+                timeseries: normalizedTimeseries,
+                termStructure: normalizedTermStructure,
             };
 
             // Broadcast overview-ready event
             window.dispatchEvent(
-                new CustomEvent("funding-overview-ready", {
+                new CustomEvent("basis-overview-ready", {
                     detail: this.overview,
                 })
             );
             return this.overview;
-        },
-
-        // Resample arbitrary intervals to 8h funding buckets (O-H-L-C from constituent points)
-        resampleToEightHours(rows) {
-            if (!Array.isArray(rows) || rows.length === 0) return [];
-
-            // Helper to get bucket start aligned to 00/08/16 UTC
-            const toBucketStart = (tsMs) => {
-                const date = new Date(tsMs);
-                const utc = Date.UTC(
-                    date.getUTCFullYear(),
-                    date.getUTCMonth(),
-                    date.getUTCDate(),
-                    date.getUTCHours(),
-                    0,
-                    0,
-                    0
-                );
-                const hour = new Date(utc).getUTCHours();
-                const bucketHour = hour < 8 ? 0 : hour < 16 ? 8 : 16;
-                const bucketDate = Date.UTC(
-                    date.getUTCFullYear(),
-                    date.getUTCMonth(),
-                    date.getUTCDate(),
-                    bucketHour,
-                    0,
-                    0,
-                    0
-                );
-                return bucketDate;
-            };
-
-            // Group by exchange + bucket
-            const groups = new Map();
-            for (const r of rows) {
-                const bucket = toBucketStart(r.ts);
-                const key = `${r.exchange}__${bucket}`;
-                if (!groups.has(key)) groups.set(key, []);
-                groups.get(key).push(r);
-            }
-
-            // Compute OHLC per group
-            const result = [];
-            for (const [key, arr] of groups.entries()) {
-                const [exchange, bucketStr] = key.split("__");
-                const sorted = arr.sort((a, b) => a.ts - b.ts);
-                const open =
-                    sorted[0].funding_rate_open ?? sorted[0].funding_rate_close;
-                const close =
-                    sorted[sorted.length - 1].funding_rate_close ??
-                    sorted[sorted.length - 1].funding_rate_open;
-                const high = Math.max(
-                    ...sorted.map((x) =>
-                        Math.max(x.funding_rate_high ?? x.funding_rate_close)
-                    )
-                );
-                const low = Math.min(
-                    ...sorted.map((x) =>
-                        Math.min(x.funding_rate_low ?? x.funding_rate_close)
-                    )
-                );
-                result.push({
-                    ts: Number(bucketStr),
-                    exchange,
-                    pair: sorted[0].pair,
-                    funding_rate_open: open,
-                    funding_rate_high: high,
-                    funding_rate_low: low,
-                    funding_rate_close: close,
-                    interval: "8h",
-                    symbol_price: null,
-                });
-            }
-
-            return result.sort((a, b) => a.ts - b.ts);
         },
 
         // Update URL with all filters
@@ -357,7 +320,7 @@ function fundingRateController() {
             if (window.history && window.history.pushState) {
                 const url = new URL(window.location);
                 url.searchParams.set("symbol", this.globalSymbol);
-                url.searchParams.set("marginType", this.globalMarginType || "");
+                url.searchParams.set("exchange", this.globalExchange);
                 url.searchParams.set("interval", this.globalInterval || "1h");
                 window.history.pushState({}, "", url);
             }
@@ -373,7 +336,8 @@ function fundingRateController() {
                 new CustomEvent("refresh-all", {
                     detail: {
                         symbol: this.globalSymbol,
-                        marginType: this.globalMarginType,
+                        exchange: this.globalExchange,
+                        interval: this.globalInterval,
                     },
                 })
             );
@@ -389,7 +353,8 @@ function fundingRateController() {
         logDashboardStatus() {
             console.group("📊 Dashboard Status");
             console.log("Symbol:", this.globalSymbol);
-            console.log("Margin Type:", this.globalMarginType || "All");
+            console.log("Exchange:", this.globalExchange);
+            console.log("Interval:", this.globalInterval);
             console.log("Components loaded:", this.components.count || 0);
             const baseMeta = document.querySelector(
                 'meta[name="api-base-url"]'
@@ -399,28 +364,29 @@ function fundingRateController() {
             console.groupEnd();
         },
 
-        // Utility: Format funding rate
-        formatRate(value) {
+        // Utility: Format basis value
+        formatBasis(value, type = "abs") {
             if (value === null || value === undefined) return "N/A";
-            const percent = (parseFloat(value) * 100).toFixed(4);
-            return (parseFloat(value) >= 0 ? "+" : "") + percent + "%";
+            if (type === "annualized") {
+                const percent = (parseFloat(value) * 100).toFixed(2);
+                return (parseFloat(value) >= 0 ? "+" : "") + percent + "%";
+            }
+            return "$" + parseFloat(value).toFixed(2);
         },
 
-        // Utility: Get bias color class
-        getBiasColorClass(bias) {
-            const biasLower = (bias || "").toLowerCase();
-            if (biasLower.includes("long")) return "text-success";
-            if (biasLower.includes("short")) return "text-danger";
+        // Utility: Get basis color class
+        getBasisColorClass(basis) {
+            if (basis > 0) return "text-success";
+            if (basis < 0) return "text-danger";
             return "text-secondary";
         },
 
-        // Utility: Calculate APR from funding rate
-        calculateAPR(rate, intervalHours) {
-            if (!rate || !intervalHours) return "N/A";
-            const numRate = parseFloat(rate);
-            const periodsPerYear = (365 * 24) / intervalHours;
-            const apr = (numRate * periodsPerYear * 100).toFixed(1);
-            return (numRate >= 0 ? "+" : "") + apr + "%";
+        // Utility: Get market structure color class
+        getMarketStructureClass(structure) {
+            const structureLower = (structure || "").toLowerCase();
+            if (structureLower.includes("contango")) return "text-warning";
+            if (structureLower.includes("backwardation")) return "text-success";
+            return "text-secondary";
         },
 
         // Utility: Format timestamp
@@ -436,67 +402,93 @@ function fundingRateController() {
             });
         },
 
-        // Utility: Calculate time until
-        timeUntil(timestamp) {
-            if (!timestamp || timestamp <= Date.now()) return "N/A";
-            const diff = timestamp - Date.now();
-            const hours = Math.floor(diff / (1000 * 60 * 60));
-            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            return `${hours}h ${minutes}m`;
+        // Utility: Calculate time until expiry
+        timeUntilExpiry(expiryTimestamp) {
+            if (!expiryTimestamp || expiryTimestamp <= Date.now()) return "N/A";
+            const diff = expiryTimestamp - Date.now();
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor(
+                (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+            );
+            return `${days}d ${hours}h`;
         },
 
         // Trading insights helper
-        getTradingInsight(bias, strength, avgFunding) {
-            const insights = {
-                long_extreme: {
-                    icon: "🚨",
-                    title: "Extreme Long Positioning",
-                    message:
-                        "Very high long bias with elevated funding rates. High risk of long squeeze if price fails to break resistance. Consider taking profits or hedging.",
-                    severity: "danger",
-                },
-                long_moderate: {
-                    icon: "📈",
-                    title: "Long Bias Building",
-                    message:
-                        "Moderate long positioning with positive funding. Market bullish but not extreme. Watch for resistance levels and funding rate increases.",
-                    severity: "warning",
-                },
-                short_extreme: {
-                    icon: "🚨",
-                    title: "Extreme Short Positioning",
-                    message:
-                        "Very high short bias with negative funding rates. High risk of short squeeze on positive catalysts. Stops should be tight.",
-                    severity: "danger",
-                },
-                short_moderate: {
-                    icon: "📉",
-                    title: "Short Pressure Active",
-                    message:
-                        "Moderate short positioning with negative funding. Market bearish but not extreme. Look for bounce setups or wait for flush.",
-                    severity: "warning",
-                },
-                neutral: {
+        getTradingInsight(analytics) {
+            if (!analytics)
+                return {
                     icon: "💡",
-                    title: "Balanced Market",
-                    message:
-                        "No extreme positioning detected. Funding rates near neutral. Normal trading conditions with no immediate squeeze risk.",
+                    title: "Market Analysis",
+                    message: "Loading market analysis...",
                     severity: "info",
-                },
+                };
+
+            const marketStructure = analytics.market_structure || "unknown";
+            const trend = analytics.trend || {};
+            const basisAbs = analytics.basis_abs || {};
+            const insights = analytics.insights || [];
+
+            // Determine primary insight
+            if (insights.length > 0) {
+                const primaryInsight = insights[0];
+                return {
+                    icon: this.getInsightIcon(primaryInsight.severity),
+                    title: primaryInsight.type || "Market Insight",
+                    message:
+                        primaryInsight.message ||
+                        "No specific insight available",
+                    severity: primaryInsight.severity || "info",
+                };
+            }
+
+            // Fallback insights based on market structure
+            if (marketStructure === "contango") {
+                return {
+                    icon: "📈",
+                    title: "Contango Market",
+                    message: `Futures trading above spot (${this.formatBasis(
+                        basisAbs.current
+                    )}). Market expects higher prices. Watch for convergence as expiry approaches.`,
+                    severity: "warning",
+                };
+            }
+
+            if (marketStructure === "backwardation") {
+                return {
+                    icon: "📉",
+                    title: "Backwardation Market",
+                    message: `Spot trading above futures (${this.formatBasis(
+                        basisAbs.current
+                    )}). Supply shortage or high demand. Potential arbitrage opportunity.`,
+                    severity: "success",
+                };
+            }
+
+            return {
+                icon: "💡",
+                title: "Neutral Market",
+                message: `Basis at ${this.formatBasis(
+                    basisAbs.current
+                )}. Market showing balanced expectations. Monitor for convergence patterns.`,
+                severity: "info",
             };
+        },
 
-            const biasLower = (bias || "").toLowerCase();
-            const strengthNum = parseFloat(strength) || 0;
-
-            let key = "neutral";
-            if (biasLower.includes("long") && strengthNum > 70)
-                key = "long_extreme";
-            else if (biasLower.includes("long")) key = "long_moderate";
-            else if (biasLower.includes("short") && strengthNum > 70)
-                key = "short_extreme";
-            else if (biasLower.includes("short")) key = "short_moderate";
-
-            return insights[key];
+        // Get insight icon based on severity
+        getInsightIcon(severity) {
+            switch (severity?.toLowerCase()) {
+                case "high":
+                case "danger":
+                    return "🚨";
+                case "medium":
+                case "warning":
+                    return "⚠️";
+                case "low":
+                case "info":
+                    return "💡";
+                default:
+                    return "💡";
+            }
         },
 
         // API Helper: Fetch with error handling
@@ -507,12 +499,12 @@ function fundingRateController() {
             );
             const configuredBase = (baseMeta?.content || "").trim();
 
-            let url = `/api/funding-rate/${endpoint}?${queryString}`; // default relative
+            let url = `/api/basis/${endpoint}?${queryString}`; // default relative
             if (configuredBase) {
                 const normalizedBase = configuredBase.endsWith("/")
                     ? configuredBase.slice(0, -1)
                     : configuredBase;
-                url = `${normalizedBase}/api/funding-rate/${endpoint}?${queryString}`;
+                url = `${normalizedBase}/api/basis/${endpoint}?${queryString}`;
             }
 
             try {
@@ -528,7 +520,9 @@ function fundingRateController() {
                 const data = await response.json();
                 const itemCount = Array.isArray(data?.data)
                     ? data.data.length
-                    : data?.summary || data?.bias || data?.analytics
+                    : data?.basis_abs ||
+                      data?.market_structure ||
+                      data?.insights
                     ? "summary"
                     : "N/A";
                 console.log(
@@ -549,7 +543,7 @@ function fundingRateController() {
 /**
  * Chart Configuration Helpers
  */
-window.FundingRateCharts = {
+window.BasisTermStructureCharts = {
     // Default chart colors
     colors: {
         primary: "#3b82f6",
@@ -558,6 +552,8 @@ window.FundingRateCharts = {
         warning: "#f59e0b",
         purple: "#8b5cf6",
         gray: "#6b7280",
+        contango: "#f59e0b",
+        backwardation: "#22c55e",
     },
 
     // Common chart options
@@ -625,7 +621,7 @@ window.FundingRateCharts = {
 /**
  * Utility Functions
  */
-window.FundingRateUtils = {
+window.BasisTermStructureUtils = {
     // Debounce function for performance
     debounce(func, wait) {
         let timeout;
@@ -644,7 +640,7 @@ window.FundingRateUtils = {
         set(key, value) {
             try {
                 localStorage.setItem(
-                    `funding_rate_${key}`,
+                    `basis_term_structure_${key}`,
                     JSON.stringify(value)
                 );
             } catch (e) {
@@ -653,7 +649,9 @@ window.FundingRateUtils = {
         },
         get(key, defaultValue = null) {
             try {
-                const item = localStorage.getItem(`funding_rate_${key}`);
+                const item = localStorage.getItem(
+                    `basis_term_structure_${key}`
+                );
                 return item ? JSON.parse(item) : defaultValue;
             } catch (e) {
                 return defaultValue;
@@ -661,7 +659,7 @@ window.FundingRateUtils = {
         },
         remove(key) {
             try {
-                localStorage.removeItem(`funding_rate_${key}`);
+                localStorage.removeItem(`basis_term_structure_${key}`);
             } catch (e) {
                 console.warn("LocalStorage not available");
             }
@@ -669,4 +667,4 @@ window.FundingRateUtils = {
     },
 };
 
-console.log("✅ Funding Rate Controller loaded");
+console.log("✅ Basis & Term Structure Controller loaded");
