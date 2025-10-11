@@ -24,8 +24,11 @@ function perpQuarterlySpreadController() {
     return {
         // Global state
         globalSymbol: "BTC",
+        globalQuote: "USDT",
         globalExchange: "Binance",
-        globalInterval: "1h",
+        globalInterval: "5m",
+        globalPerpSymbol: "", // Optional override, auto-generated if empty
+        globalLimit: "2000", // Data limit for API calls
         globalLoading: false,
 
         // Component references
@@ -42,9 +45,15 @@ function perpQuarterlySpreadController() {
         // Initialize dashboard
         init() {
             console.log("🚀 Perp-Quarterly Spread Dashboard initialized");
-            console.log("📊 Symbol:", this.globalSymbol);
+            console.log("📊 Base:", this.globalSymbol);
+            console.log("💰 Quote:", this.globalQuote);
             console.log("🏦 Exchange:", this.globalExchange);
             console.log("⏱️ Interval:", this.globalInterval);
+            console.log(
+                "🔧 Perp Symbol Override:",
+                this.globalPerpSymbol || "auto-generated"
+            );
+            console.log("📈 Data Limit:", this.globalLimit);
 
             // Setup event listeners
             this.setupEventListeners();
@@ -113,19 +122,48 @@ function perpQuarterlySpreadController() {
 
         // Update symbol globally
         updateSymbol() {
-            console.log("🔄 Updating symbol to:", this.globalSymbol);
+            console.log("🔄 Updating base symbol to:", this.globalSymbol);
 
             window.dispatchEvent(
                 new CustomEvent("symbol-changed", {
                     detail: {
                         symbol: this.globalSymbol,
+                        quote: this.globalQuote,
                         exchange: this.globalExchange,
                         interval: this.globalInterval,
+                        perpSymbol: this.globalPerpSymbol,
+                        limit: this.globalLimit,
                     },
                 })
             );
 
             this.updateURL();
+            this.loadOverview().catch((e) =>
+                console.warn("Overview reload failed:", e)
+            );
+        },
+
+        // Update quote globally
+        updateQuote() {
+            console.log("🔄 Updating quote to:", this.globalQuote);
+
+            window.dispatchEvent(
+                new CustomEvent("quote-changed", {
+                    detail: {
+                        symbol: this.globalSymbol,
+                        quote: this.globalQuote,
+                        exchange: this.globalExchange,
+                        interval: this.globalInterval,
+                        perpSymbol: this.globalPerpSymbol,
+                        limit: this.globalLimit,
+                    },
+                })
+            );
+
+            this.updateURL();
+            this.loadOverview().catch((e) =>
+                console.warn("Overview reload failed:", e)
+            );
         },
 
         // Update exchange globally
@@ -136,13 +174,19 @@ function perpQuarterlySpreadController() {
                 new CustomEvent("exchange-changed", {
                     detail: {
                         symbol: this.globalSymbol,
+                        quote: this.globalQuote,
                         exchange: this.globalExchange,
                         interval: this.globalInterval,
+                        perpSymbol: this.globalPerpSymbol,
+                        limit: this.globalLimit,
                     },
                 })
             );
 
             this.updateURL();
+            this.loadOverview().catch((e) =>
+                console.warn("Overview reload failed:", e)
+            );
         },
 
         // Update interval globally
@@ -153,21 +197,87 @@ function perpQuarterlySpreadController() {
                 new CustomEvent("interval-changed", {
                     detail: {
                         symbol: this.globalSymbol,
+                        quote: this.globalQuote,
                         exchange: this.globalExchange,
                         interval: this.globalInterval,
+                        perpSymbol: this.globalPerpSymbol,
+                        limit: this.globalLimit,
                     },
                 })
             );
 
             this.updateURL();
+            this.loadOverview().catch((e) =>
+                console.warn("Overview reload failed:", e)
+            );
+        },
+
+        // Update perp symbol override
+        updatePerpSymbol() {
+            console.log(
+                "🔄 Updating perp symbol override to:",
+                this.globalPerpSymbol || "auto-generated"
+            );
+
+            window.dispatchEvent(
+                new CustomEvent("perp-symbol-changed", {
+                    detail: {
+                        symbol: this.globalSymbol,
+                        quote: this.globalQuote,
+                        exchange: this.globalExchange,
+                        interval: this.globalInterval,
+                        perpSymbol: this.globalPerpSymbol,
+                        limit: this.globalLimit,
+                    },
+                })
+            );
+
+            this.updateURL();
+            this.loadOverview().catch((e) =>
+                console.warn("Overview reload failed:", e)
+            );
+        },
+
+        // Update data limit
+        updateLimit() {
+            console.log("🔄 Updating data limit to:", this.globalLimit);
+
+            window.dispatchEvent(
+                new CustomEvent("limit-changed", {
+                    detail: {
+                        symbol: this.globalSymbol,
+                        quote: this.globalQuote,
+                        exchange: this.globalExchange,
+                        interval: this.globalInterval,
+                        perpSymbol: this.globalPerpSymbol,
+                        limit: this.globalLimit,
+                    },
+                })
+            );
+
+            this.updateURL();
+            this.loadOverview().catch((e) =>
+                console.warn("Overview reload failed:", e)
+            );
         },
 
         // Fetch and compose overview from existing endpoints
         async loadOverview() {
             const base = this.globalSymbol;
+            const quote = this.globalQuote;
             const exchange = this.globalExchange;
             const interval = this.globalInterval;
-            const quote = "USDT";
+            const perpSymbol = this.globalPerpSymbol || `${base}${quote}`;
+            const limit = this.globalLimit;
+
+            console.log("🔄 Loading Perp-Quarterly Overview:", {
+                base,
+                quote,
+                exchange,
+                interval,
+                perpSymbol,
+                limit,
+            });
 
             // Execute in parallel
             const [analytics, history] = await Promise.all([
@@ -176,14 +286,16 @@ function perpQuarterlySpreadController() {
                     base,
                     quote,
                     interval,
-                    limit: 2000,
+                    limit: parseInt(limit),
+                    perp_symbol: perpSymbol,
                 }),
                 this.fetchAPI("history", {
                     exchange,
                     base,
                     quote,
                     interval,
-                    limit: 2000,
+                    limit: parseInt(limit),
+                    perp_symbol: perpSymbol,
                 }),
             ]);
 

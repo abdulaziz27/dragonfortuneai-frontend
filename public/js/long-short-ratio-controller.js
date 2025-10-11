@@ -12,7 +12,7 @@ class LongShortRatioController {
         // Default filters
         this.filters = {
             symbol: "BTCUSDT",
-            exchange: null, // null = all exchanges
+            exchange: "Binance", // Default to Binance
             interval: "1h",
             ratioType: "accounts",
             limit: 2000,
@@ -163,63 +163,6 @@ class LongShortRatioController {
             };
         } catch (error) {
             console.error("Error fetching all data:", error);
-            throw error;
-        }
-    }
-
-    /**
-     * Fetch multi-exchange comparison data
-     */
-    async fetchMultiExchangeData() {
-        try {
-            const exchanges = ["Binance", "Bybit", "OKX"];
-
-            const promises = exchanges.map((exchange) => {
-                const originalExchange = this.filters.exchange;
-                this.filters.exchange = exchange;
-
-                return this.filters.ratioType === "accounts"
-                    ? this.fetchTopAccounts()
-                    : this.fetchTopPositions();
-            });
-
-            const results = await Promise.all(promises);
-
-            // Restore original exchange filter
-            this.filters.exchange = null;
-
-            // Map results to exchange names
-            const exchangeData = {};
-            exchanges.forEach((exchange, index) => {
-                const data = results[index];
-                if (data && data.length > 0) {
-                    const latest = data[data.length - 1];
-                    exchangeData[exchange] = {
-                        ratio: parseFloat(
-                            this.filters.ratioType === "accounts"
-                                ? latest.ls_ratio_accounts
-                                : latest.ls_ratio_positions
-                        ),
-                        longPct: parseFloat(
-                            this.filters.ratioType === "accounts"
-                                ? latest.long_accounts
-                                : latest.long_positions_percent
-                        ),
-                        shortPct: parseFloat(
-                            this.filters.ratioType === "accounts"
-                                ? latest.short_accounts
-                                : latest.short_positions_percent
-                        ),
-                        pair: latest.pair,
-                        timestamp: latest.ts,
-                    };
-                }
-            });
-
-            console.log("📊 Exchange data prepared:", exchangeData);
-            return exchangeData;
-        } catch (error) {
-            console.error("Error fetching multi-exchange data:", error);
             throw error;
         }
     }

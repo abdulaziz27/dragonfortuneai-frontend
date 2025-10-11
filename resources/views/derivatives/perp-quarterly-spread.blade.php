@@ -32,19 +32,28 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <!-- Base Asset -->
                     <select class="form-select" style="width: 120px;" x-model="globalSymbol" @change="updateSymbol()">
-                        <option value="BTC">Bitcoin</option>
-                        <option value="ETH">Ethereum</option>
-                        <option value="SOL">Solana</option>
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
+                        <option value="SOL">SOL</option>
                         <option value="BNB">BNB</option>
                         <option value="XRP">XRP</option>
-                        <option value="ADA">Cardano</option>
-                        <option value="DOGE">Dogecoin</option>
-                        <option value="MATIC">Polygon</option>
-                        <option value="DOT">Polkadot</option>
-                        <option value="AVAX">Avalanche</option>
+                        <option value="ADA">ADA</option>
+                        <option value="DOGE">DOGE</option>
+                        <option value="MATIC">MATIC</option>
+                        <option value="DOT">DOT</option>
+                        <option value="AVAX">AVAX</option>
                     </select>
 
+                    <!-- Quote Asset -->
+                    <select class="form-select" style="width: 100px;" x-model="globalQuote" @change="updateQuote()">
+                        <option value="USDT">USDT</option>
+                        <option value="USD">USD</option>
+                        <option value="BUSD">BUSD</option>
+                    </select>
+
+                    <!-- Exchange -->
                     <select class="form-select" style="width: 140px;" x-model="globalExchange" @change="updateExchange()">
                         <option value="Binance">Binance</option>
                         <option value="Bybit">Bybit</option>
@@ -54,12 +63,32 @@
                         <option value="Deribit">Deribit</option>
                     </select>
 
+                    <!-- Interval -->
                     <select class="form-select" style="width: 120px;" x-model="globalInterval" @change="updateInterval()">
                         <option value="5m">5 Minutes</option>
                         <option value="15m">15 Minutes</option>
                         <option value="1h">1 Hour</option>
                         <option value="4h">4 Hours</option>
                         <option value="1d">1 Day</option>
+                    </select>
+
+                    <!-- Perp Symbol Override (Optional) -->
+                    <input type="text"
+                           class="form-control"
+                           style="width: 140px;"
+                           x-model="globalPerpSymbol"
+                           @input="updatePerpSymbol()"
+                           placeholder="BTCUSDT (auto)"
+                           title="Override perp symbol (optional)">
+
+                    <!-- Data Limit -->
+                    <select class="form-select" style="width: 120px;" x-model="globalLimit" @change="updateLimit()">
+                        <option value="100">100</option>
+                        <option value="500">500</option>
+                        <option value="1000">1,000</option>
+                        <option value="2000">2,000</option>
+                        <option value="5000">5,000</option>
+                        <option value="10000">10,000</option>
                     </select>
 
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
@@ -186,7 +215,6 @@
 @section('scripts')
     <!-- Chart.js - Load BEFORE Alpine components -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
     <!-- Wait for Chart.js to load -->
     <script>

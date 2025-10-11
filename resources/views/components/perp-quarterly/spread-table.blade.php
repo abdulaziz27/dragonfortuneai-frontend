@@ -90,9 +90,12 @@
 function spreadDataTable(initialSymbol = 'BTC', initialExchange = 'Binance', displayLimit = 20) {
     return {
         symbol: initialSymbol,
+        quote: 'USDT',
         exchange: initialExchange,
-        interval: '1h',
-        limit: displayLimit,
+        interval: '5m',
+        perpSymbol: '', // Auto-generated if empty
+        limit: '2000', // Data limit for API
+        displayLimit: displayLimit, // Display limit for table
         loading: false,
         tableData: [],
         totalPoints: 0,
@@ -109,16 +112,35 @@ function spreadDataTable(initialSymbol = 'BTC', initialExchange = 'Binance', dis
             // Listen to global filter changes
             window.addEventListener('symbol-changed', (e) => {
                 this.symbol = e.detail?.symbol || this.symbol;
+                this.quote = e.detail?.quote || this.quote;
                 this.exchange = e.detail?.exchange || this.exchange;
                 this.interval = e.detail?.interval || this.interval;
+                this.perpSymbol = e.detail?.perpSymbol || this.perpSymbol;
+                this.limit = e.detail?.limit || this.limit;
+                this.loadData();
+            });
+            window.addEventListener('quote-changed', (e) => {
+                this.quote = e.detail?.quote || this.quote;
+                this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
             window.addEventListener('exchange-changed', (e) => {
                 this.exchange = e.detail?.exchange || this.exchange;
+                this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
             window.addEventListener('interval-changed', (e) => {
                 this.interval = e.detail?.interval || this.interval;
+                this.limit = e.detail?.limit || this.limit;
+                this.loadData();
+            });
+            window.addEventListener('perp-symbol-changed', (e) => {
+                this.perpSymbol = e.detail?.perpSymbol || this.perpSymbol;
+                this.limit = e.detail?.limit || this.limit;
+                this.loadData();
+            });
+            window.addEventListener('limit-changed', (e) => {
+                this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
             window.addEventListener('refresh-all', () => {
@@ -136,13 +158,17 @@ function spreadDataTable(initialSymbol = 'BTC', initialExchange = 'Binance', dis
         async loadData() {
             this.loading = true;
             try {
+                const actualPerpSymbol = this.perpSymbol || `${this.symbol}${this.quote}`;
                 const params = new URLSearchParams({
                     exchange: this.exchange,
                     base: this.symbol,
-                    quote: 'USDT',
+                    quote: this.quote,
                     interval: this.interval,
-                    limit: '100' // Fetch more, display limited
+                    limit: this.limit,
+                    perp_symbol: actualPerpSymbol
                 });
+
+                console.log('📡 Fetching Perp-Quarterly Table Data:', params.toString());
 
                 const baseMeta = document.querySelector('meta[name="api-base-url"]');
                 const configuredBase = (baseMeta?.content || '').trim();

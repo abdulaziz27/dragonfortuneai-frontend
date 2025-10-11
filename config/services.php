@@ -37,7 +37,7 @@ return [
 
     // Custom API base URL for frontend fetches (used by deployment envs)
     'api' => [
-        'base_url' => env('API_BASE_URL', ''),
+        'base_url' => env('API_BASE_URL', 'http://202.155.90.20:8000'),
     ],
 
 ];

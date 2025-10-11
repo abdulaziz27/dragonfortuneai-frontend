@@ -57,9 +57,18 @@
 
                     <select class="form-select" style="width: 120px;" x-model="globalInterval" @change="updateInterval()">
                         <option value="15m">15 Minutes</option>
+                        <option value="30m">30 Minutes</option>
                         <option value="1h">1 Hour</option>
                         <option value="4h">4 Hours</option>
                         <option value="1d">1 Day</option>
+                    </select>
+
+                    <select class="form-select" style="width: 100px;" x-model="globalLimit" @change="updateLimit()">
+                        <option value="100">100</option>
+                        <option value="500">500</option>
+                        <option value="1000">1000</option>
+                        <option value="2000">2000</option>
+                        <option value="5000">5000</option>
                     </select>
 
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
@@ -115,107 +124,203 @@
             </div>
         </div>
 
-        <!-- Charts Row -->
+        <!-- Data Tables Row -->
         <div class="row g-3">
-            <!-- Main Ratio Chart -->
-            <div class="col-lg-8">
-                <div class="df-panel p-4 h-100" x-data="ratioHistoryChart()" x-init="init()">
+            <!-- Overview Summary -->
+            <div class="col-lg-6">
+                <div class="df-panel p-4 h-100" x-data="overviewSummaryTable()" x-init="init()">
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div>
-                            <h5 class="mb-0">📈 Long/Short Ratio History</h5>
-                            <small class="text-secondary">Time series analysis</small>
-                        </div>
-                        <div class="d-flex gap-2 align-items-center">
-                            <select class="form-select form-select-sm" style="width: 120px;" x-model="chartType" @change="renderChart()">
-                                <option value="line">Line Chart</option>
-                                <option value="bar">Bar Chart</option>
-                                <option value="area">Area Chart</option>
-                            </select>
-                            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
-                        </div>
-                    </div>
-
-                    <!-- Chart Container -->
-                    <div style="height: 400px; position: relative;">
-                        <canvas x-ref="ratioCanvas"></canvas>
-                    </div>
-
-                    <!-- Stats Summary -->
-                    <div class="row g-2 mt-3">
-                        <div class="col-md-3 col-6">
-                            <div class="p-2 rounded bg-primary bg-opacity-10 text-center">
-                                <div class="small text-secondary">Data Points</div>
-                                <div class="fw-bold" x-text="dataPoints">0</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-6">
-                            <div class="p-2 rounded bg-success bg-opacity-10 text-center">
-                                <div class="small text-secondary">Avg Ratio</div>
-                                <div class="fw-bold text-success" x-text="formatRatio(avgRatio)">--</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-6">
-                            <div class="p-2 rounded bg-warning bg-opacity-10 text-center">
-                                <div class="small text-secondary">Max Ratio</div>
-                                <div class="fw-bold text-warning" x-text="formatRatio(maxRatio)">--</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-6">
-                            <div class="p-2 rounded bg-danger bg-opacity-10 text-center">
-                                <div class="small text-secondary">Min Ratio</div>
-                                <div class="fw-bold text-danger" x-text="formatRatio(minRatio)">--</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- No Data State -->
-                    <div x-show="!loading && !hasData"
-                         class="position-absolute top-50 start-50 translate-middle text-center"
-                         style="z-index: 10;">
-                        <div class="text-secondary mb-2" style="font-size: 3rem;">📈</div>
-                        <div class="text-secondary">No ratio data available</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Distribution Chart -->
-            <div class="col-lg-4">
-                <div class="df-panel p-4 h-100" x-data="distributionChart()" x-init="init()">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <div>
-                            <h5 class="mb-0">🥧 Long/Short Distribution</h5>
-                            <small class="text-secondary">Current positioning</small>
+                            <h5 class="mb-0">📊 Overview Summary</h5>
+                            <small class="text-secondary">Accounts vs Positions comparison</small>
                         </div>
                         <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
                     </div>
 
-                    <!-- Chart Container -->
-                    <div style="height: 400px; position: relative;">
-                        <canvas x-ref="distributionCanvas"></canvas>
+                    <!-- Summary Table -->
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>Accounts</th>
+                                    <th>Positions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Latest Ratio</strong></td>
+                                    <td x-text="formatRatio(accountsSummary?.latest_ratio)">--</td>
+                                    <td x-text="formatRatio(positionsSummary?.latest_ratio)">--</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Average Ratio</strong></td>
+                                    <td x-text="formatRatio(accountsSummary?.average_ratio)">--</td>
+                                    <td x-text="formatRatio(positionsSummary?.average_ratio)">--</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Max Ratio</strong></td>
+                                    <td x-text="formatRatio(accountsSummary?.max_ratio)">--</td>
+                                    <td x-text="formatRatio(positionsSummary?.max_ratio)">--</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Min Ratio</strong></td>
+                                    <td x-text="formatRatio(accountsSummary?.min_ratio)">--</td>
+                                    <td x-text="formatRatio(positionsSummary?.min_ratio)">--</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Avg Long %</strong></td>
+                                    <td x-text="formatPercentage(accountsSummary?.avg_long_pct)">--</td>
+                                    <td x-text="formatPercentage(positionsSummary?.avg_long_pct)">--</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Avg Short %</strong></td>
+                                    <td x-text="formatPercentage(accountsSummary?.avg_short_pct)">--</td>
+                                    <td x-text="formatPercentage(positionsSummary?.avg_short_pct)">--</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Bias</strong></td>
+                                    <td><span class="badge" :class="getBiasClass(accountsSummary?.bias)" x-text="accountsSummary?.bias || '--'">--</span></td>
+                                    <td><span class="badge" :class="getBiasClass(positionsSummary?.bias)" x-text="positionsSummary?.bias || '--'">--</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Observations</strong></td>
+                                    <td x-text="accountsSummary?.observations || '--'">--</td>
+                                    <td x-text="positionsSummary?.observations || '--'">--</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signals & Insights -->
+            <div class="col-lg-6">
+                <div class="df-panel p-4 h-100" x-data="signalsPanel()" x-init="init()">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div>
+                            <h5 class="mb-0">🚨 Signals & Insights</h5>
+                            <small class="text-secondary">Market alerts and analysis</small>
+                        </div>
+                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
                     </div>
 
-                    <!-- Legend -->
-                    <div class="mt-3 d-flex justify-content-center gap-3">
-                        <div class="d-flex align-items-center gap-2">
-                            <div style="width: 20px; height: 20px; background: rgba(34, 197, 94, 0.8); border-radius: 4px;"></div>
-                            <span class="small">Long Positions</span>
-                        </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <div style="width: 20px; height: 20px; background: rgba(239, 68, 68, 0.8); border-radius: 4px;"></div>
-                            <span class="small">Short Positions</span>
-                        </div>
+                    <!-- Signals List -->
+                    <div x-show="signals && signals.length > 0">
+                        <template x-for="signal in signals" :key="signal.type">
+                            <div class="alert" :class="getSignalClass(signal.severity)" role="alert">
+                                <div class="d-flex align-items-start">
+                                    <div class="me-2">
+                                        <span x-text="getSignalIcon(signal.severity)">⚠️</span>
+                                    </div>
+                                    <div>
+                                        <strong x-text="signal.type">Signal Type</strong>
+                                        <p class="mb-0 mt-1" x-text="signal.message">Signal message</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                     </div>
 
-                    <!-- No Data State -->
-                    <div x-show="!loading && !hasData"
-                         class="position-absolute top-50 start-50 translate-middle text-center"
-                         style="z-index: 10;">
-                        <div class="text-secondary mb-2" style="font-size: 3rem;">🥧</div>
-                        <div class="text-secondary">No distribution data available</div>
+                    <div x-show="!signals || signals.length === 0" class="text-center text-muted py-4">
+                        <div>📊</div>
+                        <div>No signals available</div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- Detailed Data Tables -->
+        <div class="row g-3">
+            <!-- Top Accounts Table -->
+            <div class="col-lg-6">
+                <div class="df-panel p-3" x-data="topAccountsTable()" x-init="init()">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div>
+                            <h5 class="mb-0">👥 Top Accounts Data</h5>
+                            <small class="text-secondary">Recent account positioning data</small>
+                        </div>
+                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+                    </div>
+
+                    <!-- Accounts Table -->
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-striped">
+                            <thead class="sticky-top bg-white">
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Exchange</th>
+                                    <th>Long %</th>
+                                    <th>Short %</th>
+                                    <th>L/S Ratio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="account in topAccounts" :key="account.ts">
+                                    <tr>
+                                        <td x-text="formatTimestamp(account.ts)">--</td>
+                                        <td x-text="account.exchange">--</td>
+                                        <td class="text-success" x-text="formatPercentage(account.long_accounts)">--</td>
+                                        <td class="text-danger" x-text="formatPercentage(account.short_accounts)">--</td>
+                                        <td class="fw-bold" x-text="formatRatio(account.ls_ratio_accounts)">--</td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div x-show="!topAccounts || topAccounts.length === 0" class="text-center text-muted py-4">
+                        <div>📊</div>
+                        <div>No accounts data available</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Positions Table -->
+            <div class="col-lg-6">
+                <div class="df-panel p-3" x-data="topPositionsTable()" x-init="init()">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div>
+                            <h5 class="mb-0">💰 Top Positions Data</h5>
+                            <small class="text-secondary">Recent position sizing data</small>
+                        </div>
+                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+                    </div>
+
+                    <!-- Positions Table -->
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-striped">
+                            <thead class="sticky-top bg-white">
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Exchange</th>
+                                    <th>Long %</th>
+                                    <th>Short %</th>
+                                    <th>L/S Ratio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="position in topPositions" :key="position.ts">
+                                    <tr>
+                                        <td x-text="formatTimestamp(position.ts)">--</td>
+                                        <td x-text="position.exchange">--</td>
+                                        <td class="text-success" x-text="formatPercentage(position.long_positions_percent)">--</td>
+                                        <td class="text-danger" x-text="formatPercentage(position.short_positions_percent)">--</td>
+                                        <td class="fw-bold" x-text="formatRatio(position.ls_ratio_positions)">--</td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div x-show="!topPositions || topPositions.length === 0" class="text-center text-muted py-4">
+                        <div>📊</div>
+                        <div>No positions data available</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
 
         <!-- Exchange Comparison Table -->
         <div class="row g-3">
@@ -324,8 +429,9 @@
                 // Global state
                 globalSymbol: "BTC",
                 globalRatioType: "accounts",
-                globalExchange: "",
+                globalExchange: "Binance",
                 globalInterval: "1h",
+                globalLimit: 1000,
                 globalLoading: false,
 
                 // Overview data
@@ -407,36 +513,39 @@
                         const interval = this.globalInterval;
                         const ratioType = this.globalRatioType;
                         const exchange = this.globalExchange || null;
+                        const limit = this.globalLimit;
 
-                        // Fetch all data in parallel
-                        const [analytics, topAccounts, topPositions, multiExchange] = await Promise.all([
+                        // Fetch overview data first, then detailed data
+                        const [overview, analytics, topAccounts, topPositions] = await Promise.all([
+                            this.fetchAPI("overview", {
+                                limit: limit,
+                            }),
                             this.fetchAPI("analytics", {
                                 symbol: pair,
                                 exchange: exchange,
                                 interval: interval,
                                 ratio_type: ratioType,
-                                limit: 2000,
+                                limit: limit,
                             }),
                             this.fetchAPI("top-accounts", {
                                 symbol: pair,
                                 exchange: exchange,
                                 interval: interval,
-                                limit: 1000,
+                                limit: limit,
                             }),
                             this.fetchAPI("top-positions", {
                                 symbol: pair,
                                 exchange: exchange,
                                 interval: interval,
-                                limit: 1000,
-                            }),
-                            this.fetchAPI("multi-exchange", {
-                                symbol: baseSymbol,
-                                exchange: exchange,
-                                interval: interval,
-                                ratio_type: ratioType,
-                                limit: 1000,
+                                limit: limit,
                             }),
                         ]);
+
+                        // Process overview data
+                        const overviewData = overview || {};
+                        const accountsSummary = overviewData.accounts_summary || {};
+                        const positionsSummary = overviewData.positions_summary || {};
+                        const signals = overviewData.signals || [];
 
                         // Process analytics data
                         const analyticsData = analytics || {};
@@ -444,33 +553,37 @@
                         const positioning = analyticsData.positioning || {};
                         const trend = analyticsData.trend || {};
 
-                        // Process timeseries data
+                        // Process timeseries data from top-accounts or top-positions
                         const timeseries = [];
-                        if (analyticsData.timeseries && Array.isArray(analyticsData.timeseries)) {
-                            timeseries.push(...analyticsData.timeseries.map(item => ({
+                        const sourceData = ratioType === "accounts" ?
+                            (topAccounts && topAccounts.data ? topAccounts.data : []) :
+                            (topPositions && topPositions.data ? topPositions.data : []);
+
+                        if (sourceData && Array.isArray(sourceData)) {
+                            timeseries.push(...sourceData.map(item => ({
                                 ts: item.ts,
-                                ratio: parseFloat(item.ratio || 0),
-                                longPct: parseFloat(item.long_percent || 0),
-                                shortPct: parseFloat(item.short_percent || 0),
+                                ratio: parseFloat(ratioType === "accounts" ? item.ls_ratio_accounts : item.ls_ratio_positions),
+                                longPct: parseFloat(ratioType === "accounts" ? item.long_accounts : item.long_positions_percent),
+                                shortPct: parseFloat(ratioType === "accounts" ? item.short_accounts : item.short_positions_percent),
                                 exchange: item.exchange,
                                 pair: item.pair,
                             })));
                         }
 
-                        // Process exchange data
+                        // Process exchange data - create comparison from multiple exchanges
                         const exchangeData = {};
-                        if (multiExchange && Array.isArray(multiExchange)) {
-                            multiExchange.forEach(item => {
-                                if (item.exchange) {
-                                    exchangeData[item.exchange] = {
-                                        ratio: parseFloat(item.ratio || 0),
-                                        longPct: parseFloat(item.long_percent || 0),
-                                        shortPct: parseFloat(item.short_percent || 0),
-                                        pair: item.pair,
-                                        timestamp: item.ts,
-                                    };
-                                }
-                            });
+                        const exchanges = ["Binance", "Bybit", "OKX"];
+
+                        // For now, we'll use the current exchange data
+                        if (exchange && sourceData && sourceData.length > 0) {
+                            const latest = sourceData[sourceData.length - 1];
+                            exchangeData[exchange] = {
+                                ratio: parseFloat(ratioType === "accounts" ? latest.ls_ratio_accounts : latest.ls_ratio_positions),
+                                longPct: parseFloat(ratioType === "accounts" ? latest.long_accounts : latest.long_positions_percent),
+                                shortPct: parseFloat(ratioType === "accounts" ? latest.short_accounts : latest.short_positions_percent),
+                                pair: latest.pair,
+                                timestamp: latest.ts,
+                            };
                         }
 
                         this.overview = {
@@ -483,14 +596,20 @@
                                 units: { ratio: "ratio", percentage: "percentage" },
                                 last_updated: Date.now(),
                             },
+                            // Overview data
+                            accountsSummary: accountsSummary,
+                            positionsSummary: positionsSummary,
+                            signals: signals,
+                            // Analytics data
                             analytics: analyticsData,
                             ratioStats: ratioStats,
                             positioning: positioning,
                             trend: trend,
+                            // Timeseries data
                             timeseries: timeseries,
                             exchangeData: exchangeData,
-                            topAccounts: topAccounts || [],
-                            topPositions: topPositions || [],
+                            topAccounts: (topAccounts && topAccounts.data) ? topAccounts.data : [],
+                            topPositions: (topPositions && topPositions.data) ? topPositions.data : [],
                         };
 
                         // Broadcast overview ready event
@@ -550,6 +669,16 @@
                     );
                 },
 
+                // Update limit and reload
+                updateLimit() {
+                    console.log("📊 Limit changed to:", this.globalLimit);
+                    window.dispatchEvent(
+                        new CustomEvent("limit-changed", {
+                            detail: { limit: this.globalLimit },
+                        })
+                    );
+                },
+
                 // Refresh all components
                 refreshAll() {
                     this.globalLoading = true;
@@ -563,6 +692,7 @@
                                 ratioType: this.globalRatioType,
                                 exchange: this.globalExchange,
                                 interval: this.globalInterval,
+                                limit: this.globalLimit,
                             },
                         })
                     );
@@ -625,6 +755,7 @@
                     console.log("Ratio Type:", this.globalRatioType);
                     console.log("Exchange:", this.globalExchange || "All");
                     console.log("Interval:", this.globalInterval);
+                    console.log("Limit:", this.globalLimit);
                     console.log("Loading:", this.globalLoading);
                     console.log("Overview:", this.overview ? "Loaded" : "Not loaded");
                 },
@@ -662,6 +793,10 @@
                     });
 
                     window.addEventListener('interval-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('limit-changed', () => {
                         this.loadData();
                     });
 
@@ -776,6 +911,10 @@
                     });
 
                     window.addEventListener('interval-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('limit-changed', () => {
                         this.loadData();
                     });
 
@@ -994,6 +1133,10 @@
                         this.loadData();
                     });
 
+                    window.addEventListener('limit-changed', () => {
+                        this.loadData();
+                    });
+
                     window.addEventListener('refresh-all', () => {
                         this.loadData();
                     });
@@ -1129,6 +1272,10 @@
                         this.loadData();
                     });
 
+                    window.addEventListener('limit-changed', () => {
+                        this.loadData();
+                    });
+
                     window.addEventListener('refresh-all', () => {
                         this.loadData();
                     });
@@ -1179,6 +1326,347 @@
                         minute: '2-digit',
                         hour12: false,
                     });
+                },
+            };
+        }
+
+        // Overview Summary Table Component
+        function overviewSummaryTable() {
+            return {
+                loading: false,
+                accountsSummary: null,
+                positionsSummary: null,
+
+                async init() {
+                    // Listen for overview ready
+                    window.addEventListener('long-short-ratio-overview-ready', (e) => {
+                        this.applyOverview(e.detail);
+                    });
+
+                    // Listen for filter changes
+                    window.addEventListener('symbol-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('ratio-type-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('exchange-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('interval-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('limit-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('refresh-all', () => {
+                        this.loadData();
+                    });
+
+                    // Initial load with delay to ensure DOM is ready
+                    setTimeout(() => {
+                        if (this.$root?.overview) {
+                            this.applyOverview(this.$root.overview);
+                        } else {
+                            this.loadData();
+                        }
+                    }, 100);
+                },
+
+                applyOverview(overview) {
+                    if (!overview) {
+                        return;
+                    }
+
+                    this.accountsSummary = overview.accountsSummary || null;
+                    this.positionsSummary = overview.positionsSummary || null;
+                },
+
+                async loadData() {
+                    this.loading = true;
+                    setTimeout(() => {
+                        this.loading = false;
+                    }, 1000);
+                },
+
+                formatRatio(value) {
+                    if (value === null || value === undefined) return 'N/A';
+                    const num = parseFloat(value);
+                    if (isNaN(num)) return 'N/A';
+                    return num.toFixed(3);
+                },
+
+                formatPercentage(value) {
+                    if (value === null || value === undefined) return 'N/A';
+                    const num = parseFloat(value);
+                    if (isNaN(num)) return 'N/A';
+                    return num.toFixed(1) + '%';
+                },
+
+                getBiasClass(bias) {
+                    if (bias === 'long') return 'bg-success';
+                    if (bias === 'short') return 'bg-danger';
+                    return 'bg-secondary';
+                },
+            };
+        }
+
+        // Signals Panel Component
+        function signalsPanel() {
+            return {
+                loading: false,
+                signals: [],
+
+                async init() {
+                    // Listen for overview ready
+                    window.addEventListener('long-short-ratio-overview-ready', (e) => {
+                        this.applyOverview(e.detail);
+                    });
+
+                    // Listen for filter changes
+                    window.addEventListener('symbol-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('ratio-type-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('exchange-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('interval-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('limit-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('refresh-all', () => {
+                        this.loadData();
+                    });
+
+                    // Initial load with delay to ensure DOM is ready
+                    setTimeout(() => {
+                        if (this.$root?.overview) {
+                            this.applyOverview(this.$root.overview);
+                        } else {
+                            this.loadData();
+                        }
+                    }, 100);
+                },
+
+                applyOverview(overview) {
+                    if (!overview) {
+                        return;
+                    }
+
+                    this.signals = overview.signals || [];
+                },
+
+                async loadData() {
+                    this.loading = true;
+                    setTimeout(() => {
+                        this.loading = false;
+                    }, 1000);
+                },
+
+                getSignalClass(severity) {
+                    if (severity === 'high') return 'alert-danger';
+                    if (severity === 'medium') return 'alert-warning';
+                    if (severity === 'low') return 'alert-info';
+                    return 'alert-secondary';
+                },
+
+                getSignalIcon(severity) {
+                    if (severity === 'high') return '🚨';
+                    if (severity === 'medium') return '⚠️';
+                    if (severity === 'low') return 'ℹ️';
+                    return '📊';
+                },
+            };
+        }
+
+
+        // Top Accounts Table Component
+        function topAccountsTable() {
+            return {
+                loading: false,
+                topAccounts: [],
+
+                async init() {
+                    // Listen for overview ready
+                    window.addEventListener('long-short-ratio-overview-ready', (e) => {
+                        this.applyOverview(e.detail);
+                    });
+
+                    // Listen for filter changes
+                    window.addEventListener('symbol-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('ratio-type-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('exchange-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('interval-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('limit-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('refresh-all', () => {
+                        this.loadData();
+                    });
+
+                    // Initial load with delay to ensure DOM is ready
+                    setTimeout(() => {
+                        if (this.$root?.overview) {
+                            this.applyOverview(this.$root.overview);
+                        } else {
+                            this.loadData();
+                        }
+                    }, 100);
+                },
+
+                applyOverview(overview) {
+                    if (!overview) {
+                        return;
+                    }
+
+                    this.topAccounts = overview.topAccounts || [];
+                },
+
+                async loadData() {
+                    this.loading = true;
+                    setTimeout(() => {
+                        this.loading = false;
+                    }, 1000);
+                },
+
+                formatTimestamp(ts) {
+                    const date = new Date(ts);
+                    return date.toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                    });
+                },
+
+                formatPercentage(value) {
+                    if (value === null || value === undefined) return 'N/A';
+                    const num = parseFloat(value);
+                    if (isNaN(num)) return 'N/A';
+                    return num.toFixed(1) + '%';
+                },
+
+                formatRatio(value) {
+                    if (value === null || value === undefined) return 'N/A';
+                    const num = parseFloat(value);
+                    if (isNaN(num)) return 'N/A';
+                    return num.toFixed(3);
+                },
+            };
+        }
+
+        // Top Positions Table Component
+        function topPositionsTable() {
+            return {
+                loading: false,
+                topPositions: [],
+
+                async init() {
+                    // Listen for overview ready
+                    window.addEventListener('long-short-ratio-overview-ready', (e) => {
+                        this.applyOverview(e.detail);
+                    });
+
+                    // Listen for filter changes
+                    window.addEventListener('symbol-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('ratio-type-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('exchange-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('interval-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('limit-changed', () => {
+                        this.loadData();
+                    });
+
+                    window.addEventListener('refresh-all', () => {
+                        this.loadData();
+                    });
+
+                    // Initial load with delay to ensure DOM is ready
+                    setTimeout(() => {
+                        if (this.$root?.overview) {
+                            this.applyOverview(this.$root.overview);
+                        } else {
+                            this.loadData();
+                        }
+                    }, 100);
+                },
+
+                applyOverview(overview) {
+                    if (!overview) {
+                        return;
+                    }
+
+                    this.topPositions = overview.topPositions || [];
+                },
+
+                async loadData() {
+                    this.loading = true;
+                    setTimeout(() => {
+                        this.loading = false;
+                    }, 1000);
+                },
+
+                formatTimestamp(ts) {
+                    const date = new Date(ts);
+                    return date.toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                    });
+                },
+
+                formatPercentage(value) {
+                    if (value === null || value === undefined) return 'N/A';
+                    const num = parseFloat(value);
+                    if (isNaN(num)) return 'N/A';
+                    return num.toFixed(1) + '%';
+                },
+
+                formatRatio(value) {
+                    if (value === null || value === undefined) return 'N/A';
+                    const num = parseFloat(value);
+                    if (isNaN(num)) return 'N/A';
+                    return num.toFixed(3);
                 },
             };
         }

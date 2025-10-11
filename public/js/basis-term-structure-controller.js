@@ -25,7 +25,8 @@ function basisTermStructureController() {
         // Global state
         globalSymbol: "BTC",
         globalExchange: "Binance",
-        globalInterval: "1h",
+        globalInterval: "5m",
+        globalLimit: "2000", // Data limit for API calls
         globalLoading: false,
 
         // Component references
@@ -44,6 +45,8 @@ function basisTermStructureController() {
             console.log("🚀 Basis & Term Structure Dashboard initialized");
             console.log("📊 Symbol:", this.globalSymbol);
             console.log("🏢 Exchange:", this.globalExchange);
+            console.log("⏱️ Interval:", this.globalInterval);
+            console.log("📈 Data Limit:", this.globalLimit);
 
             // Setup event listeners
             this.setupEventListeners();
@@ -122,6 +125,7 @@ function basisTermStructureController() {
                         symbol: this.globalSymbol,
                         exchange: this.globalExchange,
                         interval: this.globalInterval,
+                        limit: this.globalLimit,
                     },
                 })
             );
@@ -141,6 +145,7 @@ function basisTermStructureController() {
                         symbol: this.globalSymbol,
                         exchange: this.globalExchange,
                         interval: this.globalInterval,
+                        limit: this.globalLimit,
                     },
                 })
             );
@@ -159,6 +164,26 @@ function basisTermStructureController() {
                         symbol: this.globalSymbol,
                         exchange: this.globalExchange,
                         interval: this.globalInterval,
+                        limit: this.globalLimit,
+                    },
+                })
+            );
+
+            this.updateURL();
+        },
+
+        // Update data limit
+        updateLimit() {
+            console.log("🔄 Updating data limit to:", this.globalLimit);
+
+            // Dispatch event to all components
+            window.dispatchEvent(
+                new CustomEvent("limit-changed", {
+                    detail: {
+                        symbol: this.globalSymbol,
+                        exchange: this.globalExchange,
+                        interval: this.globalInterval,
+                        limit: this.globalLimit,
                     },
                 })
             );
@@ -184,8 +209,8 @@ function basisTermStructureController() {
                 this.globalSymbol ||
                 "BTC"
             ).toUpperCase();
-            // Default to quarterly contract; can be extended later
-            return `${sym}USDT_240628`; // Example quarterly expiry
+            // Use same symbol as spot pair for perpetual contracts
+            return `${sym}USDT`; // Perpetual futures
         },
 
         // Fetch and compose overview from existing endpoints
@@ -198,7 +223,17 @@ function basisTermStructureController() {
             const pair = this.buildPair(baseSymbol);
             const futuresSymbol = this.buildFuturesSymbol(baseSymbol);
             const exchange = this.globalExchange;
-            const interval = this.globalInterval || "1h";
+            const interval = "5m"; // Use 5m interval that works with API
+            const limit = this.globalLimit;
+
+            console.log("🔄 Loading Basis Overview:", {
+                baseSymbol,
+                pair,
+                futuresSymbol,
+                exchange,
+                interval,
+                limit,
+            });
 
             // Prepare request params
             const commonRange = {}; // Placeholder to propagate start_time/end_time if later added
@@ -213,7 +248,7 @@ function basisTermStructureController() {
                         spot_pair: pair,
                         futures_symbol: futuresSymbol,
                         interval,
-                        limit: 2000,
+                        limit: parseInt(limit),
                         ...commonRange,
                     })
                 );
@@ -226,7 +261,7 @@ function basisTermStructureController() {
                         spot_pair: pair,
                         futures_symbol: futuresSymbol,
                         interval,
-                        limit: 2000,
+                        limit: parseInt(limit),
                         ...commonRange,
                     })
                 );

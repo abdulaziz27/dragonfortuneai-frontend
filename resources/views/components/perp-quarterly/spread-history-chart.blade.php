@@ -45,8 +45,11 @@
 function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') {
     return {
         symbol: initialSymbol,
+        quote: 'USDT',
         exchange: initialExchange,
-        interval: '1h',
+        interval: '5m',
+        perpSymbol: '', // Auto-generated if empty
+        limit: '2000', // Data limit
         loading: false,
         chart: null,
         chartId: 'spreadHistoryChart_' + Math.random().toString(36).substr(2, 9),
@@ -64,16 +67,35 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
             // Listen to global filter changes
             window.addEventListener('symbol-changed', (e) => {
                 this.symbol = e.detail?.symbol || this.symbol;
+                this.quote = e.detail?.quote || this.quote;
                 this.exchange = e.detail?.exchange || this.exchange;
                 this.interval = e.detail?.interval || this.interval;
+                this.perpSymbol = e.detail?.perpSymbol || this.perpSymbol;
+                this.limit = e.detail?.limit || this.limit;
+                this.loadData();
+            });
+            window.addEventListener('quote-changed', (e) => {
+                this.quote = e.detail?.quote || this.quote;
+                this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
             window.addEventListener('exchange-changed', (e) => {
                 this.exchange = e.detail?.exchange || this.exchange;
+                this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
             window.addEventListener('interval-changed', (e) => {
                 this.interval = e.detail?.interval || this.interval;
+                this.limit = e.detail?.limit || this.limit;
+                this.loadData();
+            });
+            window.addEventListener('perp-symbol-changed', (e) => {
+                this.perpSymbol = e.detail?.perpSymbol || this.perpSymbol;
+                this.limit = e.detail?.limit || this.limit;
+                this.loadData();
+            });
+            window.addEventListener('limit-changed', (e) => {
+                this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
             window.addEventListener('refresh-all', () => {
@@ -89,6 +111,12 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
         },
 
         initChart() {
+            // Destroy existing chart if it exists
+            if (this.chart) {
+                this.chart.destroy();
+                this.chart = null;
+            }
+
             const canvas = document.getElementById(this.chartId);
             if (!canvas) {
                 console.warn('Canvas not found:', this.chartId);
@@ -126,6 +154,7 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: false, // Disable animations to prevent stack overflow
                     interaction: {
                         mode: 'index',
                         intersect: false,
@@ -165,19 +194,15 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
                     },
                     scales: {
                         x: {
-                            type: 'time',
-                            time: {
-                                unit: 'hour',
-                                displayFormats: {
-                                    hour: 'MMM d HH:mm',
-                                    day: 'MMM d'
-                                },
-                            },
                             ticks: {
                                 color: '#94a3b8',
                                 font: { size: 10 },
                                 maxRotation: 45,
                                 minRotation: 0,
+                                callback: function(value, index) {
+                                    // Show every 10th label to avoid crowding
+                                    return index % 10 === 0 ? `#${index}` : '';
+                                }
                             },
                             grid: {
                                 display: false,
@@ -212,18 +237,22 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
         async loadData() {
             this.loading = true;
             try {
+                const actualPerpSymbol = this.perpSymbol || `${this.symbol}${this.quote}`;
                 const params = new URLSearchParams({
                     exchange: this.exchange,
                     base: this.symbol,
-                    quote: 'USDT',
+                    quote: this.quote,
                     interval: this.interval,
-                    limit: '2000'
+                    limit: this.limit,
+                    perp_symbol: actualPerpSymbol
                 });
 
                 const baseMeta = document.querySelector('meta[name="api-base-url"]');
                 const configuredBase = (baseMeta?.content || '').trim();
                 const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
                 const url = base ? `${base}/api/perp-quarterly/history?${params}` : `/api/perp-quarterly/history?${params}`;
+
+                console.log('📡 Fetching Perp-Quarterly History:', url);
 
                 const response = await fetch(url);
 
@@ -245,9 +274,12 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
         updateChart(historyData) {
             if (!this.chart) return;
 
-            // Process data
-            const chartData = historyData.map(row => ({
-                x: row.ts,
+            // Limit data points for performance and slice to avoid stack overflow
+            const limitedData = historyData.slice(-500);
+
+            // Process data with simple index-based x values
+            const chartData = limitedData.map((row, index) => ({
+                x: index,
                 y: parseFloat(row.spread_bps) || 0
             }));
 
@@ -271,8 +303,11 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
         updateChartFromOverview(timeseries) {
             if (!this.chart || !Array.isArray(timeseries)) return;
 
-            const chartData = timeseries.map(row => ({
-                x: row.ts,
+            // Limit data points for performance
+            const limitedData = timeseries.slice(-500);
+
+            const chartData = limitedData.map((row, index) => ({
+                x: index,
                 y: parseFloat(row.spread_bps) || 0
             }));
 

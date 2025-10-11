@@ -154,26 +154,14 @@
                             </div>
                         </li>
                         <li class="df-sidebar-menu-item">
-                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('onchain-metrics')">
+                            <a href="/onchain-metrics" class="df-sidebar-menu-button {{ request()->routeIs('onchain-metrics.*') ? 'active' : '' }}" @click="closeSidebar()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                                     <path d="M8 12h8"/>
                                     <path d="M12 8v8"/>
                                 </svg>
                                 <span>On‑Chain Metrics</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['onchain-metrics'] }">
-                                    <path d="M9 18l6-6-6-6"/>
-                                </svg>
-                            </button>
-                            <div class="df-submenu{{ request()->routeIs('onchain-metrics.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['onchain-metrics'] }">
-                                <a href="/onchain-metrics/mvrv-zscore" class="df-submenu-item {{ request()->routeIs('onchain-metrics.mvrv-zscore') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">MVRV &amp; Z-Score</a>
-                                <a href="/onchain-metrics/lth-sth-supply" class="df-submenu-item {{ request()->routeIs('onchain-metrics.lth-sth-supply') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">LTH vs STH Supply</a>
-                                <a href="/onchain-metrics/exchange-netflow" class="df-submenu-item {{ request()->routeIs('onchain-metrics.exchange-netflow') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Exchange Netflow (BTC &amp; Stablecoin)</a>
-                                <a href="/onchain-metrics/realized-cap-hodl" class="df-submenu-item {{ request()->routeIs('onchain-metrics.realized-cap-hodl') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Realized Cap &amp; HODL Waves</a>
-                                <a href="/onchain-metrics/reserve-risk-sopr" class="df-submenu-item {{ request()->routeIs('onchain-metrics.reserve-risk-sopr') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Reserve Risk / SOPR / Dormancy / CDD</a>
-                                <a href="/onchain-metrics/miner-metrics" class="df-submenu-item {{ request()->routeIs('onchain-metrics.miner-metrics') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Miner Metrics</a>
-                                <a href="/onchain-metrics/whale-holdings" class="df-submenu-item {{ request()->routeIs('onchain-metrics.whale-holdings') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Whale Holdings</a>
-                            </div>
+                            </a>
                         </li>
                         <li class="df-sidebar-menu-item">
                             <a href="/options-metrics/dashboard" class="df-sidebar-menu-button {{ request()->routeIs('options-metrics.dashboard') ? 'active' : '' }}" @click="closeSidebar()">
