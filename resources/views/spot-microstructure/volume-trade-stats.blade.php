@@ -1,341 +1,551 @@
 @extends('layouts.app')
 
-@section('title', 'Volume Trade Stats')
-
 @section('content')
-<div class="df-container">
-    <div class="df-header">
-        <h1 class="df-title">Volume Trade Statistics</h1>
-        <p class="df-subtitle">Comprehensive volume analysis and trade statistics</p>
-    </div>
+    {{--
+        Volume & Trade Stats Dashboard
+        Comprehensive spot microstructure analysis
 
-    <div class="df-grid">
-        <!-- Volume Chart -->
-        <div class="df-card">
-            <div class="df-card-header">
-                <h3>Volume Analysis</h3>
-                <div class="df-card-actions">
-                    <select class="df-select">
-                        <option value="1h">1 Hour</option>
-                        <option value="4h">4 Hours</option>
-                        <option value="1d">1 Day</option>
-                        <option value="7d">7 Days</option>
+        Data Sources:
+        - Trade Statistics: Frequency and distribution of trades
+        - Volume Profile: Aggregated volume analysis with buy/sell breakdown
+        - Volume Profile Detailed: Volume distribution by price levels (POC, Value Area)
+        - Volume Stats: Time-series volume data with volatility metrics
+    --}}
+
+    <div class="d-flex flex-column h-100 gap-3" x-data="volumeTradeStatsController()">
+        <!-- Page Header -->
+        <div class="derivatives-header">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <h1 class="mb-0">📊 Volume & Trade Stats</h1>
+                        <span class="pulse-dot pulse-success"></span>
+                    </div>
+                    <p class="mb-0 text-secondary">
+                        Comprehensive volume analysis and trade statistics for spot microstructure insights
+                    </p>
+                </div>
+
+                <!-- Global Controls -->
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <select class="form-select" style="width: 150px;" x-model="globalSymbol" @change="updateSymbol()">
+                        <option value="BTCUSDT">BTC/USDT</option>
+                        <option value="ETHUSDT">ETH/USDT</option>
+                        <option value="SOLUSDT">SOL/USDT</option>
+                        <option value="BNBUSDT">BNB/USDT</option>
+                        <option value="XRPUSDT">XRP/USDT</option>
                     </select>
-                </div>
-            </div>
-            <div class="df-card-content">
-                <div id="volume-chart" style="height: 400px;"></div>
-            </div>
-        </div>
 
-        <!-- Volume Distribution -->
-        <div class="df-card">
-            <div class="df-card-header">
-                <h3>Volume Distribution</h3>
-            </div>
-            <div class="df-card-content">
-                <div id="volume-distribution-chart" style="height: 300px;"></div>
-            </div>
-        </div>
+                    <select class="form-select" style="width: 120px;" x-model="globalTimeframe" @change="updateTimeframe()">
+                        <option value="1m">1 Minute</option>
+                        <option value="5m" selected>5 Minutes</option>
+                        <option value="15m">15 Minutes</option>
+                        <option value="1h">1 Hour</option>
+                    </select>
 
-        <!-- Volume Statistics -->
-        <div class="df-card">
-            <div class="df-card-header">
-                <h3>Volume Statistics</h3>
-            </div>
-            <div class="df-card-content">
-                <div class="df-stats-grid">
-                    <div class="df-stat">
-                        <div class="df-stat-value">$2.4M</div>
-                        <div class="df-stat-label">24h Volume</div>
-                    </div>
-                    <div class="df-stat">
-                        <div class="df-stat-value">$156K</div>
-                        <div class="df-stat-label">Avg Hourly</div>
-                    </div>
-                    <div class="df-stat">
-                        <div class="df-stat-value">+12.5%</div>
-                        <div class="df-stat-label">vs Yesterday</div>
-                    </div>
-                    <div class="df-stat">
-                        <div class="df-stat-value">847</div>
-                        <div class="df-stat-label">Total Trades</div>
-                    </div>
+                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
+                        <span x-show="!globalLoading">🔄 Refresh</span>
+                        <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Exchange Volume Comparison -->
-        <div class="df-card">
-            <div class="df-card-header">
-                <h3>Exchange Volume</h3>
+        <!-- Key Metrics Row -->
+        <div class="row g-3">
+            <div class="col-md-6 col-lg-3">
+                <div class="df-panel p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="text-secondary small">Total Trades</span>
+                        <span class="badge bg-primary">📈</span>
+                    </div>
+                    <div class="h3 mb-1 fw-bold" x-text="formatNumber(metrics.totalTrades)">--</div>
+                    <div class="small text-secondary">Buy: <span x-text="formatNumber(metrics.buyTrades)">--</span> / Sell: <span x-text="formatNumber(metrics.sellTrades)">--</span></div>
+                </div>
             </div>
-            <div class="df-card-content">
-                <div id="exchange-volume-chart" style="height: 300px;"></div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="df-panel p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="text-secondary small">Buy/Sell Ratio</span>
+                        <span class="badge" :class="metrics.buySellRatio > 1 ? 'bg-success' : 'bg-danger'">
+                            <span x-show="metrics.buySellRatio > 1">🟢</span>
+                            <span x-show="metrics.buySellRatio <= 1">🔴</span>
+                        </span>
+                    </div>
+                    <div class="h3 mb-1 fw-bold" :class="metrics.buySellRatio > 1 ? 'text-success' : 'text-danger'" x-text="metrics.buySellRatio.toFixed(2)">--</div>
+                    <div class="small text-secondary">
+                        <span x-show="metrics.buySellRatio > 1">Buying dominance</span>
+                        <span x-show="metrics.buySellRatio <= 1">Selling dominance</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="df-panel p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="text-secondary small">Total Volume</span>
+                        <span class="badge bg-info">💰</span>
+                    </div>
+                    <div class="h3 mb-1 fw-bold" x-text="formatNumber(metrics.totalVolume)">--</div>
+                    <div class="small text-secondary">Std Dev: <span x-text="formatNumber(metrics.volumeStd)">--</span></div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="df-panel p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="text-secondary small">Avg Trade Size</span>
+                        <span class="badge bg-warning">📏</span>
+                    </div>
+                    <div class="h3 mb-1 fw-bold" x-text="formatNumber(metrics.avgTradeSize)">--</div>
+                    <div class="small text-secondary">Max: <span x-text="formatNumber(metrics.maxTradeSize)">--</span></div>
+                </div>
             </div>
         </div>
 
-        <!-- Volume Profile -->
-        <div class="df-card">
-            <div class="df-card-header">
-                <h3>Volume Profile</h3>
+        <!-- Main Charts Row -->
+        <div class="row g-3">
+            <!-- Trade Statistics Over Time -->
+            <div class="col-lg-8">
+                <div class="df-panel p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="mb-1">📈 Trade Activity Over Time</h5>
+                            <p class="text-secondary small mb-0">Buy vs Sell trade frequency analysis</p>
+                        </div>
+                        <span class="badge bg-light text-dark border">Line Chart</span>
+                    </div>
+                    <div style="height: 350px;">
+                        <canvas x-ref="tradeStatsChart"></canvas>
+                    </div>
+                </div>
             </div>
-            <div class="df-card-content">
-                <div id="volume-profile-chart" style="height: 300px;"></div>
-            </div>
-        </div>
 
-        <!-- Trade Size Analysis -->
-        <div class="df-card">
-            <div class="df-card-header">
-                <h3>Trade Size Analysis</h3>
-            </div>
-            <div class="df-card-content">
-                <div class="df-stats-grid">
-                    <div class="df-stat">
-                        <div class="df-stat-value">$421</div>
-                        <div class="df-stat-label">Avg Trade Size</div>
+            <!-- Buy/Sell Distribution -->
+            <div class="col-lg-4">
+                <div class="df-panel p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="mb-1">🎯 Trade Distribution</h5>
+                            <p class="text-secondary small mb-0">Buy vs Sell breakdown</p>
+                        </div>
                     </div>
-                    <div class="df-stat">
-                        <div class="df-stat-value">$2,847</div>
-                        <div class="df-stat-label">Median Trade</div>
+                    <div style="height: 300px;">
+                        <canvas x-ref="buySellChart"></canvas>
                     </div>
-                    <div class="df-stat">
-                        <div class="df-stat-value">$45,200</div>
-                        <div class="df-stat-label">Largest Trade</div>
-                    </div>
-                    <div class="df-stat">
-                        <div class="df-stat-value">$12</div>
-                        <div class="df-stat-label">Smallest Trade</div>
+
+                    <!-- Buy/Sell Insight -->
+                    <div class="mt-3" x-data="{ insight: getBuySellInsight() }">
+                        <div class="alert mb-0" :class="insight.class">
+                            <div class="fw-semibold small mb-1" x-text="insight.icon + ' ' + insight.title"></div>
+                            <div class="small" x-text="insight.message"></div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Volume Table -->
-        <div class="df-card df-card-full">
-            <div class="df-card-header">
-                <h3>Volume Breakdown by Exchange</h3>
-                <div class="df-card-actions">
-                    <button class="df-btn df-btn-sm">Export</button>
+        <!-- Volume Analysis Row -->
+        <div class="row g-3">
+            <!-- Volume Time Series -->
+            <div class="col-lg-8">
+                <div class="df-panel p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="mb-1">📊 Volume Flow Analysis</h5>
+                            <p class="text-secondary small mb-0">Buy and sell volume over time</p>
+                        </div>
+                        <span class="badge bg-light text-dark border">Bar Chart</span>
+                    </div>
+                    <div style="height: 350px;">
+                        <canvas x-ref="volumeTimeSeriesChart"></canvas>
+                    </div>
+
+                    <!-- Volume Insight -->
+                    <div class="mt-3" x-data="{ insight: getVolumeInsight() }">
+                        <div class="p-3 rounded bg-light">
+                            <div class="fw-semibold small mb-1 d-flex align-items-center gap-2">
+                                <span x-text="insight.icon"></span>
+                                <span x-text="insight.title"></span>
+                            </div>
+                            <div class="small text-secondary" x-text="insight.message"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="df-card-content">
-                <div class="df-table-container">
-                    <table class="df-table">
-                        <thead>
-                            <tr>
-                                <th>Exchange</th>
-                                <th>24h Volume</th>
-                                <th>Volume %</th>
-                                <th>Trade Count</th>
-                                <th>Avg Trade Size</th>
-                                <th>Market Share</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Binance</td>
-                                <td>$856,420</td>
-                                <td>35.7%</td>
-                                <td>312</td>
-                                <td>$2,745</td>
-                                <td>
-                                    <div class="df-progress">
-                                        <div class="df-progress-bar" style="width: 35.7%"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Coinbase</td>
-                                <td>$642,180</td>
-                                <td>26.8%</td>
-                                <td>198</td>
-                                <td>$3,243</td>
-                                <td>
-                                    <div class="df-progress">
-                                        <div class="df-progress-bar" style="width: 26.8%"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Kraken</td>
-                                <td>$481,350</td>
-                                <td>20.1%</td>
-                                <td>156</td>
-                                <td>$3,086</td>
-                                <td>
-                                    <div class="df-progress">
-                                        <div class="df-progress-bar" style="width: 20.1%"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Others</td>
-                                <td>$420,050</td>
-                                <td>17.5%</td>
-                                <td>181</td>
-                                <td>$2,321</td>
-                                <td>
-                                    <div class="df-progress">
-                                        <div class="df-progress-bar" style="width: 17.5%"></div>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+
+            <!-- Volume Profile Summary -->
+            <div class="col-lg-4">
+                <div class="df-panel p-4 h-100">
+                    <h5 class="mb-3">📋 Volume Profile Summary</h5>
+
+                    <div class="d-flex flex-column gap-3">
+                        <!-- Period Info -->
+                        <div class="stat-item">
+                            <div class="small text-secondary mb-1">Analysis Period</div>
+                            <template x-if="volumeProfileData">
+                                <div>
+                                    <div class="fw-semibold small" x-text="volumeProfileData.period_start || 'N/A'"></div>
+                                    <div class="fw-semibold small" x-text="'to ' + (volumeProfileData.period_end || 'N/A')"></div>
+                                </div>
+                            </template>
+                            <template x-if="!volumeProfileData">
+                                <div class="text-secondary">Loading...</div>
+                            </template>
+                        </div>
+
+                        <hr class="my-2">
+
+                        <!-- Volume Metrics -->
+                        <div class="stat-item">
+                            <div class="small text-secondary mb-2">Buy Volume</div>
+                            <div class="h5 mb-0 text-success" x-text="formatNumber(metrics.buyVolume)">--</div>
+                        </div>
+
+                        <div class="stat-item">
+                            <div class="small text-secondary mb-2">Sell Volume</div>
+                            <div class="h5 mb-0 text-danger" x-text="formatNumber(metrics.sellVolume)">--</div>
+                        </div>
+
+                        <hr class="my-2">
+
+                        <!-- POC Price -->
+                        <div class="stat-item">
+                            <div class="small text-secondary mb-1">Point of Control (POC)</div>
+                            <div class="h4 mb-0 fw-bold text-primary">
+                                $<span x-text="formatNumber(metrics.pocPrice)">--</span>
+                            </div>
+                            <div class="small text-secondary">Highest volume price level</div>
+                        </div>
+
+                        <div class="alert alert-info mb-0 small">
+                            <strong>💡 POC Insight:</strong> The Point of Control represents the price level with the highest traded volume, acting as a potential support or resistance zone.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Volume Profile & Trade Size Row -->
+        <div class="row g-3">
+            <!-- Volume Profile by Price -->
+            <div class="col-lg-6">
+                <div class="df-panel p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="mb-1">💎 Volume Profile by Price Level</h5>
+                            <p class="text-secondary small mb-0">Top 20 price levels by volume (POC highlighted)</p>
+                        </div>
+                        <span class="badge bg-light text-dark border">Horizontal Bar</span>
+                    </div>
+                    <div style="height: 400px;">
+                        <canvas x-ref="volumeProfileChart"></canvas>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="p-3 rounded" style="background: rgba(139, 92, 246, 0.1);">
+                            <div class="fw-semibold small mb-1">📚 Understanding Volume Profile</div>
+                            <div class="small text-secondary">
+                                Volume Profile shows the distribution of volume across different price levels. The highest bar (purple) is the POC - a critical level where most trading activity occurred. These levels often act as support/resistance.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trade Size Distribution -->
+            <div class="col-lg-6">
+                <div class="df-panel p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="mb-1">📏 Trade Size Evolution</h5>
+                            <p class="text-secondary small mb-0">Average and maximum trade sizes over time</p>
+                        </div>
+                        <span class="badge bg-light text-dark border">Line Chart</span>
+                    </div>
+                    <div style="height: 400px;">
+                        <canvas x-ref="tradeSizeChart"></canvas>
+                    </div>
+
+                    <div class="mt-3">
+                        <div class="p-3 rounded bg-light">
+                            <div class="fw-semibold small mb-1">🔍 Trade Size Analysis</div>
+                            <div class="small text-secondary">
+                                Large spikes in maximum trade size often indicate institutional participation or whale activity. Consistent average trade size suggests retail dominance, while increasing average size may signal institutional accumulation.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Statistics Table -->
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="df-panel p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="mb-1">📋 Detailed Trade Statistics</h5>
+                            <p class="text-secondary small mb-0">Recent trade activity breakdown</p>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <span class="badge bg-light text-dark border" x-text="'Showing ' + Math.min(20, tradeStatsData.length) + ' records'"></span>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Exchange</th>
+                                    <th>Pair</th>
+                                    <th class="text-end">Total Trades</th>
+                                    <th class="text-end">Buy Trades</th>
+                                    <th class="text-end">Sell Trades</th>
+                                    <th class="text-end">Avg Size</th>
+                                    <th class="text-end">Max Size</th>
+                                    <th class="text-center">B/S Ratio</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(item, index) in tradeStatsData.slice(-20).reverse()" :key="index">
+                                    <tr>
+                                        <td class="small" x-text="new Date(item.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })"></td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border text-uppercase" x-text="item.exchange"></span>
+                                        </td>
+                                        <td class="fw-semibold small" x-text="item.symbol"></td>
+                                        <td class="text-end" x-text="formatNumber(item.total_trades)"></td>
+                                        <td class="text-end text-success" x-text="formatNumber(item.buy_trades)"></td>
+                                        <td class="text-end text-danger" x-text="formatNumber(item.sell_trades)"></td>
+                                        <td class="text-end" x-text="formatNumber(item.avg_trade_size)"></td>
+                                        <td class="text-end fw-semibold" x-text="formatNumber(item.max_trade_size)"></td>
+                                        <td class="text-center">
+                                            <span class="badge"
+                                                  :class="(item.buy_trades / item.sell_trades) > 1 ? 'bg-success' : 'bg-danger'"
+                                                  x-text="(item.buy_trades / item.sell_trades).toFixed(2)"></span>
+                                        </td>
+                                    </tr>
+                                </template>
+
+                                <template x-if="tradeStatsData.length === 0">
+                                    <tr>
+                                        <td colspan="9" class="text-center text-secondary py-4">
+                                            <div class="spinner-border spinner-border-sm me-2" role="status" x-show="globalLoading"></div>
+                                            <span x-show="globalLoading">Loading trade statistics...</span>
+                                            <span x-show="!globalLoading">No data available</span>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Volume Statistics Table -->
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="df-panel p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="mb-1">💰 Volume Statistics Breakdown</h5>
+                            <p class="text-secondary small mb-0">Detailed volume metrics with buy/sell breakdown</p>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <span class="badge bg-light text-dark border" x-text="'Showing ' + Math.min(20, volumeStatsData.length) + ' records'"></span>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Exchange</th>
+                                    <th>Timeframe</th>
+                                    <th class="text-end">Buy Volume</th>
+                                    <th class="text-end">Sell Volume</th>
+                                    <th class="text-end">Total Volume</th>
+                                    <th class="text-end">Avg Volume</th>
+                                    <th class="text-end">Vol Std Dev</th>
+                                    <th class="text-center">Dominance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(item, index) in volumeStatsData.slice(-20).reverse()" :key="index">
+                                    <tr>
+                                        <td class="small" x-text="new Date(item.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })"></td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border text-uppercase" x-text="item.exchange"></span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary" x-text="item.timeframe"></span>
+                                        </td>
+                                        <td class="text-end text-success fw-semibold" x-text="formatNumber(item.buy_volume)"></td>
+                                        <td class="text-end text-danger fw-semibold" x-text="formatNumber(item.sell_volume)"></td>
+                                        <td class="text-end fw-bold" x-text="formatNumber(item.total_volume)"></td>
+                                        <td class="text-end" x-text="formatNumber(item.avg_volume)"></td>
+                                        <td class="text-end text-secondary" x-text="formatNumber(item.volume_std)"></td>
+                                        <td class="text-center">
+                                            <span class="badge"
+                                                  :class="item.buy_volume > item.sell_volume ? 'bg-success' : 'bg-danger'"
+                                                  x-text="item.buy_volume > item.sell_volume ? 'BUY' : 'SELL'"></span>
+                                        </td>
+                                    </tr>
+                                </template>
+
+                                <template x-if="volumeStatsData.length === 0">
+                                    <tr>
+                                        <td colspan="9" class="text-center text-secondary py-4">
+                                            <div class="spinner-border spinner-border-sm me-2" role="status" x-show="globalLoading"></div>
+                                            <span x-show="globalLoading">Loading volume statistics...</span>
+                                            <span x-show="!globalLoading">No data available</span>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Educational Section -->
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="df-panel p-4">
+                    <h5 class="mb-3">📚 Understanding Volume & Trade Statistics</h5>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="p-3 rounded" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e;">
+                                <div class="fw-bold mb-2 text-success">🟩 Buy/Sell Ratio</div>
+                                <div class="small text-secondary">
+                                    <ul class="mb-0 ps-3">
+                                        <li>Ratio > 1.5: Strong buying pressure, bullish sentiment</li>
+                                        <li>Ratio 0.9-1.1: Balanced market, no clear bias</li>
+                                        <li>Ratio < 0.7: Strong selling pressure, bearish sentiment</li>
+                                        <li>Use with price action for confirmation</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="p-3 rounded" style="background: rgba(139, 92, 246, 0.1); border-left: 4px solid #8b5cf6;">
+                                <div class="fw-bold mb-2 text-primary">💎 Volume Profile (POC)</div>
+                                <div class="small text-secondary">
+                                    <ul class="mb-0 ps-3">
+                                        <li>POC = Point of Control (highest volume price)</li>
+                                        <li>Acts as strong support/resistance level</li>
+                                        <li>Price tends to return to high volume areas</li>
+                                        <li>Use for entry/exit planning and stop placement</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="p-3 rounded" style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6;">
+                                <div class="fw-bold mb-2 text-info">📏 Trade Size Analysis</div>
+                                <div class="small text-secondary">
+                                    <ul class="mb-0 ps-3">
+                                        <li>Large max trades = whale/institutional activity</li>
+                                        <li>Rising avg size = accumulation phase</li>
+                                        <li>Falling avg size = distribution phase</li>
+                                        <li>Spikes in trade size often precede volatility</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+@endsection
 
-<style>
-.df-progress {
-    width: 100%;
-    height: 8px;
-    background-color: var(--muted);
-    border-radius: 4px;
-    overflow: hidden;
-}
+@section('scripts')
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
-.df-progress-bar {
-    height: 100%;
-    background-color: var(--primary);
-    transition: width 0.3s ease;
-}
-</style>
+    <!-- Wait for Chart.js to load -->
+    <script>
+        window.chartJsReady = new Promise((resolve) => {
+            if (typeof Chart !== 'undefined') {
+                resolve();
+            } else {
+                setTimeout(() => resolve(), 100);
+            }
+        });
+    </script>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize volume chart
-    const volumeChart = new Chart(document.getElementById('volume-chart'), {
-        type: 'bar',
-        data: {
-            labels: ['14:00', '14:15', '14:30', '14:45', '15:00'],
-            datasets: [{
-                label: 'Volume ($)',
-                data: [120000, 180000, 250000, 320000, 210000],
-                backgroundColor: '#3b82f6',
-                borderColor: '#2563eb',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return '$' + (value / 1000) + 'K';
-                        }
-                    }
-                }
+    <!-- Load controller -->
+    <script src="{{ asset('js/volume-trade-stats-controller.js') }}"></script>
+
+    <style>
+        /* Pulse animation for live indicator */
+        .pulse-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .pulse-success {
+            background-color: #22c55e;
+            box-shadow: 0 0 0 rgba(34, 197, 94, 0.7);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
             }
         }
-    });
 
-    // Initialize volume distribution chart
-    const volumeDistributionChart = new Chart(document.getElementById('volume-distribution-chart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Binance', 'Coinbase', 'Kraken', 'Others'],
-            datasets: [{
-                data: [35.7, 26.8, 20.1, 17.5],
-                backgroundColor: [
-                    '#3b82f6',
-                    '#10b981',
-                    '#f59e0b',
-                    '#ef4444'
-                ],
-                borderWidth: 2,
-                borderColor: '#ffffff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
+        /* Stat item styling */
+        .stat-item {
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            background: rgba(var(--bs-light-rgb), 0.5);
+            transition: all 0.2s ease;
+        }
+
+        .stat-item:hover {
+            background: rgba(var(--bs-light-rgb), 0.8);
+            transform: translateX(4px);
+        }
+
+        /* Table styling */
+        .table-hover tbody tr:hover {
+            background-color: rgba(var(--bs-primary-rgb), 0.05);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .derivatives-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .table-responsive {
+                font-size: 0.875rem;
             }
         }
-    });
 
-    // Initialize exchange volume chart
-    const exchangeVolumeChart = new Chart(document.getElementById('exchange-volume-chart'), {
-        type: 'bar',
-        data: {
-            labels: ['Binance', 'Coinbase', 'Kraken', 'Others'],
-            datasets: [{
-                label: 'Volume ($)',
-                data: [856420, 642180, 481350, 420050],
-                backgroundColor: [
-                    '#3b82f6',
-                    '#10b981',
-                    '#f59e0b',
-                    '#ef4444'
-                ],
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return '$' + (value / 1000) + 'K';
-                        }
-                    }
-                }
-            }
+        /* Loading state */
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+            border-width: 0.15em;
         }
-    });
-
-    // Initialize volume profile chart
-    const volumeProfileChart = new Chart(document.getElementById('volume-profile-chart'), {
-        type: 'bar',
-        data: {
-            labels: ['$43,200', '$43,220', '$43,240', '$43,260', '$43,280', '$43,300'],
-            datasets: [{
-                label: 'Volume at Price',
-                data: [1200, 1800, 3200, 2800, 1500, 800],
-                backgroundColor: '#8b5cf6',
-                borderColor: '#7c3aed',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            }
-        }
-    });
-});
-</script>
+    </style>
 @endsection

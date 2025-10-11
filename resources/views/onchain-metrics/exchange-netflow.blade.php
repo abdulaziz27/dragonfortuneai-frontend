@@ -1,311 +1,177 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid">
-    <!-- Header Section -->
-    <div class="row mb-4">
+<div class="container-fluid" x-data="exchangeNetflowModule()">
+    @include('onchain-metrics.partials.global-controls')
+
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-lg-4">
+            <div class="df-panel p-3 shadow-sm rounded h-100">
+                <span class="text-uppercase text-muted small fw-semibold d-block mb-1">BTC Exchange Netflow</span>
+                <div class="fs-4 fw-bold text-dark" x-text="metrics.btcNetflow"></div>
+                <span class="small text-muted" x-text="metrics.btcNetflowTone"></span>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="df-panel p-3 shadow-sm rounded h-100">
+                <span class="text-uppercase text-muted small fw-semibold d-block mb-1">Stablecoin Netflow</span>
+                <div class="fs-4 fw-bold text-dark" x-text="metrics.stablecoinNet"></div>
+                <span class="small text-muted" x-text="metrics.stablecoinTone"></span>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="df-panel p-3 shadow-sm rounded h-100">
+                <span class="text-uppercase text-muted small fw-semibold d-block mb-1">Dominant Venue</span>
+                <div class="fs-5 fw-bold text-dark" x-text="metrics.dominantVenue"></div>
+                <span class="small text-muted">Leading venue flow bias</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-12 col-lg-8">
+            <div class="df-panel p-4 shadow-sm rounded h-100 d-flex flex-column">
+                <div class="d-flex align-items-start justify-content-between mb-3">
+                    <div>
+                        <h3 class="h5 mb-1">Exchange Netflow by Asset</h3>
+                        <p class="text-muted small mb-0">Directional pressure measured by net inflow versus outflow</p>
+                    </div>
+                    <span class="badge bg-light text-dark border">Bar</span>
+                </div>
+                <div class="flex-grow-1">
+                    <canvas x-ref="netflowChart" style="max-height: 320px;"></canvas>
+                </div>
+                <div class="mt-3">
+                    <div class="p-3 rounded bg-light">
+                        <span class="text-uppercase small fw-semibold text-muted d-block mb-1">Insight</span>
+                        <p class="mb-0 small" x-text="insights.netflow"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="df-panel p-4 shadow-sm rounded h-100 d-flex flex-column">
+                <div class="d-flex align-items-start justify-content-between mb-3">
+                    <div>
+                        <h3 class="h6 mb-1">Exchange Breakdown</h3>
+                        <p class="text-muted small mb-0">Relative venue contribution</p>
+                    </div>
+                </div>
+                <div class="table-responsive flex-grow-1">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr class="text-muted small">
+                                <th scope="col">Exchange</th>
+                                <th scope="col" class="text-end">Netflow</th>
+                                <th scope="col" class="text-end">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="row in exchangeRows" :key="row.venue">
+                                <tr>
+                                    <td x-text="row.venue"></td>
+                                    <td class="text-end">
+                                        <span :class="row.netflow >= 0 ? 'text-danger fw-semibold' : 'text-success fw-semibold'"
+                                              x-text="`${row.netflow >= 0 ? '+' : ''}${row.netflow.toFixed(2)}%`"></span>
+                                    </td>
+                                    <td class="text-end"
+                                        x-text="`${row.balance.toFixed(2)}M`"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-0">
+        <div class="col-12 col-lg-6">
+            <div class="df-panel p-4 shadow-sm rounded h-100 d-flex flex-column">
+                <div class="d-flex align-items-start justify-content-between mb-3">
+                    <div>
+                        <h3 class="h5 mb-1">Stablecoin Liquidity Pulse</h3>
+                        <p class="text-muted small mb-0">Liquidity runway inferred from stablecoin circulation</p>
+                    </div>
+                    <span class="badge bg-light text-dark border">Line</span>
+                </div>
+                <div class="flex-grow-1">
+                    <canvas x-ref="stablecoinChart" style="max-height: 300px;"></canvas>
+                </div>
+                <div class="mt-3">
+                    <div class="p-3 rounded bg-light">
+                        <span class="text-uppercase small fw-semibold text-muted d-block mb-1">Insight</span>
+                        <p class="mb-0 small" x-text="insights.liquidity"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="df-panel p-4 shadow-sm rounded h-100 d-flex flex-column">
+                <div class="d-flex align-items-start justify-content-between mb-3">
+                    <div>
+                        <h3 class="h5 mb-1">Exchange Comparison Heatmap</h3>
+                        <p class="text-muted small mb-0">Venue intensity map to spot liquidity rotations</p>
+                    </div>
+                    <span class="badge bg-light text-dark border">Heatmap</span>
+                </div>
+                <div class="flex-grow-1">
+                    <canvas x-ref="heatmapChart" style="max-height: 300px;"></canvas>
+                </div>
+                <div class="mt-3">
+                    <div class="p-3 rounded bg-light">
+                        <span class="text-uppercase small fw-semibold text-muted d-block mb-1">Insight</span>
+                        <p class="mb-0 small" x-text="insights.heatmap"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-3">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2 class="h4 mb-1 fw-semibold">Exchange Netflow (BTC in‑out)</h2>
-                    <p class="text-muted mb-0">Real-time measurement of buy/sell pressure on exchanges</p>
-                </div>
-                <div class="d-flex gap-2">
-                    <select class="form-select form-select-sm" style="width: auto;">
-                        <option value="24h">24 Hours</option>
-                        <option value="7d" selected>7 Days</option>
-                        <option value="30d">30 Days</option>
-                        <option value="90d">90 Days</option>
-                    </select>
-                    <button class="btn btn-outline-secondary btn-sm">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                            <path d="M3 3v5h5"/>
-                        </svg>
-                        Refresh
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+            <div class="df-panel p-4">
+                <h5 class="mb-3">📚 Understanding Exchange Netflow</h5>
 
-    <!-- Key Metrics Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <div class="bg-success bg-opacity-10 rounded-circle p-2">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-success">
-                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                </svg>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="p-3 rounded" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e;">
+                            <div class="fw-bold mb-2 text-success">🟩 BTC Outflow</div>
+                            <div class="small text-secondary">
+                                <ul class="mb-0 ps-3">
+                                    <li>BTC leaving exchanges = bullish</li>
+                                    <li>Indicates accumulation</li>
+                                    <li>Reduces selling pressure</li>
+                                    <li>Long-term bullish signal</li>
+                                </ul>
                             </div>
                         </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="card-title mb-1">Net Flow (24h)</h6>
-                            <h4 class="mb-0 text-success">-2,847 BTC</h4>
-                            <small class="text-muted">Leaving exchanges</small>
-                        </div>
                     </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <div class="bg-info bg-opacity-10 rounded-circle p-2">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-info">
-                                    <path d="M3 3v18h18"/>
-                                    <path d="M7 12l3-3 3 3 5-5"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="card-title mb-1">Inflow</h6>
-                            <h4 class="mb-0 text-info">18,234 BTC</h4>
-                            <small class="text-muted">To exchanges</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <div class="bg-warning bg-opacity-10 rounded-circle p-2">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-warning">
-                                    <path d="M3 3v18h18"/>
-                                    <path d="M7 12l3-3 3 3 5-5"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="card-title mb-1">Outflow</h6>
-                            <h4 class="mb-0 text-warning">21,081 BTC</h4>
-                            <small class="text-muted">From exchanges</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <div class="bg-primary bg-opacity-10 rounded-circle p-2">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-primary">
-                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="card-title mb-1">Exchange Balance</h6>
-                            <h4 class="mb-0 text-primary">2.34M BTC</h4>
-                            <small class="text-muted">Total on exchanges</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Main Chart Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-bottom">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">BTC Exchange Netflow</h5>
-                        <div class="d-flex gap-2">
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="showInflow" checked>
-                                <label class="form-check-label" for="showInflow">Inflow</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="showOutflow" checked>
-                                <label class="form-check-label" for="showOutflow">Outflow</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="showNetflow" checked>
-                                <label class="form-check-label" for="showNetflow">Net Flow</label>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded" style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444;">
+                            <div class="fw-bold mb-2 text-danger">🔴 BTC Inflow</div>
+                            <div class="small text-secondary">
+                                <ul class="mb-0 ps-3">
+                                    <li>BTC entering exchanges = bearish</li>
+                                    <li>Indicates distribution</li>
+                                    <li>Increases selling pressure</li>
+                                    <li>Short-term bearish signal</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
-                </div>
-                <div class="card-body">
-                    <div id="netflowChart" style="height: 400px;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Exchange Breakdown -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-bottom">
-                    <h5 class="card-title mb-0">Top Exchanges by Netflow</h5>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Exchange</th>
-                                    <th class="text-end">Net Flow (24h)</th>
-                                    <th class="text-end">Balance</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="bg-primary bg-opacity-10 rounded-circle p-1 me-2" style="width: 24px; height: 24px;">
-                                                <span class="small fw-bold text-primary">B</span>
-                                            </div>
-                                            Binance
-                                        </div>
-                                    </td>
-                                    <td class="text-end text-success">-1,234 BTC</td>
-                                    <td class="text-end">456,789 BTC</td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="bg-info bg-opacity-10 rounded-circle p-1 me-2" style="width: 24px; height: 24px;">
-                                                <span class="small fw-bold text-info">C</span>
-                                            </div>
-                                            Coinbase
-                                        </div>
-                                    </td>
-                                    <td class="text-end text-warning">+567 BTC</td>
-                                    <td class="text-end">234,567 BTC</td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="bg-success bg-opacity-10 rounded-circle p-1 me-2" style="width: 24px; height: 24px;">
-                                                <span class="small fw-bold text-success">K</span>
-                                            </div>
-                                            Kraken
-                                        </div>
-                                    </td>
-                                    <td class="text-end text-success">-890 BTC</td>
-                                    <td class="text-end">123,456 BTC</td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="bg-warning bg-opacity-10 rounded-circle p-1 me-2" style="width: 24px; height: 24px;">
-                                                <span class="small fw-bold text-warning">H</span>
-                                            </div>
-                                            Huobi
-                                        </div>
-                                    </td>
-                                    <td class="text-end text-success">-445 BTC</td>
-                                    <td class="text-end">98,765 BTC</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-bottom">
-                    <h5 class="card-title mb-0">Market Sentiment Indicator</h5>
-                </div>
-                <div class="card-body">
-                    <div class="text-center mb-3">
-                        <div class="position-relative d-inline-block">
-                            <svg width="120" height="120" viewBox="0 0 120 120" class="position-relative">
-                                <circle cx="60" cy="60" r="50" fill="none" stroke="#e9ecef" stroke-width="8"/>
-                                <circle cx="60" cy="60" r="50" fill="none" stroke="#28a745" stroke-width="8"
-                                        stroke-dasharray="314" stroke-dashoffset="62.8" transform="rotate(-90 60 60)"/>
-                            </svg>
-                            <div class="position-absolute top-50 start-50 translate-middle text-center">
-                                <h3 class="mb-0 text-success">80%</h3>
-                                <small class="text-muted">Bullish</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row text-center">
-                        <div class="col-4">
-                            <div class="border-end">
-                                <h6 class="text-success mb-1">Strong Buy</h6>
-                                <small class="text-muted">80%</small>
-                            </div>
-                        </div>
-                        <div class="col-4">
-                            <div class="border-end">
-                                <h6 class="text-warning mb-1">Neutral</h6>
-                                <small class="text-muted">15%</small>
-                            </div>
-                        </div>
-                        <div class="col-4">
-                            <h6 class="text-danger mb-1">Sell</h6>
-                            <small class="text-muted">5%</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Insights Section -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-bottom">
-                    <h5 class="card-title mb-0">Trading Insights</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="alert alert-success border-0">
-                                <div class="d-flex align-items-start">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-success me-2 mt-1">
-                                        <path d="M9 12l2 2 4-4"/>
-                                        <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
-                                    </svg>
-                                    <div>
-                                        <h6 class="alert-heading">Bullish Signal</h6>
-                                        <p class="mb-0 small">Negative netflow indicates accumulation phase. Large holders are moving BTC off exchanges, reducing sell pressure.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="alert alert-info border-0">
-                                <div class="d-flex align-items-start">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-info me-2 mt-1">
-                                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                    </svg>
-                                    <div>
-                                        <h6 class="alert-heading">Market Trend</h6>
-                                        <p class="mb-0 small">Exchange balance at 2.34M BTC (13.2% of supply). Historical low levels suggest reduced selling pressure.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="alert alert-warning border-0">
-                                <div class="d-flex align-items-start">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-warning me-2 mt-1">
-                                        <path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
-                                    </svg>
-                                    <div>
-                                        <h6 class="alert-heading">Watch Out</h6>
-                                        <p class="mb-0 small">Coinbase showing positive netflow (+567 BTC). Monitor for potential institutional selling pressure.</p>
-                                    </div>
-                                </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded" style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6;">
+                            <div class="fw-bold mb-2 text-info">💰 Stablecoin Flow</div>
+                            <div class="small text-secondary">
+                                <ul class="mb-0 ps-3">
+                                    <li>Stablecoin inflow = buying power</li>
+                                    <li>Stablecoin outflow = selling pressure</li>
+                                    <li>Liquidity indicator</li>
+                                    <li>Market sentiment gauge</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
@@ -314,12 +180,212 @@
         </div>
     </div>
 </div>
+@endsection
 
+@section('scripts')
 <script>
-// Chart.js implementation would go here
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize chart with sample data
-    console.log('Exchange Netflow chart initialized');
-});
+function exchangeNetflowModule() {
+    return {
+        metrics: {
+            btcNetflow: '-2,847 BTC',
+            btcNetflowTone: 'Outflow (Bullish)',
+            stablecoinNet: '+$156M',
+            stablecoinTone: 'Inflow (Buying Power)',
+            dominantVenue: 'Binance'
+        },
+
+        exchangeRows: [
+            { venue: 'Binance', netflow: -1.2, balance: 245.6 },
+            { venue: 'Coinbase', netflow: -0.8, balance: 189.3 },
+            { venue: 'Kraken', netflow: 0.3, balance: 156.7 },
+            { venue: 'Bitfinex', netflow: -0.5, balance: 98.4 }
+        ],
+
+        insights: {
+            netflow: 'Strong BTC outflow indicates accumulation phase. Stablecoin inflow provides buying power for potential upward movement.',
+            liquidity: 'Stablecoin supply increasing, providing liquidity runway for continued market expansion.',
+            heatmap: 'Binance showing consistent outflow pattern, indicating strong accumulation trend across major venues.'
+        },
+
+        init() {
+            console.log('🚀 Exchange Netflow Module initialized');
+            this.renderCharts();
+        },
+
+        renderCharts() {
+            this.$nextTick(() => {
+                this.renderNetflowChart();
+                this.renderStablecoinChart();
+                this.renderHeatmapChart();
+            });
+        },
+
+        renderNetflowChart() {
+            const canvas = this.$refs.netflowChart;
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+
+            // Sample data for netflow
+            const labels = ['Binance', 'Coinbase', 'Kraken', 'Bitfinex', 'Others'];
+            const btcData = [-1200, -800, 300, -500, -200];
+            const stablecoinData = [500, 300, -100, 200, 150];
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'BTC Netflow (BTC)',
+                            data: btcData,
+                            backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                            borderColor: '#ef4444',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Stablecoin Netflow ($M)',
+                            data: stablecoinData,
+                            backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                            borderColor: '#22c55e',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            display: true,
+                            grid: {
+                                color: 'rgba(148, 163, 184, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        },
+
+        renderStablecoinChart() {
+            const canvas = this.$refs.stablecoinChart;
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+
+            // Sample data for stablecoin liquidity
+            const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'];
+            const liquidityData = [120, 125, 130, 128, 135, 140, 138, 145, 150, 156];
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Stablecoin Liquidity ($B)',
+                        data: liquidityData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            display: true,
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(148, 163, 184, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        },
+
+        renderHeatmapChart() {
+            const canvas = this.$refs.heatmapChart;
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+
+            // Sample heatmap data
+            const exchanges = ['Binance', 'Coinbase', 'Kraken', 'Bitfinex'];
+            const timeframes = ['24h', '7d', '30d'];
+            const heatmapData = [
+                [-1.2, -0.8, -1.5],
+                [-0.8, -0.6, -1.2],
+                [0.3, 0.1, -0.2],
+                [-0.5, -0.3, -0.8]
+            ];
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: exchanges,
+                    datasets: timeframes.map((timeframe, i) => ({
+                        label: timeframe,
+                        data: heatmapData.map(row => row[i]),
+                        backgroundColor: heatmapData.map(row =>
+                            row[i] < 0 ? 'rgba(34, 197, 94, 0.7)' : 'rgba(239, 68, 68, 0.7)'
+                        ),
+                        borderWidth: 1
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            display: true,
+                            grid: {
+                                color: 'rgba(148, 163, 184, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    };
+}
 </script>
 @endsection

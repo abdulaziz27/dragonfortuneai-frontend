@@ -27,11 +27,14 @@ Route::view('/spot-microstructure/vwap-twap', 'spot-microstructure.vwap-twap')->
 Route::view('/spot-microstructure/volume-trade-stats', 'spot-microstructure.volume-trade-stats')->name('spot-microstructure.volume-trade-stats');
 
 // On-Chain Metrics Routes
-Route::redirect('/onchain-metrics', '/onchain-metrics/valuation')->name('onchain-metrics.index');
-Route::view('/onchain-metrics/valuation', 'onchain-metrics.valuation')->name('onchain-metrics.valuation');
-Route::view('/onchain-metrics/supply', 'onchain-metrics.supply')->name('onchain-metrics.supply');
-Route::view('/onchain-metrics/flows', 'onchain-metrics.flows')->name('onchain-metrics.flows');
-Route::view('/onchain-metrics/miners-whales', 'onchain-metrics.miners-whales')->name('onchain-metrics.miners-whales');
+Route::redirect('/onchain-metrics', '/onchain-metrics/mvrv-zscore')->name('onchain-metrics.index');
+Route::view('/onchain-metrics/mvrv-zscore', 'onchain-metrics.mvrv-zscore')->name('onchain-metrics.mvrv-zscore');
+Route::view('/onchain-metrics/lth-sth-supply', 'onchain-metrics.lth-sth-supply')->name('onchain-metrics.lth-sth-supply');
+Route::view('/onchain-metrics/exchange-netflow', 'onchain-metrics.exchange-netflow')->name('onchain-metrics.exchange-netflow');
+Route::view('/onchain-metrics/realized-cap-hodl', 'onchain-metrics.realized-cap-hodl')->name('onchain-metrics.realized-cap-hodl');
+Route::view('/onchain-metrics/reserve-risk-sopr', 'onchain-metrics.reserve-risk-sopr')->name('onchain-metrics.reserve-risk-sopr');
+Route::view('/onchain-metrics/miner-metrics', 'onchain-metrics.miner-metrics')->name('onchain-metrics.miner-metrics');
+Route::view('/onchain-metrics/whale-holdings', 'onchain-metrics.whale-holdings')->name('onchain-metrics.whale-holdings');
 
 // Options Intelligence Route
 Route::view('/options-metrics/dashboard', 'options-metrics.dashboard')->name('options-metrics.dashboard');
