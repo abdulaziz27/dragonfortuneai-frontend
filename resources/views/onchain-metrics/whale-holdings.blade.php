@@ -3,6 +3,7 @@
 @section('content')
 <div class="container-fluid" x-data="whaleHoldingsModule()">
     @include('onchain-metrics.partials.global-controls')
+    @include('onchain-metrics.partials.module-nav')
 
     <div class="row g-3 mb-3">
         <div class="col-12 col-lg-4">

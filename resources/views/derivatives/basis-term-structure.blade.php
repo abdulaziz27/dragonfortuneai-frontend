@@ -134,7 +134,7 @@
         <div class="row g-3">
             <!-- Basis History Chart -->
             <div class="col-lg-8">
-                <div class="df-panel p-3 h-100 d-flex flex-column">
+                <div class="df-panel p-3 h-100 d-flex flex-column" x-data="basisHistoryChart()" x-init="init()">
                     <div class="mb-3 flex-shrink-0">
                         <h5 class="mb-1">Basis History</h5>
                         <small class="text-secondary">Historical basis movement over time</small>
@@ -206,7 +206,7 @@
         <!-- Term Structure Chart (Full Width) -->
         <div class="row g-3">
             <div class="col-12">
-                <div class="df-panel p-3">
+                <div class="df-panel p-3" x-data="termStructureChart()" x-init="init()">
                     <div class="mb-3">
                         <h5 class="mb-1">Term Structure Analysis</h5>
                         <small class="text-secondary">Basis across different contract expiries</small>
@@ -314,7 +314,6 @@
 @section('scripts')
     <!-- Chart.js - Load BEFORE Alpine components -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
     <!-- Wait for Chart.js to load -->
     <script>
@@ -1066,121 +1065,451 @@
         }
     </script>
 
-    <!-- Chart Initialization -->
+    <!-- Basis History Chart Component -->
     <script>
-        // Wait for Chart.js and Alpine to be ready
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize charts after a short delay to ensure Alpine components are ready
-            setTimeout(() => {
-                initializeBasisCharts();
-            }, 1000);
-        });
+        function basisHistoryChart() {
+            return {
+                symbol: 'BTC',
+                exchange: 'Binance',
+                interval: '1h',
+                chart: null,
+                loading: false,
 
-        function initializeBasisCharts() {
-            // Basis History Chart
-            const basisHistoryCtx = document.getElementById('basisHistoryChart');
-            if (basisHistoryCtx) {
-                new Chart(basisHistoryCtx, {
-                    type: 'line',
-                    data: {
-                        labels: generateDateLabels(30),
-                        datasets: [
-                            {
-                                label: 'Basis (Absolute)',
-                                data: generateBasisData(30),
-                                borderColor: 'rgb(59, 130, 246)',
-                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                tension: 0.4,
-                                fill: true
+                init() {
+                    // Get initial from parent
+                    this.symbol = this.$root?.globalSymbol || 'BTC';
+                    this.exchange = this.$root?.globalExchange || 'Binance';
+                    this.interval = this.$root?.globalInterval || '1h';
+
+                    // Wait for Chart.js and canvas to be ready
+                    setTimeout(() => {
+                        this.initChart();
+                        this.loadData();
+                    }, 1500);
+
+                    // Auto refresh every 30 seconds
+                    setInterval(() => this.loadData(), 30000);
+
+                    // Listen for filter changes
+                    window.addEventListener('symbol-changed', (e) => {
+                        this.symbol = e.detail?.symbol || this.symbol;
+                        this.exchange = e.detail?.exchange || this.exchange;
+                        this.interval = e.detail?.interval || this.interval;
+                        this.loadData();
+                    });
+                    window.addEventListener('exchange-changed', (e) => {
+                        this.exchange = e.detail?.exchange || this.exchange;
+                        this.loadData();
+                    });
+                    window.addEventListener('interval-changed', (e) => {
+                        this.interval = e.detail?.interval || this.interval;
+                        this.loadData();
+                    });
+
+                    // Listen for overview composite
+                    window.addEventListener('basis-overview-ready', (e) => {
+                        try {
+                            const o = e.detail || {};
+                            if (Array.isArray(o.timeseries)) {
+                                this.updateChart(o.timeseries);
+                            }
+                        } catch (err) {
+                            console.warn('Chart update failed:', err);
+                        }
+                    });
+                },
+
+                initChart() {
+                    const canvas = document.getElementById('basisHistoryChart');
+                    if (!canvas) return;
+
+                    // Destroy existing chart if any
+                    if (this.chart) {
+                        this.chart.destroy();
+                        this.chart = null;
+                    }
+
+                    const ctx = canvas.getContext('2d');
+                    this.chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: [
+                                {
+                                    label: 'Basis (Absolute)',
+                                    data: [],
+                                    borderColor: 'rgb(59, 130, 246)',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    tension: 0.4,
+                                    fill: true,
+                                    pointRadius: 2,
+                                    pointHoverRadius: 5
+                                },
+                                {
+                                    label: 'Zero Line',
+                                    data: [],
+                                    borderColor: 'rgb(156, 163, 175)',
+                                    borderDash: [5, 5],
+                                    pointRadius: 0
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                intersect: false,
+                                mode: 'index'
                             },
-                            {
-                                label: 'Zero Line',
-                                data: new Array(30).fill(0),
-                                borderColor: 'rgb(156, 163, 175)',
-                                borderDash: [5, 5],
-                                pointRadius: 0
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: true, position: 'top' }
-                        },
-                        scales: {
-                            y: {
-                                position: 'right',
-                                title: { display: true, text: 'Basis ($)' }
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top',
+                                    labels: {
+                                        color: '#94a3b8',
+                                        font: { size: 12 }
+                                    }
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                    padding: 12,
+                                    titleColor: '#fff',
+                                    bodyColor: '#fff',
+                                    callbacks: {
+                                        label: function(context) {
+                                            let label = context.dataset.label || '';
+                                            if (label) {
+                                                label += ': ';
+                                            }
+                                            if (context.parsed.y !== null) {
+                                                label += '$' + context.parsed.y.toFixed(2);
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        font: { size: 10 },
+                                        maxTicksLimit: 15,
+                                        callback: function(value, index, values) {
+                                            // Format timestamp ke readable date
+                                            const date = new Date(this.getLabelForValue(value));
+                                            return date.toLocaleDateString('en-US', {
+                                                month: 'short',
+                                                day: 'numeric',
+                                                hour: '2-digit'
+                                            });
+                                        }
+                                    },
+                                    grid: {
+                                        display: false
+                                    }
+                                },
+                                y: {
+                                    position: 'right',
+                                    title: {
+                                        display: true,
+                                        text: 'Basis ($)',
+                                        color: '#94a3b8',
+                                        font: { size: 12 }
+                                    },
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        font: { size: 10 },
+                                        callback: function(value) {
+                                            return '$' + value.toFixed(0);
+                                        }
+                                    },
+                                    grid: {
+                                        color: 'rgba(148, 163, 184, 0.1)'
+                                    }
+                                }
                             }
                         }
-                    }
-                });
-            }
+                    });
+                },
 
-            // Term Structure Chart
-            const termStructureCtx = document.getElementById('termStructureChart');
-            if (termStructureCtx) {
-                new Chart(termStructureCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: ['Q1 2024', 'Q2 2024', 'Q3 2024', 'Q4 2024', 'Q1 2025'],
-                        datasets: [{
-                            label: 'Basis by Expiry',
-                            data: [150, 320, 280, 450, 380],
-                            backgroundColor: [
-                                'rgba(59, 130, 246, 0.7)',
-                                'rgba(34, 197, 94, 0.7)',
-                                'rgba(245, 158, 11, 0.7)',
-                                'rgba(239, 68, 68, 0.7)',
-                                'rgba(139, 92, 246, 0.7)'
-                            ],
-                            borderColor: [
-                                'rgb(59, 130, 246)',
-                                'rgb(34, 197, 94)',
-                                'rgb(245, 158, 11)',
-                                'rgb(239, 68, 68)',
-                                'rgb(139, 92, 246)'
-                            ],
-                            borderWidth: 2
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false }
+                async loadData() {
+                    this.loading = true;
+                    try {
+                        const pair = `${this.symbol}USDT`;
+                        const futuresSymbol = `${this.symbol}USDT_240628`;
+
+                        const params = new URLSearchParams({
+                            exchange: this.exchange,
+                            spot_pair: pair,
+                            futures_symbol: futuresSymbol,
+                            interval: this.interval,
+                            limit: '2000'
+                        });
+
+                        const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                        const configuredBase = (baseMeta?.content || '').trim();
+                        const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
+                        const url = base ? `${base}/api/basis/history?${params}` : `/api/basis/history?${params}`;
+
+                        console.log('📡 Fetching Basis History from:', url);
+
+                        const response = await fetch(url);
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+
+                        const data = await response.json();
+                        console.log('✅ Basis History Response:', data);
+
+                        if (data.data && Array.isArray(data.data)) {
+                            console.log(`📊 Chart data points: ${data.data.length}`);
+                            this.updateChart(data.data);
+                        } else {
+                            console.warn('⚠️ No data.data array in response');
+                        }
+                    } catch (error) {
+                        console.error('❌ Error loading basis history:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                updateChart(historyData) {
+                    if (!this.chart) {
+                        console.warn('⚠️ Chart not initialized yet');
+                        return;
+                    }
+
+                    if (!historyData || historyData.length === 0) {
+                        console.warn('⚠️ No history data to display');
+                        return;
+                    }
+
+                    // Sort by timestamp
+                    const sortedData = [...historyData].sort((a, b) => a.ts - b.ts);
+
+                    // Prepare chart data
+                    const labels = sortedData.map(row => row.ts);
+                    const basisValues = sortedData.map(row => parseFloat(row.basis_abs));
+                    const zeroLine = new Array(sortedData.length).fill(0);
+
+                    console.log('📊 Updating chart with', labels.length, 'points');
+
+                    // Update chart
+                    this.chart.data.labels = labels;
+                    this.chart.data.datasets[0].data = basisValues;
+                    this.chart.data.datasets[1].data = zeroLine;
+                    this.chart.update();
+                }
+            };
+        }
+    </script>
+
+    <!-- Term Structure Chart Component -->
+    <script>
+        function termStructureChart() {
+            return {
+                symbol: 'BTC',
+                exchange: 'Binance',
+                chart: null,
+                loading: false,
+
+                init() {
+                    // Get initial from parent
+                    this.symbol = this.$root?.globalSymbol || 'BTC';
+                    this.exchange = this.$root?.globalExchange || 'Binance';
+
+                    // Wait for Chart.js and canvas to be ready
+                    setTimeout(() => {
+                        this.initChart();
+                        this.loadData();
+                    }, 1500);
+
+                    // Auto refresh every 30 seconds
+                    setInterval(() => this.loadData(), 30000);
+
+                    // Listen for filter changes
+                    window.addEventListener('symbol-changed', (e) => {
+                        this.symbol = e.detail?.symbol || this.symbol;
+                        this.exchange = e.detail?.exchange || this.exchange;
+                        this.loadData();
+                    });
+                    window.addEventListener('exchange-changed', (e) => {
+                        this.exchange = e.detail?.exchange || this.exchange;
+                        this.loadData();
+                    });
+
+                    // Listen for overview composite
+                    window.addEventListener('basis-overview-ready', (e) => {
+                        try {
+                            const o = e.detail || {};
+                            if (Array.isArray(o.termStructure)) {
+                                this.updateChart(o.termStructure);
+                            }
+                        } catch (err) {
+                            console.warn('Term structure chart update failed:', err);
+                        }
+                    });
+                },
+
+                initChart() {
+                    const canvas = document.getElementById('termStructureChart');
+                    if (!canvas) return;
+
+                    // Destroy existing chart if any
+                    if (this.chart) {
+                        this.chart.destroy();
+                        this.chart = null;
+                    }
+
+                    const ctx = canvas.getContext('2d');
+                    this.chart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                label: 'Basis by Expiry',
+                                data: [],
+                                backgroundColor: [],
+                                borderColor: [],
+                                borderWidth: 2
+                            }]
                         },
-                        scales: {
-                            y: {
-                                position: 'right',
-                                title: { display: true, text: 'Basis ($)' }
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                    padding: 12,
+                                    titleColor: '#fff',
+                                    bodyColor: '#fff',
+                                    callbacks: {
+                                        title: function(context) {
+                                            return context[0].label;
+                                        },
+                                        label: function(context) {
+                                            return 'Basis: $' + context.parsed.y.toFixed(2);
+                                        },
+                                        afterLabel: function(context) {
+                                            const dataIndex = context.dataIndex;
+                                            const dataset = context.dataset;
+                                            if (dataset.annualizedBasis && dataset.annualizedBasis[dataIndex]) {
+                                                const annualized = dataset.annualizedBasis[dataIndex];
+                                                return 'Annualized: ' + (annualized * 100).toFixed(2) + '%';
+                                            }
+                                            return '';
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        font: { size: 10 }
+                                    },
+                                    grid: {
+                                        display: false
+                                    }
+                                },
+                                y: {
+                                    position: 'right',
+                                    title: {
+                                        display: true,
+                                        text: 'Basis ($)',
+                                        color: '#94a3b8',
+                                        font: { size: 12 }
+                                    },
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        font: { size: 10 },
+                                        callback: function(value) {
+                                            return '$' + value.toFixed(0);
+                                        }
+                                    },
+                                    grid: {
+                                        color: 'rgba(148, 163, 184, 0.1)'
+                                    }
+                                }
                             }
                         }
+                    });
+                },
+
+                async loadData() {
+                    this.loading = true;
+                    try {
+                        const pair = `${this.symbol}USDT`;
+
+                        const params = new URLSearchParams({
+                            exchange: this.exchange,
+                            spot_pair: pair,
+                            max_contracts: '20'
+                        });
+
+                        const response = await fetch(
+                            (function(){
+                                const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                                const configuredBase = (baseMeta?.content || '').trim();
+                                const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
+                                const url = base ? `${base}/api/basis/term-structure?${params}` : `/api/basis/term-structure?${params}`;
+                                return url;
+                            })());
+                        const data = await response.json();
+
+                        if (data.data && Array.isArray(data.data)) {
+                            this.updateChart(data.data);
+                        }
+                    } catch (error) {
+                        console.error('❌ Error loading term structure:', error);
+                    } finally {
+                        this.loading = false;
                     }
-                });
-            }
-        }
+                },
 
-        function generateDateLabels(days) {
-            const labels = [];
-            const today = new Date();
-            for (let i = days - 1; i >= 0; i--) {
-                const date = new Date(today);
-                date.setDate(date.getDate() - i);
-                labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-            }
-            return labels;
-        }
+                updateChart(termStructureData) {
+                    if (!this.chart || !termStructureData || termStructureData.length === 0) return;
 
-        function generateBasisData(days) {
-            const data = [];
-            let value = 0;
-            for (let i = 0; i < days; i++) {
-                value += (Math.random() - 0.5) * 100;
-                data.push(Math.floor(value));
-            }
-            return data;
+                    // Sort by expiry timestamp
+                    const sortedData = [...termStructureData]
+                        .filter(row => row.expiry)
+                        .sort((a, b) => a.expiry - b.expiry);
+
+                    // Prepare chart data
+                    const labels = sortedData.map(row => {
+                        const date = new Date(row.expiry);
+                        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    });
+
+                    const basisValues = sortedData.map(row => parseFloat(row.basis_abs));
+                    const annualizedBasis = sortedData.map(row => row.basis_annualized ? parseFloat(row.basis_annualized) : null);
+
+                    // Color code based on basis value (green for positive/contango, red for negative/backwardation)
+                    const colors = basisValues.map(value => {
+                        if (value > 0) return 'rgba(34, 197, 94, 0.7)'; // Green for contango
+                        if (value < 0) return 'rgba(239, 68, 68, 0.7)'; // Red for backwardation
+                        return 'rgba(156, 163, 175, 0.7)'; // Gray for neutral
+                    });
+
+                    const borderColors = basisValues.map(value => {
+                        if (value > 0) return 'rgb(34, 197, 94)';
+                        if (value < 0) return 'rgb(239, 68, 68)';
+                        return 'rgb(156, 163, 175)';
+                    });
+
+                    // Update chart
+                    this.chart.data.labels = labels;
+                    this.chart.data.datasets[0].data = basisValues;
+                    this.chart.data.datasets[0].backgroundColor = colors;
+                    this.chart.data.datasets[0].borderColor = borderColors;
+                    this.chart.data.datasets[0].annualizedBasis = annualizedBasis;
+                    this.chart.update();
+                }
+            };
         }
     </script>
 
