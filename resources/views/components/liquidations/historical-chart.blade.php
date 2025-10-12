@@ -134,7 +134,15 @@ function liquidationsHistoricalTable() {
                 const exchange = this.$root?.globalExchange || '';
 
                 // Build API URL
-                let apiUrl = `http://202.155.90.20:8000/api/liquidations/pair-history?symbol=${symbol}&interval=${interval}&limit=50`;
+                const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                const configuredBase = (baseMeta?.content || "").trim();
+                const getApiBaseUrl = () => {
+                    if (configuredBase) {
+                        return configuredBase.endsWith("/") ? configuredBase.slice(0, -1) : configuredBase;
+                    }
+                    return "";
+                };
+                let apiUrl = `${getApiBaseUrl()}/api/liquidations/pair-history?symbol=${symbol}&interval=${interval}&limit=50`;
                 if (exchange) {
                     apiUrl += `&exchange=${exchange}`;
                 }

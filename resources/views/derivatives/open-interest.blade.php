@@ -436,16 +436,13 @@
                     const baseMeta = document.querySelector('meta[name="api-base-url"]');
                     const configuredBase = (baseMeta?.content || "").trim();
 
-                    // Always use the configured external API base URL
-                    let url;
+                    // Use relative URL as default (follows same pattern as funding rate)
+                    let url = `/api/open-interest/${endpoint}?${queryString}`; // default relative
                     if (configuredBase) {
                         const normalizedBase = configuredBase.endsWith("/")
                             ? configuredBase.slice(0, -1)
                             : configuredBase;
                         url = `${normalizedBase}/api/open-interest/${endpoint}?${queryString}`;
-                    } else {
-                        // Fallback to external API if no config
-                        url = `http://202.155.90.20:8000/api/open-interest/${endpoint}?${queryString}`;
                     }
 
                     try {
@@ -749,8 +746,15 @@
 
                         const baseMeta = document.querySelector('meta[name="api-base-url"]');
                         const configuredBase = (baseMeta?.content || "").trim();
-                        const apiBase = configuredBase ? configuredBase : 'http://202.155.90.20:8000';
-                        const url = `${apiBase}/api/open-interest/history?${params.toString()}`;
+                        
+                        // Use relative URL as default (same pattern as funding rate)
+                        let url = `/api/open-interest/history?${params.toString()}`;
+                        if (configuredBase) {
+                            const normalizedBase = configuredBase.endsWith("/")
+                                ? configuredBase.slice(0, -1)
+                                : configuredBase;
+                            url = `${normalizedBase}/api/open-interest/history?${params.toString()}`;
+                        }
 
 
                         const response = await fetch(url);

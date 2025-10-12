@@ -27,7 +27,7 @@ function onchainMetricsController() {
         // API Base URL
         apiBaseUrl:
             document.querySelector('meta[name="api-base-url"]')?.content ||
-            "http://202.155.90.20:8000",
+            "",
 
         // Global loading state
         loading: false,

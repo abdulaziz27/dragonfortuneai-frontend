@@ -22,7 +22,7 @@ function getApiBaseUrl() {
             ? configuredBase.slice(0, -1)
             : configuredBase;
     }
-    return "http://202.155.90.20:8000";
+    return "";
 }
 
 const API_BASE_URL = getApiBaseUrl() + "/api/spot-microstructure";

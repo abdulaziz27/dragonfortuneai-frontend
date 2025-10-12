@@ -140,7 +140,7 @@ function liquidationsStreamTable() {
                     if (configuredBase) {
                         return configuredBase.endsWith("/") ? configuredBase.slice(0, -1) : configuredBase;
                     }
-                    return "http://202.155.90.20:8000";
+                    return "";
                 };
 
                 // Build API URL with filters

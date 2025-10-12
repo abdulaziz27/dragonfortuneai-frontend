@@ -20,7 +20,7 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <h1 class="mb-0">⛓️ On-Chain Metrics</h1>
+                        <h1 class="mb-0">On-Chain Metrics</h1>
                         <span class="pulse-dot pulse-success"></span>
                     </div>
                     <p class="mb-0 text-secondary">

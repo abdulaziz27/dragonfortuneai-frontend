@@ -1,7 +1,46 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="d-flex flex-column h-100 gap-3" x-data="dashboardData()">
+    <div class="d-flex flex-column h-100 gap-3" x-data="dashboardData()" x-init="init()">
+        <!-- Macro Snapshot (API-powered) -->
+        <!-- <div class="row g-3">
+            <div class="col-lg-3 col-md-6">
+                <div class="df-panel p-3 h-100">
+                    <div class="small" style="color: var(--muted-foreground);">Risk Appetite</div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="h5 mb-0" x-text="macro?.analytics?.market_sentiment?.risk_appetite || 'N/A'">N/A</span>
+                        <span class="badge" :class="getSentimentBadge(macro?.analytics?.market_sentiment?.risk_appetite)">
+                            <span x-text="macro?.analytics?.market_sentiment?.dollar_strengthening === true ? 'USD Strong' : macro?.analytics?.market_sentiment?.dollar_strengthening === false ? 'USD Weak' : '—'">—</span>
+                        </span>
+                    </div>
+                    <div class="small text-secondary mt-1" x-text="macro.loading ? 'Loading…' : ''"></div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="df-panel p-3 h-100">
+                    <div class="small" style="color: var(--muted-foreground);">Fed Stance</div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="h5 mb-0" x-text="macro?.analytics?.monetary_policy?.fed_stance || 'N/A'">N/A</span>
+                        <span class="badge" :class="getFedStanceBadge(macro?.analytics?.monetary_policy?.fed_stance)">•</span>
+                    </div>
+                    <div class="small text-secondary">Liquidity: <span x-text="macro?.analytics?.monetary_policy?.liquidity_conditions || 'N/A'">N/A</span></div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="df-panel p-3 h-100">
+                    <div class="small" style="color: var(--muted-foreground);">DXY Level</div>
+                    <div class="h5 mb-0" x-text="formatNumber(macro?.analytics?.market_sentiment?.details?.dxy_level)">N/A</div>
+                    <div class="small" :class="(macro?.analytics?.market_sentiment?.dollar_strengthening ? 'text-danger' : 'text-success')" x-text="macro?.analytics?.market_sentiment?.dollar_strengthening === true ? 'USD Strengthening' : macro?.analytics?.market_sentiment?.dollar_strengthening === false ? 'USD Weakening' : '—'">—</div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="df-panel p-3 h-100">
+                    <div class="small" style="color: var(--muted-foreground);">10Y Yield</div>
+                    <div class="h5 mb-0"><span x-text="formatNumber(macro?.analytics?.market_sentiment?.details?.yield_10y_level)">N/A</span><span class="small text-secondary">%</span></div>
+                    <div class="small text-secondary">Trend: <span x-text="macro?.analytics?.trends?.yield_trend || 'N/A'">N/A</span></div>
+                </div>
+            </div>
+        </div> -->
         <!-- Market Snapshot + Regime Indicator -->
         <div class="row g-3">
             <div class="col-lg-8">
@@ -79,7 +118,7 @@
         <!-- Derivatives + Options + On‑Chain + ETF Tiles -->
         <section class="row g-3">
             <div class="col-lg-3 col-md-6">
-                <a href="/derivatives/funding-rate" class="text-decoration-none metric-card-hover" style="color: inherit;">
+                <a href="/derivatives/funding-rate" class="text-decoration-none metric-card-hover" style="color: inherit;" x-data="{}">
                     <div class="df-panel p-3 h-100 position-relative overflow-hidden">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div class="small" style="color: var(--muted-foreground);">Funding Rate (perp)</div>
@@ -90,10 +129,10 @@
                             </div>
                         </div>
                         <div class="d-flex align-items-baseline gap-2 mb-2">
-                            <div class="h4 mb-0" :class="funding >= 0 ? 'text-success' : 'text-danger'" x-text="signed(funding) + '%'">+0.02%</div>
-                            <small class="text-secondary">24h avg</small>
+                            <div class="h4 mb-0" :class="funding >= 0 ? 'text-success' : 'text-danger'" x-text="macro?.funding?.current != null ? signed(macro.funding.current * 100) + '%' : signed(funding) + '%'">+0.02%</div>
+                            <small class="text-secondary" x-text="macro?.funding?.window || '24h avg'">24h avg</small>
                         </div>
-                        <div class="sparkline-container mb-2" x-html="renderSparkline(fundingHistory, funding >= 0 ? '#22c55e' : '#ef4444')"></div>
+                        <div class="sparkline-container mb-2" x-html="renderSparkline(macro?.funding?.history || fundingHistory, (macro?.funding?.current ?? funding) >= 0 ? '#22c55e' : '#ef4444')"></div>
                         <div class="small" :class="fundingTrend >= 0 ? 'text-success' : 'text-danger'">
                             <span x-text="trendText(fundingTrend)">Rising</span> last 4h
                         </div>
@@ -116,14 +155,14 @@
                     <div class="df-panel p-3 h-100 position-relative overflow-hidden">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div class="small" style="color: var(--muted-foreground);">Open Interest Δ 24h</div>
-                            <div class="metric-badge" :class="oiChange >= 0 ? 'badge-success' : 'badge-danger'">
+                            <div class="metric-badge" :class="(macro?.oi?.change ?? oiChange) >= 0 ? 'badge-success' : 'badge-danger'">
                                 <svg width="12" height="12" :class="oiChange >= 0 ? '' : 'rotate-180'">
                                     <path d="M6 2 L10 8 L2 8 Z" fill="currentColor" />
                                 </svg>
                             </div>
                         </div>
-                        <div class="h4 mb-0" :class="oiChange >= 0 ? 'text-success' : 'text-danger'" x-text="signed(oiChange) + 'B'">+0.8B</div>
-                        <div class="sparkline-container mb-2" x-html="renderSparkline(oiHistory, oiChange >= 0 ? '#22c55e' : '#ef4444')"></div>
+                        <div class="h4 mb-0" :class="(macro?.oi?.change ?? oiChange) >= 0 ? 'text-success' : 'text-danger'" x-text="(macro?.oi?.change != null ? signed(macro.oi.change) : signed(oiChange)) + 'B'">+0.8B</div>
+                        <div class="sparkline-container mb-2" x-html="renderSparkline(macro?.oi?.history || oiHistory, (macro?.oi?.change ?? oiChange) >= 0 ? '#22c55e' : '#ef4444')"></div>
                         <div class="small text-secondary">Across major venues</div>
                         <div class="metric-tooltip">
                             <template x-if="oiChange > 0 && btc.chgPct > 0">
@@ -146,20 +185,22 @@
                         <div class="d-flex align-items-center gap-3 mb-2">
                             <div class="flex-fill">
                                 <div class="small text-secondary">Long</div>
-                                <div class="fw-semibold text-danger" x-text="'$' + formatCompact(liq.long)">$120M</div>
+                                <div class="fw-semibold text-danger" x-text="'$' + formatCompact((macro?.liq?.long ?? liq.long))">$120M</div>
                                 <div class="progress mt-1" style="height: 3px;">
-                                    <div class="progress-bar bg-danger" :style="'width: ' + (liq.long / (liq.long + liq.short) * 100) + '%'"></div>
+                                    <div class="progress-bar bg-danger" :style="'width: ' + (((macro?.liq?.long ?? liq.long) / ((macro?.liq?.long ?? liq.long) + (macro?.liq?.short ?? liq.short))) * 100) + '%'"
+                                    ></div>
                                 </div>
                             </div>
                             <div class="flex-fill">
                                 <div class="small text-secondary">Short</div>
-                                <div class="fw-semibold text-success" x-text="'$' + formatCompact(liq.short)">$98M</div>
+                                <div class="fw-semibold text-success" x-text="'$' + formatCompact((macro?.liq?.short ?? liq.short))">$98M</div>
                                 <div class="progress mt-1" style="height: 3px;">
-                                    <div class="progress-bar bg-success" :style="'width: ' + (liq.short / (liq.long + liq.short) * 100) + '%'"></div>
+                                    <div class="progress-bar bg-success" :style="'width: ' + (((macro?.liq?.short ?? liq.short) / ((macro?.liq?.long ?? liq.long) + (macro?.liq?.short ?? liq.short))) * 100) + '%'"
+                                    ></div>
                                 </div>
                             </div>
                         </div>
-                        <div class="small" :class="liq.long > liq.short ? 'text-danger' : 'text-success'" x-text="liq.long > liq.short ? 'Long squeeze active' : 'Short squeeze active'">
+                        <div class="small" :class="((macro?.liq?.long ?? liq.long) > (macro?.liq?.short ?? liq.short)) ? 'text-danger' : 'text-success'" x-text="((macro?.liq?.long ?? liq.long) > (macro?.liq?.short ?? liq.short)) ? 'Long squeeze active' : 'Short squeeze active'">
                             Long squeeze active
                         </div>
                         <div class="metric-tooltip">
@@ -296,6 +337,13 @@
     <script type="text/javascript">
         function dashboardData() {
             const state = {
+                macro: {
+                    loading: false,
+                    analytics: null,
+                    funding: null, // { current, window, history[] }
+                    oi: null,      // { change, history[] }
+                    liq: null      // { long, short }
+                },
                 btc: { last: 65420, chg: 1250, chgPct: 1.95, low: 64200, high: 66800, volume: 28.5e9, dominance: 54.2 },
                 fgIndex: 'Neutral (53)',
                 funding: 0.02,
@@ -330,6 +378,11 @@
             };
 
             // Helpers
+            state.formatNumber = (v) => {
+                const n = Number(v);
+                if (isNaN(n)) return 'N/A';
+                return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+            };
             state.formatPrice = (v) => '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
             state.formatVolume = (v) => {
                 if (v >= 1e9) return (v / 1e9).toFixed(1) + 'B';
@@ -389,6 +442,25 @@
             state.getFundingBadge = (funding) => {
                 if (Math.abs(funding) < 0.02) return 'badge-neutral';
                 return funding > 0 ? 'badge-success' : 'badge-danger';
+            };
+
+            // Macro badges
+            state.getSentimentBadge = (risk) => {
+                const map = {
+                    'High': 'text-bg-danger',
+                    'Moderate': 'text-bg-warning',
+                    'Low': 'text-bg-success',
+                    'N/A': 'text-bg-secondary'
+                };
+                return map[risk] || 'text-bg-secondary';
+            };
+            state.getFedStanceBadge = (stance) => {
+                const map = {
+                    'Tightening': 'text-bg-danger',
+                    'Neutral': 'text-bg-secondary',
+                    'Easing': 'text-bg-success'
+                };
+                return map[stance] || 'text-bg-secondary';
             };
 
             // Calculate market regime based on multiple factors
@@ -471,6 +543,70 @@
 
             // Initial calculation
             state.calculateRegime();
+
+            // API base util
+            const getApiBase = () => {
+                const meta = document.querySelector('meta[name="api-base-url"]');
+                return (meta?.content || '').trim();
+            };
+
+            // Load Macro Overlay quick data
+            state.loadMacroQuick = async () => {
+                state.macro.loading = true;
+                try {
+                    const base = getApiBase();
+                    const baseUrl = base ? base.replace(/\/$/, '') : '';
+
+                    // 1) Analytics (provides sentiment, policy, trends)
+                    const analyticsUrl = `${baseUrl}/api/macro-overlay/analytics?limit=100`;
+                    const analyticsRes = await fetch(analyticsUrl);
+                    state.macro.analytics = await analyticsRes.json();
+
+                    // 2) Funding rate proxy (use funding-rate analytics current)
+                    // Optional: guarded if endpoint not reachable
+                    try {
+                        const frUrl = `${baseUrl}/api/funding-rate/analytics?symbol=BTCUSDT&interval=4h&limit=60`;
+                        const frRes = await fetch(frUrl);
+                        const fr = await frRes.json();
+                        const hist = (fr?.history || []).map(x => x?.funding_rate || 0).slice(-24);
+                        state.macro.funding = {
+                            current: fr?.summary?.current ?? null,
+                            window: '24h avg',
+                            history: hist
+                        };
+                    } catch (_) {}
+
+                    // 3) Liquidations quick (use liquidations analytics)
+                    try {
+                        const lqUrl = `${baseUrl}/api/liquidations/analytics?symbol=BTCUSDT&interval=1h&limit=24`;
+                        const lqRes = await fetch(lqUrl);
+                        const lq = await lqRes.json();
+                        state.macro.liq = {
+                            long: lq?.summary?.total_long_usd ?? 0,
+                            short: lq?.summary?.total_short_usd ?? 0
+                        };
+                    } catch (_) {}
+
+                    // 4) OI quick (use funding-rate aggregate or oi endpoint if exists)
+                    try {
+                        const oiUrl = `${baseUrl}/api/funding-rate/aggregate?symbol=BTCUSDT&window=24h`;
+                        const oiRes = await fetch(oiUrl);
+                        const oi = await oiRes.json();
+                        const series = (oi?.exchanges || []).map(e => Number(e?.avg_rate || 0));
+                        const change = series.reduce((a, b) => a + b, 0) / Math.max(1, series.length);
+                        state.macro.oi = { change, history: series.slice(-24) };
+                    } catch (_) {}
+
+                } catch (e) {
+                    console.warn('Macro quick load failed:', e);
+                } finally {
+                    state.macro.loading = false;
+                }
+            };
+
+            state.init = () => {
+                state.loadMacroQuick();
+            };
 
             return state;
         }

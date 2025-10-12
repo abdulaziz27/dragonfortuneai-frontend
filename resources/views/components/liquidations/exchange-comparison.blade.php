@@ -132,7 +132,15 @@ function liquidationsExchangeComparisonTable() {
                 const symbol = this.$root?.globalSymbol || 'BTC';
 
                 // Build API URL
-                const apiUrl = `http://202.155.90.20:8000/api/liquidations/exchange-list?symbol=${symbol}&range_str=${this.selectedRange}`;
+                const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                const configuredBase = (baseMeta?.content || "").trim();
+                const getApiBaseUrl = () => {
+                    if (configuredBase) {
+                        return configuredBase.endsWith("/") ? configuredBase.slice(0, -1) : configuredBase;
+                    }
+                    return "";
+                };
+                const apiUrl = `${getApiBaseUrl()}/api/liquidations/exchange-list?symbol=${symbol}&range_str=${this.selectedRange}`;
 
                 console.log('📊 Exchange Comparison: Fetching from:', apiUrl);
 

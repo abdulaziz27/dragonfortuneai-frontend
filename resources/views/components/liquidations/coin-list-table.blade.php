@@ -176,7 +176,15 @@ function liquidationsCoinListTable() {
 
             try {
                 // Build API URL
-                const apiUrl = `http://202.155.90.20:8000/api/liquidations/coin-list?symbol=${this.symbol}&limit=100`;
+                const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                const configuredBase = (baseMeta?.content || "").trim();
+                const getApiBaseUrl = () => {
+                    if (configuredBase) {
+                        return configuredBase.endsWith("/") ? configuredBase.slice(0, -1) : configuredBase;
+                    }
+                    return "";
+                };
+                const apiUrl = `${getApiBaseUrl()}/api/liquidations/coin-list?symbol=${this.symbol}&limit=100`;
 
                 console.log('🏦 Exchange Breakdown: Fetching from:', apiUrl);
 

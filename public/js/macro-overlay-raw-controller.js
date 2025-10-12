@@ -8,7 +8,7 @@ class MacroOverlayRawController {
     constructor() {
         // Get API base URL from meta tag
         const metaTag = document.querySelector('meta[name="api-base-url"]');
-        this.baseUrl = metaTag ? metaTag.content : "http://202.155.90.20:8000";
+        this.baseUrl = metaTag ? metaTag.content : "";
 
         // Default filters matching API parameters
         this.filters = {

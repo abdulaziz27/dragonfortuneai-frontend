@@ -714,8 +714,8 @@ function volumeTradeStatsController() {
                 return `${normalizedBase}${endpoint}`;
             }
 
-            // Fallback to default API base URL
-            return `http://202.155.90.20:8000${endpoint}`;
+            // Fallback to relative URL (no hardcode HTTP)
+            return endpoint;
         },
 
         // Format timestamp
