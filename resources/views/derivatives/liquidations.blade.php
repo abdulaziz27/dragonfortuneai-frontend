@@ -74,35 +74,36 @@
             </div>
         </div>
 
-        <!-- Second Row: Historical Chart + Liquidation Stream -->
+        <!-- Second Row: Live Liquidation Stream (Full Width) -->
         <div class="row g-3">
-            <!-- Historical Chart -->
-            <div class="col-lg-8">
-                @include('components.liquidations.historical-chart')
-            </div>
-
-            <!-- Live Liquidation Stream -->
-            <div class="col-lg-4">
+            <div class="col-12">
                 @include('components.liquidations.liquidation-stream')
             </div>
         </div>
 
-        <!-- Third Row: Heatmap + Exchange Comparison -->
+        <!-- Third Row: Historical Liquidations (Full Width) -->
         <div class="row g-3">
-            <!-- Liquidation Heatmap -->
-            <div class="col-lg-7">
-                @include('components.liquidations.heatmap-chart')
-            </div>
-
-            <!-- Exchange Comparison -->
-            <div class="col-lg-5">
-                @include('components.liquidations.exchange-comparison')
+            <div class="col-12">
+                @include('components.liquidations.historical-chart')
             </div>
         </div>
 
-        <!-- Fourth Row: Coin List Table (Full Width) -->
+        <!-- Fourth Row: Liquidation Heatmap (Full Width) -->
         <div class="row g-3">
             <div class="col-12">
+                @include('components.liquidations.heatmap-chart')
+            </div>
+        </div>
+
+        <!-- Fifth Row: Exchange Comparison + Exchange Breakdown -->
+        <div class="row g-3">
+            <!-- Exchange Comparison -->
+            <div class="col-lg-6">
+                @include('components.liquidations.exchange-comparison')
+            </div>
+
+            <!-- Exchange Breakdown -->
+            <div class="col-lg-6">
                 @include('components.liquidations.coin-list-table')
             </div>
         </div>

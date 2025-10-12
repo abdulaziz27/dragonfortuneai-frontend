@@ -1,42 +1,24 @@
 {{--
-    Liquidation Stream Component
-    Real-time liquidation orders blotter
-    Shows: timestamp, exchange, pair, side, qty_usd, price
+    Live Liquidation Stream Component
+    Real-time liquidation orders displayed in table format
+    Uses orders API endpoint: /api/liquidations/orders
 --}}
 
 <div class="df-panel p-4 h-100"
-     x-data="liquidationsStream()"
+     x-data="liquidationsStreamTable()"
      x-init="init()">
 
     <div class="d-flex align-items-center justify-content-between mb-3">
         <div>
             <h5 class="mb-0">⚡ Live Liquidation Stream</h5>
-            <small class="text-secondary">Real-time order feed</small>
+            <small class="text-secondary">Real-time liquidation orders</small>
         </div>
         <div class="d-flex gap-2 align-items-center">
             <span x-show="isStreaming" class="pulse-dot pulse-danger"></span>
-            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
-        </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="row g-2 mb-3">
-        <div class="col-md-6">
-            <select class="form-select form-select-sm" x-model="filterSide" @change="applyFilters()">
-                <option value="">All Sides</option>
-                <option value="long">Long Only</option>
-                <option value="short">Short Only</option>
-            </select>
-        </div>
-        <div class="col-md-6">
-            <select class="form-select form-select-sm" x-model="filterExchange" @change="applyFilters()">
-                <option value="">All Exchanges</option>
-                <option value="Binance">Binance</option>
-                <option value="Bybit">Bybit</option>
-                <option value="OKX">OKX</option>
-                <option value="Bitget">Bitget</option>
-                <option value="Hyperliquid">Hyperliquid</option>
-            </select>
+            <button class="btn btn-sm btn-outline-primary" @click="loadData()" :disabled="loading">
+                <span x-show="!loading">🔄 Refresh</span>
+                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
+            </button>
         </div>
     </div>
 
@@ -44,7 +26,7 @@
     <div class="d-flex gap-3 mb-3 p-2 rounded bg-dark bg-opacity-10">
         <div class="flex-fill text-center">
             <div class="small text-secondary">Total Orders</div>
-            <div class="fw-bold" x-text="orders.length">0</div>
+            <div class="fw-bold" x-text="filteredOrders.length">0</div>
         </div>
         <div class="flex-fill text-center">
             <div class="small text-secondary">Avg Size</div>
@@ -56,82 +38,74 @@
         </div>
     </div>
 
-    <!-- Liquidation Feed -->
-    <div class="liquidation-feed" style="max-height: 450px; overflow-y: auto;">
-        <template x-for="(order, index) in filteredOrders.slice(0, 100)" :key="index">
-            <div class="liquidation-item p-2 mb-2 rounded"
-                 :class="getSideClass(order.side)"
-                 x-transition:enter="transition ease-out duration-300"
-                 x-transition:enter-start="opacity-0 transform scale-95"
-                 x-transition:enter-end="opacity-100 transform scale-100">
-
-                <div class="d-flex justify-content-between align-items-start">
-                    <!-- Left Side: Time, Exchange, Pair -->
-                    <div class="flex-grow-1">
-                        <div class="d-flex align-items-center gap-2 mb-1">
+    <!-- Liquidation Orders Table -->
+    <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+        <table class="table table-sm table-striped">
+            <thead class="sticky-top bg-white">
+                <tr>
+                    <th>Time</th>
+                    <th>Exchange</th>
+                    <th>Pair</th>
+                    <th>Side</th>
+                    <th class="text-end">Amount USD</th>
+                    <th class="text-end">Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(order, index) in filteredOrders.slice(0, 100)" :key="'order-' + index + '-' + order.ts">
+                    <tr>
+                        <td x-text="formatTime(order.ts)">--</td>
+                        <td>
+                            <span class="badge bg-secondary" x-text="order.exchange">--</span>
+                        </td>
+                        <td x-text="order.pair">--</td>
+                        <td>
                             <span class="badge"
                                   :class="order.side_label === 'long' ? 'bg-danger' : 'bg-success'"
                                   x-text="order.side_label?.toUpperCase()">
-                                LONG
+                                --
                             </span>
-                            <span class="badge bg-secondary" x-text="order.exchange">Exchange</span>
-                            <span class="small text-secondary" x-text="formatTime(order.ts)">00:00:00</span>
-                        </div>
-                        <div class="fw-bold" x-text="order.pair">BTCUSDT</div>
-                    </div>
-
-                    <!-- Right Side: Amount & Price -->
-                    <div class="text-end">
-                        <div class="fw-bold"
-                             :class="order.side_label === 'long' ? 'text-danger' : 'text-success'"
-                             x-text="formatUSD(order.qty_usd)">
-                            $0.00
-                        </div>
-                        <div class="small text-secondary">
-                            @ $<span x-text="formatPrice(order.price)">0.00</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </template>
+                        </td>
+                        <td class="text-end fw-bold"
+                            :class="order.side_label === 'long' ? 'text-danger' : 'text-success'"
+                            x-text="formatUSD(order.qty_usd)">--</td>
+                        <td class="text-end" x-text="formatPrice(order.price)">--</td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
     </div>
 
-    <!-- Load More Button -->
+    <!-- Load More Info -->
     <div x-show="filteredOrders.length > 100" class="text-center mt-3">
-        <button class="btn btn-sm btn-outline-primary" @click="showMore()">
-            Show More (showing 100 of <span x-text="filteredOrders.length">0</span>)
-        </button>
+        <small class="text-muted">Showing 100 of <span x-text="filteredOrders.length">0</span> orders</small>
     </div>
 
     <!-- No Data State -->
-    <div x-show="!loading && orders.length === 0" class="text-center py-5">
+    <div x-show="!loading && filteredOrders.length === 0" class="text-center py-4">
         <div class="text-secondary mb-2" style="font-size: 3rem;">⚡</div>
-        <div class="text-secondary">Waiting for liquidation data...</div>
+        <div class="text-secondary">No liquidation orders available</div>
+        <div class="small text-muted mt-2">Try adjusting filters or refresh data</div>
     </div>
 </div>
 
 <script>
-function liquidationsStream() {
+function liquidationsStreamTable() {
     return {
         orders: [],
         filteredOrders: [],
-        filterSide: '',
-        filterExchange: '',
         loading: false,
         isStreaming: true,
 
-        init() {
-            // Listen for overview ready
-            window.addEventListener('liquidations-overview-ready', (e) => {
-                this.applyOverview(e.detail);
-            });
+        async init() {
+            console.log('⚡ Liquidation Stream: Initializing component');
 
             // Listen for filter changes
-            window.addEventListener('symbol-changed', (e) => {
+            window.addEventListener('symbol-changed', () => {
                 this.loadData();
             });
 
-            window.addEventListener('exchange-changed', (e) => {
+            window.addEventListener('exchange-changed', () => {
                 this.loadData();
             });
 
@@ -139,74 +113,99 @@ function liquidationsStream() {
                 this.loadData();
             });
 
-            // Initial load with delay to ensure DOM is ready
-            setTimeout(() => {
-                if (this.$root?.overview) {
-                    this.applyOverview(this.$root.overview);
-                } else {
-                    this.loadData();
-                }
-            }, 100);
+            // Initial load
+            this.loadData();
 
-            // Auto-refresh every 10 seconds for real-time feel
+            // Auto-refresh every 15 seconds for real-time feel
             setInterval(() => {
                 if (!this.loading && this.isStreaming) {
                     this.loadData();
                 }
-            }, 10000);
-        },
-
-        applyOverview(overview) {
-            if (!overview?.orders) return;
-            this.orders = overview.orders.sort((a, b) => b.ts - a.ts); // Sort by newest first
-            this.applyFilters();
-        },
-
-        applyFilters() {
-            this.filteredOrders = this.orders.filter(order => {
-                // Filter by side
-                if (this.filterSide) {
-                    const orderSide = (order.side_label || '').toLowerCase();
-                    if (orderSide !== this.filterSide.toLowerCase()) {
-                        return false;
-                    }
-                }
-
-                // Filter by exchange
-                if (this.filterExchange) {
-                    if (order.exchange !== this.filterExchange) {
-                        return false;
-                    }
-                }
-
-                return true;
-            });
+            }, 15000);
         },
 
         async loadData() {
             this.loading = true;
-            setTimeout(() => {
+            console.log('⚡ Liquidation Stream: Loading data...');
+
+            try {
+                // Get current filters from global state
+                const globalSymbol = this.$root?.globalSymbol || 'BTC';
+                const globalExchange = this.$root?.globalExchange || '';
+
+                // Get API base URL from environment
+                const getApiBaseUrl = () => {
+                    const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                    const configuredBase = (baseMeta?.content || "").trim();
+                    if (configuredBase) {
+                        return configuredBase.endsWith("/") ? configuredBase.slice(0, -1) : configuredBase;
+                    }
+                    return "http://202.155.90.20:8000";
+                };
+
+                // Build API URL with filters
+                let apiUrl = `${getApiBaseUrl()}/api/liquidations/orders?limit=500`;
+                
+                // Add symbol filter (convert BTC to BTCUSDT format)
+                if (globalSymbol) {
+                    const symbolPair = globalSymbol === 'BTC' ? 'BTCUSDT' : 
+                                     globalSymbol === 'ETH' ? 'ETHUSDT' :
+                                     globalSymbol === 'SOL' ? 'SOLUSDT' :
+                                     globalSymbol === 'BNB' ? 'BNBUSDT' :
+                                     globalSymbol === 'XRP' ? 'XRPUSDT' :
+                                     globalSymbol === 'ADA' ? 'ADAUSDT' :
+                                     globalSymbol === 'DOGE' ? 'DOGEUSDT' :
+                                     globalSymbol === 'MATIC' ? 'MATICUSDT' :
+                                     globalSymbol === 'DOT' ? 'DOTUSDT' :
+                                     globalSymbol === 'AVAX' ? 'AVAXUSDT' : 'BTCUSDT';
+                    apiUrl += `&symbol=${symbolPair}`;
+                }
+
+                // Add exchange filter
+                if (globalExchange) {
+                    apiUrl += `&exchange=${globalExchange}`;
+                }
+
+                console.log('⚡ Liquidation Stream: Fetching from:', apiUrl);
+
+                const response = await fetch(apiUrl);
+                const result = await response.json();
+
+                console.log('⚡ Liquidation Stream: API Response:', result);
+
+                if (result.data && Array.isArray(result.data)) {
+                    this.orders = result.data.sort((a, b) => b.ts - a.ts); // Sort by newest first
+                    this.filteredOrders = this.orders; // No need for client-side filtering since API handles it
+                    console.log('⚡ Liquidation Stream: Loaded', this.orders.length, 'orders');
+                } else {
+                    console.warn('⚡ Liquidation Stream: No data in response');
+                    this.orders = [];
+                    this.filteredOrders = [];
+                }
+
+            } catch (error) {
+                console.error('⚡ Liquidation Stream: Error loading data:', error);
+                this.orders = [];
+                this.filteredOrders = [];
+            } finally {
                 this.loading = false;
-            }, 1000);
+            }
+        },
+
+        applyFilters() {
+            // Since API handles filtering, just copy orders to filteredOrders
+            this.filteredOrders = [...this.orders];
         },
 
         getAverageSize() {
-            if (this.orders.length === 0) return 0;
-            const total = this.orders.reduce((sum, o) => sum + parseFloat(o.qty_usd || 0), 0);
-            return total / this.orders.length;
+            if (this.filteredOrders.length === 0) return 0;
+            const total = this.filteredOrders.reduce((sum, o) => sum + parseFloat(o.qty_usd || 0), 0);
+            return total / this.filteredOrders.length;
         },
 
         getLargestOrder() {
-            if (this.orders.length === 0) return 0;
-            return Math.max(...this.orders.map(o => parseFloat(o.qty_usd || 0)));
-        },
-
-        getSideClass(side) {
-            const sideStr = (side || '').toString().toLowerCase();
-            if (sideStr === 'long' || sideStr === '1') {
-                return 'bg-danger bg-opacity-10 border-start border-danger border-3';
-            }
-            return 'bg-success bg-opacity-10 border-start border-success border-3';
+            if (this.filteredOrders.length === 0) return 0;
+            return Math.max(...this.filteredOrders.map(o => parseFloat(o.qty_usd || 0)));
         },
 
         formatUSD(value) {
@@ -235,11 +234,6 @@ function liquidationsStream() {
                 second: '2-digit',
                 hour12: false,
             });
-        },
-
-        showMore() {
-            // Placeholder for pagination
-            console.log('Show more clicked');
         },
     };
 }

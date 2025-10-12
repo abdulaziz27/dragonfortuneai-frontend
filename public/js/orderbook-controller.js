@@ -554,29 +554,30 @@ function liveOrderbookSnapshot() {
 /**
  * Book Pressure Chart Component
  */
-function bookPressureChart() {
+function bookPressureTable() {
     return {
-        chart: null,
         loading: false,
-        dataPoints: 0,
+        pressureData: [],
+        avgBidPressure: 0,
+        avgAskPressure: 0,
+        avgRatio: 0,
 
         init() {
-            this.loadChart();
+            this.loadData();
 
             // Listen to global events
-            window.addEventListener("symbol-changed", () => this.loadChart());
-            window.addEventListener("exchange-changed", () => this.loadChart());
-            window.addEventListener("refresh-all", () => this.loadChart());
+            window.addEventListener("symbol-changed", () => this.loadData());
+            window.addEventListener("exchange-changed", () => this.loadData());
+            window.addEventListener("refresh-all", () => this.loadData());
         },
 
-        async loadChart() {
+        async loadData() {
             this.loading = true;
-            const symbol = this.$root?.globalSymbol || "BTCUSDT";
-            const exchange = this.$root?.globalExchange || "binance";
+            console.log('📈 Book Pressure Table: Loading data...');
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/book-pressure?symbol=${symbol}&exchange=${exchange}&limit=100`
+                    `${API_BASE_URL}/book-pressure?limit=100`
                 );
 
                 if (!response.ok) {
@@ -586,94 +587,71 @@ function bookPressureChart() {
                 const result = await response.json();
                 const data = result.data || [];
 
-                this.dataPoints = data.length;
-
                 if (data.length > 0) {
-                    this.renderChart(data);
-                    console.log(
-                        "✅ Book pressure chart loaded:",
-                        data.length,
-                        "points"
-                    );
+                    this.pressureData = data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    this.calculateStats();
+                    console.log("✅ Book pressure table loaded:", data.length, "records");
                 } else {
-                    if (this.chart) {
-                        this.chart.destroy();
-                        this.chart = null;
-                    }
+                    console.warn("⚠️ No book pressure data available");
+                    this.pressureData = [];
                 }
             } catch (error) {
-                console.error("❌ Error loading book pressure chart:", error);
-                this.dataPoints = 0;
+                console.error("❌ Error loading book pressure data:", error);
+                this.pressureData = [];
             } finally {
                 this.loading = false;
             }
         },
 
-        renderChart(data) {
-            const ctx = document.getElementById("bookPressureChart");
-            if (!ctx) return;
-
-            if (this.chart) {
-                this.chart.destroy();
+        calculateStats() {
+            if (this.pressureData.length === 0) {
+                this.avgBidPressure = 0;
+                this.avgAskPressure = 0;
+                this.avgRatio = 0;
+                return;
             }
 
-            const labels = data.map((d) => new Date(d.timestamp));
-            const bidPressure = data.map((d) => d.bid_pressure);
-            const askPressure = data.map((d) => d.ask_pressure);
+            const bidPressures = this.pressureData.map(d => parseFloat(d.bid_pressure || 0));
+            const askPressures = this.pressureData.map(d => parseFloat(d.ask_pressure || 0));
+            const ratios = this.pressureData.map(d => parseFloat(d.pressure_ratio || 0));
 
-            this.chart = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: "Bid Pressure",
-                            data: bidPressure,
-                            borderColor: "#22c55e",
-                            backgroundColor: "rgba(34, 197, 94, 0.1)",
-                            tension: 0.4,
-                            fill: true,
-                            borderWidth: 2,
-                        },
-                        {
-                            label: "Ask Pressure",
-                            data: askPressure,
-                            borderColor: "#ef4444",
-                            backgroundColor: "rgba(239, 68, 68, 0.1)",
-                            tension: 0.4,
-                            fill: true,
-                            borderWidth: 2,
-                        },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: "top",
-                        },
-                    },
-                    scales: {
-                        x: {
-                            type: "time",
-                            time: {
-                                unit: "minute",
-                            },
-                            grid: {
-                                display: false,
-                            },
-                        },
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: "rgba(255, 255, 255, 0.1)",
-                            },
-                        },
-                    },
-                },
+            this.avgBidPressure = bidPressures.reduce((a, b) => a + b, 0) / bidPressures.length;
+            this.avgAskPressure = askPressures.reduce((a, b) => a + b, 0) / askPressures.length;
+            this.avgRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+        },
+
+        formatPressure(value) {
+            if (value === null || value === undefined) return 'N/A';
+            const num = parseFloat(value);
+            if (isNaN(num)) return 'N/A';
+            return num.toFixed(2);
+        },
+
+        formatRatio(value) {
+            if (value === null || value === undefined) return 'N/A';
+            const num = parseFloat(value);
+            if (isNaN(num)) return 'N/A';
+            return num.toFixed(3);
+        },
+
+        formatTime(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp);
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
             });
+        },
+
+        getDirectionClass(direction) {
+            switch (direction?.toLowerCase()) {
+                case 'bullish': return 'bg-success';
+                case 'bearish': return 'bg-danger';
+                default: return 'bg-secondary';
+            }
         },
     };
 }

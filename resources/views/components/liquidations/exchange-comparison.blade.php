@@ -1,11 +1,11 @@
 {{--
     Exchange Comparison Component
     Compares liquidation volumes across exchanges for different time ranges
-    Uses exchange-list endpoint data
+    Uses exchange-list API endpoint: /api/liquidations/exchange-list
 --}}
 
 <div class="df-panel p-4 h-100"
-     x-data="liquidationsExchangeComparison()"
+     x-data="liquidationsExchangeComparisonTable()"
      x-init="init()">
 
     <div class="d-flex align-items-center justify-content-between mb-3">
@@ -13,85 +13,93 @@
             <h5 class="mb-0">📊 Exchange Comparison</h5>
             <small class="text-secondary">Volume breakdown by exchange</small>
         </div>
-        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select form-select-sm" style="width: 100px;" x-model="selectedRange" @change="loadData()">
+                <option value="1h">1H</option>
+                <option value="4h">4H</option>
+                <option value="12h">12H</option>
+                <option value="24h">24H</option>
+            </select>
+            <button class="btn btn-sm btn-outline-primary" @click="loadData()" :disabled="loading">
+                <span x-show="!loading">🔄 Refresh</span>
+                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
+            </button>
+        </div>
     </div>
 
-    <!-- Time Range Tabs -->
-    <ul class="nav nav-pills mb-3" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" :class="selectedRange === '1h' ? 'active' : ''"
-                    @click="selectedRange = '1h'" type="button">
-                1H
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" :class="selectedRange === '4h' ? 'active' : ''"
-                    @click="selectedRange = '4h'" type="button">
-                4H
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" :class="selectedRange === '12h' ? 'active' : ''"
-                    @click="selectedRange = '12h'" type="button">
-                12H
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" :class="selectedRange === '24h' ? 'active' : ''"
-                    @click="selectedRange = '24h'" type="button">
-                24H
-            </button>
-        </li>
-    </ul>
-
-    <!-- Chart Container -->
-    <div style="height: 350px; position: relative;">
-        <canvas x-ref="comparisonCanvas"></canvas>
+    <!-- Exchange Comparison Table -->
+    <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+        <table class="table table-sm table-striped">
+            <thead class="sticky-top bg-white">
+                <tr>
+                    <th>Rank</th>
+                    <th>Exchange</th>
+                    <th class="text-end">Total USD</th>
+                    <th class="text-end text-danger">Long USD</th>
+                    <th class="text-end text-success">Short USD</th>
+                    <th class="text-end">Market Share</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(exchange, index) in displayedExchanges" :key="'exchange-' + index + '-' + exchange.exchange">
+                    <tr>
+                        <td>
+                            <span class="badge bg-primary" x-text="'#' + (index + 1)">#1</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary" x-text="exchange.exchange">--</span>
+                        </td>
+                        <td class="text-end fw-bold" x-text="formatUSD(exchange.liquidation_usd)">--</td>
+                        <td class="text-end text-danger" x-text="formatUSD(exchange.long_liquidation_usd)">--</td>
+                        <td class="text-end text-success" x-text="formatUSD(exchange.short_liquidation_usd)">--</td>
+                        <td class="text-end">
+                            <span class="badge bg-info" x-text="exchange.percentage + '%'">--</span>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
     </div>
 
-    <!-- Exchange Stats Grid -->
-    <div class="row g-2 mt-3">
-        <template x-for="(exchange, index) in topExchanges" :key="index">
-            <div class="col-6 col-md-4">
-                <div class="p-2 rounded bg-dark bg-opacity-10">
-                    <div class="d-flex align-items-center justify-content-between mb-1">
-                        <span class="small fw-bold" x-text="exchange.name">Exchange</span>
-                        <span class="badge bg-primary" x-text="'#' + (index + 1)">#1</span>
-                    </div>
-                    <div class="fw-bold" x-text="formatUSD(exchange.total)">$0</div>
-                    <div class="small text-secondary" x-text="exchange.percentage + '%'">0%</div>
-                </div>
+    <!-- Summary Stats -->
+    <div class="mt-3 pt-3 border-top">
+        <div class="row g-2 small">
+            <div class="col-4">
+                <div class="text-secondary">Total Volume</div>
+                <div class="fw-bold" x-text="formatUSD(totalVolume)">--</div>
             </div>
-        </template>
+            <div class="col-4">
+                <div class="text-secondary">Total Long</div>
+                <div class="fw-bold text-danger" x-text="formatUSD(totalLong)">--</div>
+            </div>
+            <div class="col-4">
+                <div class="text-secondary">Total Short</div>
+                <div class="fw-bold text-success" x-text="formatUSD(totalShort)">--</div>
+            </div>
+        </div>
     </div>
 
     <!-- No Data State -->
-    <div x-show="!loading && !hasData"
-         class="position-absolute top-50 start-50 translate-middle text-center"
-         style="z-index: 10;">
+    <div x-show="!loading && displayedExchanges.length === 0" class="text-center py-4">
         <div class="text-secondary mb-2" style="font-size: 3rem;">📊</div>
-        <div class="text-secondary">No comparison data available</div>
+        <div class="text-secondary">No exchange comparison data available</div>
+        <div class="small text-muted mt-2">Try changing symbol or refresh data</div>
     </div>
 </div>
 
 <script>
-function liquidationsExchangeComparison() {
+function liquidationsExchangeComparisonTable() {
     return {
         loading: false,
-        hasData: false,
-        chart: null,
-        exchangeListData: {},
+        exchangeData: [],
         selectedRange: '1h',
-        topExchanges: [],
+        displayedExchanges: [],
+        totalVolume: 0,
+        totalLong: 0,
+        totalShort: 0,
 
         async init() {
-            // Wait for Chart.js
-            await window.chartJsReady;
-
-            // Listen for overview ready
-            window.addEventListener('liquidations-overview-ready', (e) => {
-                this.applyOverview(e.detail);
-            });
+            console.log('📊 Exchange Comparison: Initializing component');
 
             // Listen for filter changes
             window.addEventListener('symbol-changed', () => {
@@ -102,168 +110,78 @@ function liquidationsExchangeComparison() {
                 this.loadData();
             });
 
-            window.addEventListener('interval-changed', () => {
-                this.loadData();
-            });
-
             window.addEventListener('refresh-all', () => {
                 this.loadData();
             });
 
             // Watch selected range
             this.$watch('selectedRange', () => {
-                this.renderChart();
+                this.loadData();
             });
 
-            // Initial load with delay to ensure DOM is ready
-            setTimeout(() => {
-                if (this.$root?.overview) {
-                    this.applyOverview(this.$root.overview);
-                } else {
-                    this.loadData();
-                }
-            }, 100);
-        },
-
-        applyOverview(overview) {
-            if (!overview?.exchangeList) return;
-            this.exchangeListData = overview.exchangeList;
-            this.renderChart();
-        },
-
-        renderChart() {
-            const data = this.exchangeListData[this.selectedRange];
-            if (!data || !Array.isArray(data) || data.length === 0) {
-                this.hasData = false;
-                return;
-            }
-
-            this.hasData = true;
-
-            // Filter out "All" exchange and get top 8
-            const exchanges = data
-                .filter(ex => ex.exchange !== 'All')
-                .map(ex => ({
-                    name: ex.exchange,
-                    total: parseFloat(ex.liquidation_usd) || 0,
-                    long: parseFloat(ex.long_liquidation_usd) || 0,
-                    short: parseFloat(ex.short_liquidation_usd) || 0,
-                }))
-                .sort((a, b) => b.total - a.total)
-                .slice(0, 8);
-
-            // Calculate percentages
-            const totalVolume = exchanges.reduce((sum, ex) => sum + ex.total, 0);
-            this.topExchanges = exchanges.map(ex => ({
-                ...ex,
-                percentage: ((ex.total / totalVolume) * 100).toFixed(1),
-            }));
-
-            // Prepare chart data
-            const labels = exchanges.map(ex => ex.name);
-            const longData = exchanges.map(ex => ex.long);
-            const shortData = exchanges.map(ex => ex.short);
-
-            // Destroy existing chart
-            if (this.chart) {
-                this.chart.destroy();
-            }
-
-            // Create new chart
-            const canvas = this.$refs.comparisonCanvas;
-            if (!canvas) {
-                console.error('Canvas element not found');
-                return;
-            }
-
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                console.error('Canvas context not available');
-                return;
-            }
-
-            this.chart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Long Liquidations',
-                            data: longData,
-                            backgroundColor: 'rgba(239, 68, 68, 0.8)',
-                            borderColor: 'rgb(239, 68, 68)',
-                            borderWidth: 1,
-                        },
-                        {
-                            label: 'Short Liquidations',
-                            data: shortData,
-                            backgroundColor: 'rgba(34, 197, 94, 0.8)',
-                            borderColor: 'rgb(34, 197, 94)',
-                            borderWidth: 1,
-                        },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                color: '#94a3b8',
-                                font: { size: 11 },
-                                usePointStyle: true,
-                            },
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                            padding: 12,
-                            callbacks: {
-                                label: (context) => {
-                                    const label = context.dataset.label || '';
-                                    const value = this.formatUSD(context.parsed.y);
-                                    return `${label}: ${value}`;
-                                },
-                            },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            stacked: false,
-                            ticks: {
-                                color: '#94a3b8',
-                                font: { size: 10 },
-                            },
-                            grid: {
-                                display: false,
-                            },
-                        },
-                        y: {
-                            stacked: false,
-                            ticks: {
-                                color: '#94a3b8',
-                                font: { size: 10 },
-                                callback: (value) => this.formatUSD(value),
-                            },
-                            grid: {
-                                color: 'rgba(148, 163, 184, 0.1)',
-                            },
-                        },
-                    },
-                },
-            });
+            // Initial load
+            this.loadData();
         },
 
         async loadData() {
             this.loading = true;
-            setTimeout(() => {
+            console.log('📊 Exchange Comparison: Loading data...');
+
+            try {
+                // Get current symbol from global state
+                const symbol = this.$root?.globalSymbol || 'BTC';
+
+                // Build API URL
+                const apiUrl = `http://202.155.90.20:8000/api/liquidations/exchange-list?symbol=${symbol}&range_str=${this.selectedRange}`;
+
+                console.log('📊 Exchange Comparison: Fetching from:', apiUrl);
+
+                const response = await fetch(apiUrl);
+                const result = await response.json();
+
+                console.log('📊 Exchange Comparison: API Response:', result);
+
+                if (result.data && Array.isArray(result.data)) {
+                    this.exchangeData = result.data;
+                    this.updateDisplayedData();
+                    console.log('📊 Exchange Comparison: Loaded', this.exchangeData.length, 'exchanges');
+                } else {
+                    console.warn('📊 Exchange Comparison: No data in response');
+                    this.exchangeData = [];
+                    this.displayedExchanges = [];
+                }
+
+            } catch (error) {
+                console.error('📊 Exchange Comparison: Error loading data:', error);
+                this.exchangeData = [];
+                this.displayedExchanges = [];
+            } finally {
                 this.loading = false;
-            }, 1000);
+            }
+        },
+
+        updateDisplayedData() {
+            // Filter out "All" exchange and sort by total volume
+            const exchanges = this.exchangeData
+                .filter(ex => ex.exchange !== 'All')
+                .map(ex => ({
+                    exchange: ex.exchange,
+                    liquidation_usd: parseFloat(ex.liquidation_usd) || 0,
+                    long_liquidation_usd: parseFloat(ex.long_liquidation_usd) || 0,
+                    short_liquidation_usd: parseFloat(ex.short_liquidation_usd) || 0,
+                }))
+                .sort((a, b) => b.liquidation_usd - a.liquidation_usd);
+
+            // Calculate totals
+            this.totalVolume = exchanges.reduce((sum, ex) => sum + ex.liquidation_usd, 0);
+            this.totalLong = exchanges.reduce((sum, ex) => sum + ex.long_liquidation_usd, 0);
+            this.totalShort = exchanges.reduce((sum, ex) => sum + ex.short_liquidation_usd, 0);
+
+            // Calculate percentages and prepare display data
+            this.displayedExchanges = exchanges.map(ex => ({
+                ...ex,
+                percentage: this.totalVolume > 0 ? ((ex.liquidation_usd / this.totalVolume) * 100).toFixed(1) : '0.0',
+            }));
         },
 
         formatUSD(value) {

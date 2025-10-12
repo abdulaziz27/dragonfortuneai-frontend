@@ -170,7 +170,7 @@
                                     <path d="M8 12h8"/>
                                     <path d="M12 8v8"/>
                                 </svg>
-                                <span>Options Intelligence</span>
+                                <span>Options Metrics</span>
                             </a>
                         </li>
                         <li class="df-sidebar-menu-item">

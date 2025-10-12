@@ -1,11 +1,11 @@
 {{--
-    Liquidation Heatmap Chart Component
-    Visualizes liquidation intensity across time and exchanges
-    Uses pair-history data with bucket aggregation
+    Liquidation Heatmap Table Component
+    Visualizes liquidation intensity across time and exchanges in table format
+    Uses pair-history API endpoint: /api/liquidations/pair-history
 --}}
 
 <div class="df-panel p-4 h-100"
-     x-data="liquidationsHeatmapChart()"
+     x-data="liquidationsHeatmapTable()"
      x-init="init()">
 
     <div class="d-flex align-items-center justify-content-between mb-3">
@@ -13,30 +13,94 @@
             <h5 class="mb-0">🔥 Liquidation Heatmap</h5>
             <small class="text-secondary">Intensity across time & exchanges</small>
         </div>
-        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+        <div class="d-flex gap-2 align-items-center">
+            <button class="btn btn-sm btn-outline-primary" @click="loadData()" :disabled="loading">
+                <span x-show="!loading">🔄 Refresh</span>
+                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
+            </button>
+        </div>
     </div>
 
-    <!-- Chart Container -->
-    <div style="height: 400px; position: relative;">
-        <canvas x-ref="heatmapCanvas"></canvas>
+    <!-- Stats Summary -->
+    <div class="row g-2 mb-3">
+        <div class="col-md-3 col-6">
+            <div class="p-2 rounded bg-primary bg-opacity-10 text-center">
+                <div class="small text-secondary">Data Points</div>
+                <div class="fw-bold" x-text="pairHistoryData.length">0</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="p-2 rounded bg-warning bg-opacity-10 text-center">
+                <div class="small text-secondary">Peak Intensity</div>
+                <div class="fw-bold text-warning" x-text="formatUSD(peakIntensity)">$0</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="p-2 rounded bg-danger bg-opacity-10 text-center">
+                <div class="small text-secondary">Avg Long</div>
+                <div class="fw-bold text-danger" x-text="formatUSD(avgLong)">$0</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="p-2 rounded bg-success bg-opacity-10 text-center">
+                <div class="small text-secondary">Avg Short</div>
+                <div class="fw-bold text-success" x-text="formatUSD(avgShort)">$0</div>
+            </div>
+        </div>
     </div>
 
-    <!-- Legend -->
-    <div class="mt-3 d-flex justify-content-center gap-3">
+    <!-- Heatmap Data Table -->
+    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+        <table class="table table-sm table-striped">
+            <thead class="sticky-top bg-white">
+                <tr>
+                    <th>Time</th>
+                    <th>Exchange</th>
+                    <th>Pair</th>
+                    <th class="text-end text-danger">Long USD</th>
+                    <th class="text-end text-success">Short USD</th>
+                    <th class="text-end">Total USD</th>
+                    <th class="text-end">Intensity</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(item, index) in pairHistoryData" :key="'heatmap-' + index + '-' + item.ts">
+                    <tr :class="getIntensityClass(item.liq_usd)">
+                        <td x-text="formatTimestamp(item.ts)">--</td>
+                        <td>
+                            <span class="badge bg-secondary" x-text="item.exchange">--</span>
+                        </td>
+                        <td x-text="item.pair">--</td>
+                        <td class="text-end text-danger fw-bold" x-text="formatUSD(item.long_liquidation_usd)">--</td>
+                        <td class="text-end text-success fw-bold" x-text="formatUSD(item.short_liquidation_usd)">--</td>
+                        <td class="text-end fw-bold" x-text="formatUSD(item.liq_usd)">--</td>
+                        <td class="text-end">
+                            <span class="badge" :class="getIntensityBadgeClass(item.liq_usd)" x-text="getIntensityLevel(item.liq_usd)">--</span>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Intensity Legend -->
+    <div class="mt-3 d-flex justify-content-center gap-3 flex-wrap">
         <div class="d-flex align-items-center gap-2">
             <div style="width: 20px; height: 20px; background: rgba(239, 68, 68, 0.8); border-radius: 4px;"></div>
-            <span class="small">Long Liquidations</span>
+            <span class="small">High Intensity</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div style="width: 20px; height: 20px; background: rgba(245, 158, 11, 0.8); border-radius: 4px;"></div>
+            <span class="small">Medium Intensity</span>
         </div>
         <div class="d-flex align-items-center gap-2">
             <div style="width: 20px; height: 20px; background: rgba(34, 197, 94, 0.8); border-radius: 4px;"></div>
-            <span class="small">Short Liquidations</span>
+            <span class="small">Low Intensity</span>
         </div>
     </div>
 
     <!-- No Data State -->
-    <div x-show="!loading && !hasData"
-         class="position-absolute top-50 start-50 translate-middle text-center"
-         style="z-index: 10;">
+    <div x-show="!loading && pairHistoryData.length === 0" class="text-center py-4">
         <div class="text-secondary mb-2" style="font-size: 3rem;">🔥</div>
         <div class="text-secondary">No liquidation heatmap data available</div>
         <div class="small text-muted mt-2">Try changing symbol, exchange, or time interval</div>
@@ -44,25 +108,16 @@
 </div>
 
 <script>
-function liquidationsHeatmapChart() {
+function liquidationsHeatmapTable() {
     return {
         loading: false,
-        hasData: false,
-        chart: null,
         pairHistoryData: [],
+        peakIntensity: 0,
+        avgLong: 0,
+        avgShort: 0,
 
         async init() {
-            console.log('🔥 Heatmap Chart: Initializing component');
-
-            // Wait for Chart.js to load
-            await window.chartJsReady;
-            console.log('🔥 Heatmap Chart: Chart.js ready');
-
-            // Listen for overview ready
-            window.addEventListener('liquidations-overview-ready', (e) => {
-                console.log('🔥 Heatmap Chart: Received overview ready event');
-                this.applyOverview(e.detail);
-            });
+            console.log('🔥 Heatmap Table: Initializing component');
 
             // Listen for filter changes
             window.addEventListener('symbol-changed', () => {
@@ -81,203 +136,97 @@ function liquidationsHeatmapChart() {
                 this.loadData();
             });
 
-            // Initial load with delay to ensure DOM is ready
-            setTimeout(() => {
-                if (this.$root?.overview) {
-                    this.applyOverview(this.$root.overview);
-                } else {
+            // Initial load
                     this.loadData();
-                }
-            }, 100);
-        },
-
-        applyOverview(overview) {
-            console.log('🔥 Heatmap Chart: Applying overview', overview);
-
-            if (!overview?.pairHistory || !Array.isArray(overview.pairHistory)) {
-                console.warn('🔥 Heatmap Chart: No pair history data in overview');
-                this.hasData = false;
-                return;
-            }
-
-            if (overview.pairHistory.length === 0) {
-                console.warn('🔥 Heatmap Chart: Empty pair history data');
-                this.hasData = false;
-                return;
-            }
-
-            this.pairHistoryData = overview.pairHistory;
-            console.log('🔥 Heatmap Chart: Processed data points:', this.pairHistoryData.length);
-            this.renderChart();
-        },
-
-        renderChart() {
-            console.log('🔥 Heatmap Chart: Rendering chart with', this.pairHistoryData?.length || 0, 'data points');
-
-            if (!this.pairHistoryData || this.pairHistoryData.length === 0) {
-                console.warn('🔥 Heatmap Chart: No data to render');
-                this.hasData = false;
-                return;
-            }
-
-            this.hasData = true;
-
-            // Group data by exchange
-            const exchangeData = {};
-            this.pairHistoryData.forEach(row => {
-                if (!exchangeData[row.exchange]) {
-                    exchangeData[row.exchange] = [];
-                }
-                exchangeData[row.exchange].push({
-                    ts: row.ts,
-                    long: parseFloat(row.long_liq_usd || 0),
-                    short: parseFloat(row.short_liq_usd || 0),
-                    total: parseFloat(row.liq_usd || 0),
-                });
-            });
-
-            // Sort and limit to recent data
-            Object.keys(exchangeData).forEach(exchange => {
-                exchangeData[exchange] = exchangeData[exchange]
-                    .sort((a, b) => a.ts - b.ts)
-                    .slice(-20); // Last 20 buckets
-            });
-
-            // Get all unique timestamps
-            const allTimestamps = [...new Set(
-                Object.values(exchangeData)
-                    .flat()
-                    .map(d => d.ts)
-            )].sort((a, b) => a - b);
-
-            // Prepare datasets for stacked bar chart (simulating heatmap)
-            const exchanges = Object.keys(exchangeData).slice(0, 5); // Top 5 exchanges
-            const labels = allTimestamps.map(ts => this.formatTimestamp(ts));
-
-            const longDatasets = exchanges.map((exchange, idx) => ({
-                label: `${exchange} - Long`,
-                data: allTimestamps.map(ts => {
-                    const point = exchangeData[exchange]?.find(d => d.ts === ts);
-                    return point ? point.long : 0;
-                }),
-                backgroundColor: this.getExchangeColor(idx, 'long'),
-                stack: 'long',
-            }));
-
-            const shortDatasets = exchanges.map((exchange, idx) => ({
-                label: `${exchange} - Short`,
-                data: allTimestamps.map(ts => {
-                    const point = exchangeData[exchange]?.find(d => d.ts === ts);
-                    return point ? point.short : 0;
-                }),
-                backgroundColor: this.getExchangeColor(idx, 'short'),
-                stack: 'short',
-            }));
-
-            // Destroy existing chart
-            if (this.chart) {
-                this.chart.destroy();
-            }
-
-            // Create new chart
-            const canvas = this.$refs.heatmapCanvas;
-            if (!canvas) {
-                console.error('Canvas element not found');
-                return;
-            }
-
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                console.error('Canvas context not available');
-                return;
-            }
-
-            this.chart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [...longDatasets, ...shortDatasets],
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        legend: {
-                            display: false, // Too many series, hide legend
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                            padding: 12,
-                            callbacks: {
-                                label: (context) => {
-                                    const label = context.dataset.label || '';
-                                    const value = this.formatUSD(context.parsed.y);
-                                    return `${label}: ${value}`;
-                                },
-                            },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            stacked: true,
-                            ticks: {
-                                color: '#94a3b8',
-                                font: { size: 10 },
-                                maxRotation: 45,
-                                minRotation: 45,
-                            },
-                            grid: {
-                                display: false,
-                            },
-                        },
-                        y: {
-                            stacked: true,
-                            ticks: {
-                                color: '#94a3b8',
-                                font: { size: 10 },
-                                callback: (value) => this.formatUSD(value),
-                            },
-                            grid: {
-                                color: 'rgba(148, 163, 184, 0.1)',
-                            },
-                        },
-                    },
-                },
-                    });
-
-                    console.log('✅ Heatmap Chart: Chart rendered successfully');
-                },
-
-                getExchangeColor(index, side) {
-            const baseColors = [
-                '#3b82f6',  // blue
-                '#8b5cf6',  // purple
-                '#f59e0b',  // orange
-                '#06b6d4',  // cyan
-                '#ec4899',  // pink
-            ];
-
-            const color = baseColors[index % baseColors.length];
-
-            // Adjust opacity based on side
-            if (side === 'long') {
-                return color.replace(')', ', 0.7)').replace('#', 'rgba(') || color + 'b3';
-            } else {
-                return color.replace(')', ', 0.4)').replace('#', 'rgba(') || color + '66';
-            }
         },
 
         async loadData() {
             this.loading = true;
-            console.log('🔥 Heatmap Chart: Loading data...');
-            setTimeout(() => {
+            console.log('🔥 Heatmap Table: Loading data...');
+
+            try {
+                // Get current filters from global state
+                const symbol = this.$root?.globalSymbol || 'BTCUSDT';
+                const interval = this.$root?.globalInterval || '1m';
+                const exchange = this.$root?.globalExchange || '';
+
+                // Build API URL
+                let apiUrl = `http://202.155.90.20:8000/api/liquidations/pair-history?symbol=${symbol}&interval=${interval}&limit=100`;
+                if (exchange) {
+                    apiUrl += `&exchange=${exchange}`;
+                }
+
+                console.log('🔥 Heatmap Table: Fetching from:', apiUrl);
+
+                const response = await fetch(apiUrl);
+                const result = await response.json();
+
+                console.log('🔥 Heatmap Table: API Response:', result);
+
+                if (result.data && Array.isArray(result.data)) {
+                    // Sort by total liquidation volume (highest intensity first)
+                    this.pairHistoryData = result.data
+                        .sort((a, b) => parseFloat(b.liq_usd || 0) - parseFloat(a.liq_usd || 0))
+                        .slice(0, 50); // Limit to 50 records for performance
+                    
+                    this.calculateStats();
+                    console.log('🔥 Heatmap Table: Loaded', this.pairHistoryData.length, 'records');
+                } else {
+                    console.warn('🔥 Heatmap Table: No data in response');
+                    this.pairHistoryData = [];
+                }
+
+            } catch (error) {
+                console.error('🔥 Heatmap Table: Error loading data:', error);
+                this.pairHistoryData = [];
+            } finally {
                 this.loading = false;
-                console.log('🔥 Heatmap Chart: Data loading completed');
-            }, 1000);
+            }
+        },
+
+        calculateStats() {
+            if (this.pairHistoryData.length === 0) {
+                this.peakIntensity = 0;
+                this.avgLong = 0;
+                this.avgShort = 0;
+                return;
+            }
+
+            const longValues = this.pairHistoryData.map(d => parseFloat(d.long_liquidation_usd || 0));
+            const shortValues = this.pairHistoryData.map(d => parseFloat(d.short_liquidation_usd || 0));
+            const totalValues = this.pairHistoryData.map(d => parseFloat(d.liq_usd || 0));
+
+            this.peakIntensity = Math.max(...totalValues);
+            this.avgLong = longValues.reduce((a, b) => a + b, 0) / longValues.length;
+            this.avgShort = shortValues.reduce((a, b) => a + b, 0) / shortValues.length;
+        },
+
+        getIntensityLevel(value) {
+            const num = parseFloat(value || 0);
+            if (num >= 1e6) return 'HIGH';
+            if (num >= 1e5) return 'MED';
+            if (num >= 1e4) return 'LOW';
+            return 'MIN';
+        },
+
+        getIntensityBadgeClass(value) {
+            const level = this.getIntensityLevel(value);
+            switch (level) {
+                case 'HIGH': return 'bg-danger';
+                case 'MED': return 'bg-warning';
+                case 'LOW': return 'bg-success';
+                default: return 'bg-secondary';
+            }
+        },
+
+        getIntensityClass(value) {
+            const level = this.getIntensityLevel(value);
+            switch (level) {
+                case 'HIGH': return 'table-danger';
+                case 'MED': return 'table-warning';
+                case 'LOW': return 'table-success';
+                default: return '';
+            }
         },
 
         formatUSD(value) {

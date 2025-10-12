@@ -14,7 +14,18 @@
  */
 
 // Base API URL
-const API_BASE_URL = "http://202.155.90.20:8000/api/spot-microstructure";
+function getApiBaseUrl() {
+    const baseMeta = document.querySelector('meta[name="api-base-url"]');
+    const configuredBase = (baseMeta?.content || "").trim();
+    if (configuredBase) {
+        return configuredBase.endsWith("/")
+            ? configuredBase.slice(0, -1)
+            : configuredBase;
+    }
+    return "http://202.155.90.20:8000";
+}
+
+const API_BASE_URL = getApiBaseUrl() + "/api/spot-microstructure";
 
 /**
  * Main Trades Controller
@@ -125,29 +136,33 @@ function tradeBiasCard() {
 }
 
 /**
- * CVD Chart Component
+ * CVD Table Component
  */
-function cvdChart() {
+function cvdTable() {
     return {
-        chart: null,
         loading: false,
-        dataPoints: 0,
+        cvdData: [],
+        currentCvd: 0,
+        avgCvd: 0,
+        maxCvd: 0,
+        minCvd: 0,
 
         init() {
-            this.loadCVD();
+            this.loadData();
 
             // Listen to global events
-            this.$watch("$root.globalSymbol", () => this.loadCVD());
-            window.addEventListener("refresh-all", () => this.loadCVD());
+            this.$watch("$root.globalSymbol", () => this.loadData());
+            window.addEventListener("refresh-all", () => this.loadData());
         },
 
-        async loadCVD() {
+        async loadData() {
             this.loading = true;
+            console.log('📊 CVD Table: Loading data...');
             const symbol = this.$root.globalSymbol || "BTCUSDT";
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/cvd?symbol=${symbol}&limit=500`
+                    `${API_BASE_URL}/cvd?exchange=binance&symbol=${symbol.toLowerCase()}&limit=100`
                 );
 
                 if (!response.ok) {
@@ -157,104 +172,80 @@ function cvdChart() {
                 const result = await response.json();
                 const data = result.data || [];
 
-                this.dataPoints = data.length;
-
                 if (data.length > 0) {
-                    this.renderChart(data);
-                    console.log("✅ CVD data loaded:", data.length, "points");
+                    this.cvdData = data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    this.calculateStats();
+                    console.log("✅ CVD table loaded:", data.length, "records");
                 } else {
                     console.warn("⚠️ No CVD data available");
-                    if (this.chart) {
-                        this.chart.destroy();
-                        this.chart = null;
-                    }
+                    this.cvdData = [];
                 }
             } catch (error) {
                 console.error("❌ Error loading CVD:", error);
-                this.dataPoints = 0;
+                this.cvdData = [];
             } finally {
                 this.loading = false;
             }
         },
 
-        renderChart(data) {
-            const ctx = document.getElementById("cvdChart");
-            if (!ctx) return;
-
-            // Destroy existing chart
-            if (this.chart) {
-                this.chart.destroy();
+        calculateStats() {
+            if (this.cvdData.length === 0) {
+                this.currentCvd = 0;
+                this.avgCvd = 0;
+                this.maxCvd = 0;
+                this.minCvd = 0;
+                return;
             }
 
-            // Prepare data
-            const labels = data.map((d) => new Date(d.timestamp));
-            const cvdValues = data.map((d) => d.cvd);
+            const cvdValues = this.cvdData.map(d => parseFloat(d.cvd || 0));
+            
+            this.currentCvd = cvdValues[0]; // Most recent (first after sorting)
+            this.avgCvd = cvdValues.reduce((a, b) => a + b, 0) / cvdValues.length;
+            this.maxCvd = Math.max(...cvdValues);
+            this.minCvd = Math.min(...cvdValues);
+        },
 
-            this.chart = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: "CVD",
-                            data: cvdValues,
-                            borderColor:
-                                cvdValues[cvdValues.length - 1] >= 0
-                                    ? "#22c55e"
-                                    : "#ef4444",
-                            backgroundColor:
-                                cvdValues[cvdValues.length - 1] >= 0
-                                    ? "rgba(34, 197, 94, 0.1)"
-                                    : "rgba(239, 68, 68, 0.1)",
-                            tension: 0.4,
-                            fill: true,
-                            borderWidth: 2,
-                        },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false,
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) => {
-                                    return (
-                                        "CVD: " +
-                                        context.parsed.y.toLocaleString()
-                                    );
-                                },
-                            },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            type: "time",
-                            time: {
-                                unit: "minute",
-                                displayFormats: {
-                                    minute: "HH:mm",
-                                },
-                            },
-                            grid: {
-                                display: false,
-                            },
-                        },
-                        y: {
-                            beginAtZero: false,
-                            grid: {
-                                color: "rgba(255, 255, 255, 0.1)",
-                            },
-                            ticks: {
-                                callback: (value) => value.toLocaleString(),
-                            },
-                        },
-                    },
-                },
+        formatCvd(value) {
+            if (value === null || value === undefined) return 'N/A';
+            const num = parseFloat(value);
+            if (isNaN(num)) return 'N/A';
+            
+            if (Math.abs(num) >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+            if (Math.abs(num) >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+            return num.toFixed(2);
+        },
+
+        formatTime(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp);
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
             });
+        },
+
+        getCvdClass(value) {
+            const num = parseFloat(value || 0);
+            if (num > 0) return 'text-success';
+            if (num < 0) return 'text-danger';
+            return 'text-secondary';
+        },
+
+        getTrendClass(value) {
+            const num = parseFloat(value || 0);
+            if (num > 0) return 'bg-success';
+            if (num < 0) return 'bg-danger';
+            return 'bg-secondary';
+        },
+
+        getTrendText(value) {
+            const num = parseFloat(value || 0);
+            if (num > 0) return 'BULLISH';
+            if (num < 0) return 'BEARISH';
+            return 'NEUTRAL';
         },
     };
 }
@@ -284,7 +275,7 @@ function cvdStats() {
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/cvd?symbol=${symbol}&limit=500`
+                    `${API_BASE_URL}/cvd?exchange=binance&symbol=${symbol.toLowerCase()}&limit=500`
                 );
 
                 if (!response.ok) {

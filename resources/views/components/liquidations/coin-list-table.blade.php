@@ -9,11 +9,14 @@
      x-init="init()">
 
     <div class="d-flex align-items-center justify-content-between mb-3">
-        <h5 class="mb-0">🏦 Exchange Breakdown</h5>
+        <div>
+            <h5 class="mb-0">🏦 Exchange Breakdown</h5>
+            <small class="text-secondary">Multi-range liquidation data per exchange</small>
+        </div>
         <div class="d-flex gap-2 align-items-center">
-            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
-            <button class="btn btn-sm btn-outline-primary" @click="loadData()">
-                <i class="bi bi-arrow-clockwise"></i>
+            <button class="btn btn-sm btn-outline-primary" @click="loadData()" :disabled="loading">
+                <span x-show="!loading">🔄 Refresh</span>
+                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
             </button>
         </div>
     </div>
@@ -115,13 +118,9 @@ function liquidationsCoinListTable() {
             short: 0,
         },
 
-        init() {
+        async init() {
+            console.log('🏦 Exchange Breakdown: Initializing component');
             this.symbol = this.$root?.globalSymbol || 'BTC';
-
-            // Listen for overview ready
-            window.addEventListener('liquidations-overview-ready', (e) => {
-                this.applyOverview(e.detail);
-            });
 
             // Listen for filter changes
             window.addEventListener('symbol-changed', (e) => {
@@ -138,20 +137,8 @@ function liquidationsCoinListTable() {
                 this.updateDisplayedData();
             });
 
-            // Initial load with delay to ensure DOM is ready
-            setTimeout(() => {
-                if (this.$root?.overview) {
-                    this.applyOverview(this.$root.overview);
-                } else {
-                    this.loadData();
-                }
-            }, 100);
-        },
-
-        applyOverview(overview) {
-            if (!overview?.coinList) return;
-            this.coinListData = overview.coinList;
-            this.updateDisplayedData();
+            // Initial load
+            this.loadData();
         },
 
         updateDisplayedData() {
@@ -185,9 +172,36 @@ function liquidationsCoinListTable() {
 
         async loadData() {
             this.loading = true;
-            setTimeout(() => {
+            console.log('🏦 Exchange Breakdown: Loading data...');
+
+            try {
+                // Build API URL
+                const apiUrl = `http://202.155.90.20:8000/api/liquidations/coin-list?symbol=${this.symbol}&limit=100`;
+
+                console.log('🏦 Exchange Breakdown: Fetching from:', apiUrl);
+
+                const response = await fetch(apiUrl);
+                const result = await response.json();
+
+                console.log('🏦 Exchange Breakdown: API Response:', result);
+
+                if (result.data && Array.isArray(result.data)) {
+                    this.coinListData = result.data;
+                    this.updateDisplayedData();
+                    console.log('🏦 Exchange Breakdown: Loaded', this.coinListData.length, 'exchanges');
+                } else {
+                    console.warn('🏦 Exchange Breakdown: No data in response');
+                    this.coinListData = [];
+                    this.displayedData = [];
+                }
+
+            } catch (error) {
+                console.error('🏦 Exchange Breakdown: Error loading data:', error);
+                this.coinListData = [];
+                this.displayedData = [];
+            } finally {
                 this.loading = false;
-            }, 1000);
+            }
         },
 
         formatUSD(value) {

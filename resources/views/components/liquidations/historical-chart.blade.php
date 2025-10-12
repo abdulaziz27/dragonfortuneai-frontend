@@ -1,36 +1,28 @@
 {{--
-    Historical Liquidations Chart Component
-    Time series visualization of liquidations with price overlay
-    Uses pair-history data
+    Historical Liquidations Table Component
+    Time series data of liquidations displayed in table format
+    Uses pair-history API endpoint: /api/liquidations/pair-history
 --}}
 
 <div class="df-panel p-4 h-100"
-     x-data="liquidationsHistoricalChart()"
+     x-data="liquidationsHistoricalTable()"
      x-init="init()">
 
     <div class="d-flex align-items-center justify-content-between mb-3">
         <div>
             <h5 class="mb-0">📈 Historical Liquidations</h5>
-            <small class="text-secondary">Time series with price overlay</small>
+            <small class="text-secondary">Time series liquidation data</small>
         </div>
         <div class="d-flex gap-2 align-items-center">
-            <select class="form-select form-select-sm" style="width: 120px;"
-                    x-model="chartType" @change="renderChart()">
-                <option value="line">Line Chart</option>
-                <option value="bar">Bar Chart</option>
-                <option value="area">Area Chart</option>
-            </select>
-            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+            <button class="btn btn-sm btn-outline-primary" @click="loadData()" :disabled="loading">
+                <span x-show="!loading">🔄 Refresh</span>
+                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
+            </button>
         </div>
-    </div>
-
-    <!-- Chart Container -->
-    <div style="height: 400px; position: relative;">
-        <canvas x-ref="historicalCanvas"></canvas>
     </div>
 
     <!-- Stats Summary -->
-    <div class="row g-2 mt-3">
+    <div class="row g-2 mb-3">
         <div class="col-md-3 col-6">
             <div class="p-2 rounded bg-primary bg-opacity-10 text-center">
                 <div class="small text-secondary">Data Points</div>
@@ -57,10 +49,38 @@
         </div>
     </div>
 
+    <!-- Historical Data Table -->
+    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+        <table class="table table-sm table-striped">
+            <thead class="sticky-top bg-white">
+                <tr>
+                    <th>Time</th>
+                    <th>Exchange</th>
+                    <th>Pair</th>
+                    <th class="text-end text-danger">Long USD</th>
+                    <th class="text-end text-success">Short USD</th>
+                    <th class="text-end">Total USD</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(item, index) in pairHistoryData" :key="'history-' + index + '-' + item.ts">
+                    <tr>
+                        <td x-text="formatTimestamp(item.ts)">--</td>
+                        <td>
+                            <span class="badge bg-secondary" x-text="item.exchange">--</span>
+                        </td>
+                        <td x-text="item.pair">--</td>
+                        <td class="text-end text-danger fw-bold" x-text="formatUSD(item.long_liquidation_usd)">--</td>
+                        <td class="text-end text-success fw-bold" x-text="formatUSD(item.short_liquidation_usd)">--</td>
+                        <td class="text-end fw-bold" x-text="formatUSD(item.liq_usd)">--</td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
     <!-- No Data State -->
-    <div x-show="!loading && !hasData"
-         class="position-absolute top-50 start-50 translate-middle text-center"
-         style="z-index: 10;">
+    <div x-show="!loading && (!pairHistoryData || pairHistoryData.length === 0)" class="text-center py-4">
         <div class="text-secondary mb-2" style="font-size: 3rem;">📈</div>
         <div class="text-secondary">No historical liquidation data available</div>
         <div class="small text-muted mt-2">Try changing symbol, exchange, or time interval</div>
@@ -68,13 +88,10 @@
 </div>
 
 <script>
-function liquidationsHistoricalChart() {
+function liquidationsHistoricalTable() {
     return {
         loading: false,
-        hasData: false,
-        chart: null,
         pairHistoryData: [],
-        chartType: 'line',
 
         // Stats
         dataPoints: 0,
@@ -83,17 +100,7 @@ function liquidationsHistoricalChart() {
         peakTotal: 0,
 
         async init() {
-            console.log('📊 Historical Chart: Initializing component');
-
-            // Wait for Chart.js
-            await window.chartJsReady;
-            console.log('📊 Historical Chart: Chart.js ready');
-
-            // Listen for overview ready
-            window.addEventListener('liquidations-overview-ready', (e) => {
-                console.log('📊 Historical Chart: Received overview ready event');
-                this.applyOverview(e.detail);
-            });
+            console.log('📊 Historical Table: Initializing component');
 
             // Listen for filter changes
             window.addEventListener('symbol-changed', () => {
@@ -112,194 +119,72 @@ function liquidationsHistoricalChart() {
                 this.loadData();
             });
 
-            // Initial load with delay to ensure DOM is ready
-            setTimeout(() => {
-                if (this.$root?.overview) {
-                    this.applyOverview(this.$root.overview);
-                } else {
-                    this.loadData();
-                }
-            }, 100);
+            // Initial load
+            this.loadData();
         },
 
-        applyOverview(overview) {
-            console.log('📊 Historical Chart: Applying overview', overview);
+        async loadData() {
+            this.loading = true;
+            console.log('📊 Historical Table: Loading data...');
 
-            if (!overview?.pairHistory || !Array.isArray(overview.pairHistory)) {
-                console.warn('📊 Historical Chart: No pair history data available');
-                this.hasData = false;
-                return;
+            try {
+                // Get current filters from global state
+                const symbol = this.$root?.globalSymbol || 'BTCUSDT';
+                const interval = this.$root?.globalInterval || '1m';
+                const exchange = this.$root?.globalExchange || '';
+
+                // Build API URL
+                let apiUrl = `http://202.155.90.20:8000/api/liquidations/pair-history?symbol=${symbol}&interval=${interval}&limit=50`;
+                if (exchange) {
+                    apiUrl += `&exchange=${exchange}`;
+                }
+
+                console.log('📊 Historical Table: Fetching from:', apiUrl);
+
+                const response = await fetch(apiUrl);
+                const result = await response.json();
+
+                console.log('📊 Historical Table: API Response:', result);
+
+                if (result.data && Array.isArray(result.data)) {
+                    this.pairHistoryData = result.data
+                        .sort((a, b) => b.ts - a.ts) // Sort by newest first
+                        .slice(0, 100); // Limit to 100 records for performance
+                    
+                    this.calculateStats();
+                    console.log('📊 Historical Table: Loaded', this.pairHistoryData.length, 'records');
+                } else {
+                    console.warn('📊 Historical Table: No data in response');
+                    this.pairHistoryData = [];
+                }
+
+            } catch (error) {
+                console.error('📊 Historical Table: Error loading data:', error);
+                this.pairHistoryData = [];
+            } finally {
+                this.loading = false;
             }
-
-            if (overview.pairHistory.length === 0) {
-                console.warn('📊 Historical Chart: Empty pair history data');
-                this.hasData = false;
-                return;
-            }
-
-            this.pairHistoryData = overview.pairHistory.sort((a, b) => a.ts - b.ts);
-            console.log('📊 Historical Chart: Processed data points:', this.pairHistoryData.length);
-            this.calculateStats();
-            this.renderChart();
         },
 
         calculateStats() {
-            if (this.pairHistoryData.length === 0) return;
+            if (this.pairHistoryData.length === 0) {
+                this.dataPoints = 0;
+                this.avgLong = 0;
+                this.avgShort = 0;
+                this.peakTotal = 0;
+                return;
+            }
 
             this.dataPoints = this.pairHistoryData.length;
 
-            const longValues = this.pairHistoryData.map(d => parseFloat(d.long_liq_usd || 0));
-            const shortValues = this.pairHistoryData.map(d => parseFloat(d.short_liq_usd || 0));
+            const longValues = this.pairHistoryData.map(d => parseFloat(d.long_liquidation_usd || 0));
+            const shortValues = this.pairHistoryData.map(d => parseFloat(d.short_liquidation_usd || 0));
             const totalValues = this.pairHistoryData.map(d => parseFloat(d.liq_usd || 0));
 
             this.avgLong = longValues.reduce((a, b) => a + b, 0) / longValues.length;
             this.avgShort = shortValues.reduce((a, b) => a + b, 0) / shortValues.length;
             this.peakTotal = Math.max(...totalValues);
         },
-
-        renderChart() {
-            console.log('📊 Historical Chart: Rendering chart with', this.pairHistoryData?.length || 0, 'data points');
-
-            if (!this.pairHistoryData || this.pairHistoryData.length === 0) {
-                console.warn('📊 Historical Chart: No data to render');
-                this.hasData = false;
-                return;
-            }
-
-            this.hasData = true;
-
-            // Prepare data
-            const labels = this.pairHistoryData.map(d => this.formatTimestamp(d.ts));
-            const longData = this.pairHistoryData.map(d => parseFloat(d.long_liq_usd || 0));
-            const shortData = this.pairHistoryData.map(d => parseFloat(d.short_liq_usd || 0));
-
-            // Determine chart type config
-            let chartTypeConfig = 'line';
-            let fillConfig = false;
-            let tensionConfig = 0.4;
-
-            if (this.chartType === 'bar') {
-                chartTypeConfig = 'bar';
-            } else if (this.chartType === 'area') {
-                chartTypeConfig = 'line';
-                fillConfig = true;
-                tensionConfig = 0.4;
-            }
-
-            // Destroy existing chart
-            if (this.chart) {
-                this.chart.destroy();
-            }
-
-            // Create new chart
-            const canvas = this.$refs.historicalCanvas;
-            if (!canvas) {
-                console.error('Canvas element not found');
-                return;
-            }
-
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                console.error('Canvas context not available');
-                return;
-            }
-
-            this.chart = new Chart(ctx, {
-                type: chartTypeConfig,
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Long Liquidations',
-                            data: longData,
-                            backgroundColor: fillConfig ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.8)',
-                            borderColor: 'rgb(239, 68, 68)',
-                            borderWidth: 2,
-                            fill: fillConfig,
-                            tension: tensionConfig,
-                            pointRadius: this.chartType === 'bar' ? 0 : 2,
-                            pointHoverRadius: this.chartType === 'bar' ? 0 : 4,
-                        },
-                        {
-                            label: 'Short Liquidations',
-                            data: shortData,
-                            backgroundColor: fillConfig ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.8)',
-                            borderColor: 'rgb(34, 197, 94)',
-                            borderWidth: 2,
-                            fill: fillConfig,
-                            tension: tensionConfig,
-                            pointRadius: this.chartType === 'bar' ? 0 : 2,
-                            pointHoverRadius: this.chartType === 'bar' ? 0 : 4,
-                        },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                color: '#94a3b8',
-                                font: { size: 11 },
-                                usePointStyle: true,
-                            },
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                            padding: 12,
-                            callbacks: {
-                                label: (context) => {
-                                    const label = context.dataset.label || '';
-                                    const value = this.formatUSD(context.parsed.y);
-                                    return `${label}: ${value}`;
-                                },
-                            },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            ticks: {
-                                color: '#94a3b8',
-                                font: { size: 9 },
-                                maxRotation: 45,
-                                minRotation: 45,
-                                maxTicksLimit: 15,
-                            },
-                            grid: {
-                                display: false,
-                            },
-                        },
-                        y: {
-                            ticks: {
-                                color: '#94a3b8',
-                                font: { size: 10 },
-                                callback: (value) => this.formatUSD(value),
-                            },
-                            grid: {
-                                color: 'rgba(148, 163, 184, 0.1)',
-                            },
-                        },
-                    },
-                },
-                    });
-
-                    console.log('✅ Historical Chart: Chart rendered successfully');
-                },
-
-                async loadData() {
-                    this.loading = true;
-                    console.log('📊 Historical Chart: Loading data...');
-                    setTimeout(() => {
-                        this.loading = false;
-                        console.log('📊 Historical Chart: Data loading completed');
-                    }, 1000);
-                },
 
         formatUSD(value) {
             if (value === null || value === undefined) return 'N/A';

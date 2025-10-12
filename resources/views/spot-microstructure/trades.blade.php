@@ -115,19 +115,79 @@
 
         <!-- CVD & Volume Charts -->
         <div class="row g-3">
-            <!-- CVD Chart -->
+            <!-- CVD Table -->
             <div class="col-lg-8">
-                <div class="df-panel p-3" x-data="cvdChart()" x-init="init()">
+                <div class="df-panel p-3" x-data="cvdTable()" x-init="init()">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">📊 Cumulative Volume Delta (CVD)</h5>
-                        <span class="badge bg-secondary" x-show="loading">Loading...</span>
+                        <div>
+                            <h5 class="mb-0">📊 Cumulative Volume Delta (CVD)</h5>
+                            <small class="text-secondary">Recent CVD data points</small>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center">
+                            <button class="btn btn-sm btn-outline-primary" @click="loadData()" :disabled="loading">
+                                <span x-show="!loading">🔄 Refresh</span>
+                                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
+                            </button>
+                        </div>
                     </div>
-                    <canvas id="cvdChart" height="80"></canvas>
-                    <div class="mt-2 small text-secondary" x-show="!loading && dataPoints > 0">
-                        Showing last <span x-text="dataPoints"></span> data points
+
+                    <!-- CVD Data Table -->
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-striped">
+                            <thead class="sticky-top bg-white">
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Exchange</th>
+                                    <th>Symbol</th>
+                                    <th class="text-end">CVD Value</th>
+                                    <th class="text-center">Trend</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(item, index) in cvdData" :key="'cvd-' + index + '-' + item.timestamp">
+                                    <tr>
+                                        <td x-text="formatTime(item.timestamp)">--</td>
+                                        <td>
+                                            <span class="badge bg-secondary" x-text="item.exchange">--</span>
+                                        </td>
+                                        <td x-text="item.symbol">--</td>
+                                        <td class="text-end fw-bold" :class="getCvdClass(item.cvd)" x-text="formatCvd(item.cvd)">--</td>
+                                        <td class="text-center">
+                                            <span class="badge" :class="getTrendClass(item.cvd)" x-text="getTrendText(item.cvd)">--</span>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="mt-2 text-center text-secondary" x-show="!loading && dataPoints === 0">
-                        No CVD data available for this symbol
+
+                    <!-- Summary Stats -->
+                    <div class="mt-3 pt-3 border-top">
+                        <div class="row g-2 small">
+                            <div class="col-3">
+                                <div class="text-secondary">Data Points</div>
+                                <div class="fw-bold" x-text="cvdData.length">--</div>
+                            </div>
+                            <div class="col-3">
+                                <div class="text-secondary">Current CVD</div>
+                                <div class="fw-bold" :class="getCvdClass(currentCvd)" x-text="formatCvd(currentCvd)">--</div>
+                            </div>
+                            <div class="col-3">
+                                <div class="text-secondary">Avg CVD</div>
+                                <div class="fw-bold" x-text="formatCvd(avgCvd)">--</div>
+                            </div>
+                            <div class="col-3">
+                                <div class="text-secondary">CVD Range</div>
+                                <div class="fw-bold" x-text="formatCvd(maxCvd - minCvd)">--</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- No Data State -->
+                    <div x-show="!loading && cvdData.length === 0" class="text-center py-4">
+                        <div class="text-secondary mb-2" style="font-size: 3rem;">📊</div>
+                        <div class="text-secondary">No CVD data available</div>
+                        <div class="small text-muted mt-2">Try refreshing or changing the symbol</div>
                     </div>
                 </div>
             </div>

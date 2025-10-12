@@ -53,6 +53,9 @@ function volumeTradeStatsController() {
         // Initialize
         init() {
             console.log("🚀 Volume & Trade Stats Dashboard initialized");
+            console.log("📊 Symbol:", this.globalSymbol);
+            console.log("⏱️ Timeframe:", this.globalTimeframe);
+            console.log("🔢 Limit:", this.globalLimit);
             this.loadAllData();
 
             // Auto refresh every 60 seconds
@@ -91,7 +94,6 @@ function volumeTradeStatsController() {
             try {
                 const params = new URLSearchParams({
                     symbol: this.globalSymbol,
-                    timeframe: this.globalTimeframe,
                     limit: this.globalLimit,
                 });
 
@@ -211,7 +213,6 @@ function volumeTradeStatsController() {
             try {
                 const params = new URLSearchParams({
                     symbol: this.globalSymbol,
-                    timeframe: this.globalTimeframe,
                     limit: this.globalLimit,
                 });
 
@@ -247,6 +248,11 @@ function volumeTradeStatsController() {
 
         // Calculate aggregated metrics
         calculateMetrics() {
+            console.log("📊 Calculating metrics...");
+            console.log("📈 Volume Profile Data:", this.volumeProfileData);
+            console.log("📊 Volume Stats Data length:", this.volumeStatsData.length);
+            console.log("💎 Volume Profile Detailed length:", this.volumeProfileDetailedData.length);
+
             // From volume profile
             if (this.volumeProfileData) {
                 this.metrics.totalTrades =
@@ -280,6 +286,8 @@ function volumeTradeStatsController() {
                 );
                 this.metrics.pocPrice = sorted[0]?.price_level || 0;
             }
+
+            console.log("✅ Calculated metrics:", this.metrics);
         },
 
         // Render all charts
@@ -706,7 +714,8 @@ function volumeTradeStatsController() {
                 return `${normalizedBase}${endpoint}`;
             }
 
-            return endpoint;
+            // Fallback to default API base URL
+            return `http://202.155.90.20:8000${endpoint}`;
         },
 
         // Format timestamp

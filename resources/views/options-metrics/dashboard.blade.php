@@ -7,11 +7,11 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <h1 class="mb-0">Options Intelligence Dashboard</h1>
+                        <h1 class="mb-0">Options Metrics</h1>
                         <span class="pulse-dot pulse-success"></span>
                     </div>
                     <p class="mb-0 text-secondary">
-                        Menyajikan struktur volatilitas, skew 25D, distribusi open interest, dan positioning dealer untuk membaca rezim pasar derivatif.
+                        Comprehensive options analytics including IV Smile & Surface, 25D Skew, Open Interest & Volume distribution, and GEX/Dealer Greeks positioning.
                     </p>
                 </div>
 
@@ -27,6 +27,14 @@
                         <option value="OKX">OKX</option>
                     </select>
 
+                    <select class="form-select" style="width: 120px;" x-model="selectedTimeframe">
+                        <option value="5m">5m</option>
+                        <option value="15m">15m</option>
+                        <option value="1h">1h</option>
+                        <option value="4h">4h</option>
+                        <option value="1d">1d</option>
+                    </select>
+
                     <button class="btn btn-primary" @click="applyProfile(); refreshAll();">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2">
                             <path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.6M21 3v6h-6"/>
@@ -37,7 +45,7 @@
             </div>
         </div>
 
-        <!-- A. Volatility Overview -->
+        <!-- Key Metrics Overview -->
         <div class="row g-3">
             <div class="col-sm-6 col-xl-3">
                 <div class="df-panel p-4 h-100 d-flex flex-column">
@@ -73,14 +81,14 @@
                 <div class="df-panel p-4 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <div class="text-uppercase small fw-semibold text-secondary">Call/Put Imbalance</div>
-                            <div class="h2 mb-1" x-text="formatMultiplier(metrics.callPutRatio)"></div>
+                            <div class="text-uppercase small fw-semibold text-secondary">Total OI</div>
+                            <div class="h2 mb-1" x-text="formatCompact(metrics.totalOi)"></div>
                         </div>
                         <div class="badge rounded-pill"
-                             :class="metrics.callPutDelta >= 0 ? 'text-bg-info' : 'text-bg-danger'"
-                             x-text="formatDelta(metrics.callPutDelta, '')"></div>
+                             :class="metrics.oiChange >= 0 ? 'text-bg-info' : 'text-bg-secondary'"
+                             x-text="formatDelta(metrics.oiChange, '%')"></div>
                     </div>
-                    <div class="small text-secondary mt-3" x-text="metrics.cpNarrative"></div>
+                    <div class="small text-secondary mt-3" x-text="metrics.oiNarrative"></div>
                 </div>
             </div>
 
@@ -88,8 +96,8 @@
                 <div class="df-panel p-4 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <div class="text-uppercase small fw-semibold text-secondary">Gamma Hotspot</div>
-                            <div class="h2 mb-1" x-text="formatPrice(metrics.gammaHotspot)"></div>
+                            <div class="text-uppercase small fw-semibold text-secondary">Net Gamma</div>
+                            <div class="h2 mb-1" x-text="formatGamma(metrics.netGamma)"></div>
                         </div>
                         <div class="badge rounded-pill"
                              :class="metrics.gammaTag === 'Short Gamma' ? 'text-bg-danger' : 'text-bg-success'"
@@ -100,160 +108,88 @@
             </div>
         </div>
 
-        <!-- B. IV Smile -->
+        <!-- 1. IV Smile & Surface -->
         <div class="row g-3">
             <div class="col-12">
                 <div class="df-panel p-3 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                         <div>
-                            <h5 class="mb-1">IV Smile by Strike</h5>
-                            <small class="text-secondary">Kurva volatilitas antar strike untuk tenor utama; smile menggambarkan premi volatilitas antar strike, bentuk U menandakan keseimbangan demand call dan put.</small>
+                            <h5 class="mb-1">IV Smile & Surface</h5>
+                            <small class="text-secondary">Implied volatility structure across strikes and tenors (ts, exchange, tenor, strike, iv) - 5-15m intervals</small>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
                             <template x-for="tenor in smileTenors" :key="tenor">
                                 <span class="badge" :style="`background-color:${smilePalette[tenor]}20;color:${smilePalette[tenor]};`" x-text="tenor"></span>
                             </template>
+                            <span class="badge text-bg-info" x-text="`${selectedTimeframe} intervals`"></span>
                         </div>
                     </div>
-                    <div class="flex-grow-1 position-relative" style="z-index: 1201;">
+                    <div class="flex-grow-1 position-relative" style="z-index: 1201; min-height: 400px;">
                         <canvas id="ivSmileChart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- C & D -->
+        <!-- 2. 25D Skew -->
         <div class="row g-3">
-            <div class="col-xl-8">
+            <div class="col-12">
                 <div class="df-panel p-3 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
-                            <h5 class="mb-1">25D Skew Monitor</h5>
-                            <small class="text-secondary">RR25 negatif dapat menandakan permintaan proteksi downside meningkat.</small>
+                            <h5 class="mb-1">25D Skew</h5>
+                            <small class="text-secondary">Risk reversal 25 delta across time series (ts, exchange, tenor, rr25) - 5-15m intervals</small>
                         </div>
-                        <span class="badge text-bg-secondary">Last 24h</span>
+                        <div class="d-flex gap-2 align-items-center">
+                            <span class="badge text-bg-warning" x-text="`${selectedTimeframe} intervals`"></span>
+                            <span class="badge text-bg-secondary" x-text="`Last ${getTimeRange()}h`"></span>
+                        </div>
                     </div>
-                    <div class="flex-grow-1 position-relative" style="z-index: 1201;">
+                    <div class="flex-grow-1 position-relative" style="z-index: 1201; min-height: 350px;">
                         <canvas id="skewChart"></canvas>
                     </div>
                 </div>
             </div>
-            <div class="col-xl-4">
-                <div class="df-panel p-3 h-100 d-flex flex-column">
-                    <div class="mb-3">
-                        <h5 class="mb-1">Term Structure Snapshot</h5>
-                        <small class="text-secondary">Kurva IV tetap steep; tenor pendek memimpin perubahan volatilitas.</small>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Tenor</th>
-                                    <th class="text-end">ATM IV</th>
-                                    <th class="text-end">RR25</th>
-                                    <th class="text-end">Flow Bias</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="row in termStructure" :key="row.tenor">
-                                    <tr>
-                                        <td x-text="row.tenor"></td>
-                                        <td class="text-end" x-text="formatPercent(row.atmIv)"></td>
-                                        <td class="text-end" x-text="formatDelta(row.rr25, '%')"></td>
-                                        <td class="text-end">
-                                            <span class="badge rounded-pill"
-                                                  :class="row.flow.includes('call') ? 'text-bg-primary' : 'text-bg-warning'"
-                                                  x-text="row.flow"></span>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
         </div>
 
-        <!-- E & G -->
+        <!-- 3. OI & Volume by Strike/Expiry -->
         <div class="row g-3">
-            <div class="col-xl-8">
+            <div class="col-12">
                 <div class="df-panel p-3 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
-                            <h5 class="mb-1">OI & Volume by Expiry</h5>
-                            <small class="text-secondary">Distribusi posisi antar expiry utama.</small>
+                            <h5 class="mb-1">OI & Volume by Strike/Expiry</h5>
+                            <small class="text-secondary">Open interest and volume distribution across strikes and expiries (ts, exchange, expiry, strike, call_oi, put_oi, call_vol, put_vol) - 15-60m intervals</small>
                         </div>
-                        <span class="badge text-bg-info" x-text="`Spot ${currentProfile().spotLabel}`"></span>
+                        <div class="d-flex gap-2 align-items-center">
+                            <span class="badge text-bg-success" x-text="`${selectedTimeframe} intervals`"></span>
+                            <span class="badge text-bg-info" x-text="`Spot ${currentProfile().spotLabel}`"></span>
+                        </div>
                     </div>
-                    <div class="flex-grow-1 position-relative" style="z-index: 1201;">
+                    <div class="flex-grow-1 position-relative" style="z-index: 1201; min-height: 400px;">
                         <canvas id="oiVolumeChart"></canvas>
                     </div>
                 </div>
             </div>
-            <div class="col-xl-4">
-                <div class="df-panel p-3 h-100 d-flex flex-column">
-                    <div class="mb-3">
-                        <h5 class="mb-1">Top Strike Flows</h5>
-                        <small class="text-secondary">Level strike aktif menggambarkan bias positioning.</small>
-                    </div>
-                    <div class="d-flex flex-column gap-3">
-                        <template x-for="strike in topStrikes" :key="strike.label">
-                            <div class="p-3 rounded border" style="border: 1px solid var(--df-border-muted, rgba(148, 163, 184, 0.25));">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <div class="fw-semibold" x-text="strike.label"></div>
-                                        <div class="small text-secondary mt-1" x-text="strike.insight"></div>
-                                    </div>
-                                    <div class="text-end">
-                                        <div class="badge text-bg-dark mb-1" x-text="strike.oi"></div>
-                                        <div class="badge"
-                                             :class="strike.flow.startsWith('+') ? 'text-bg-success' : 'text-bg-danger'"
-                                             x-text="strike.flow"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-            </div>
         </div>
 
-        <!-- F & H -->
+        <!-- 4. GEX / Dealer Greeks -->
         <div class="row g-3">
-            <div class="col-xl-8">
+            <div class="col-12">
                 <div class="df-panel p-3 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
-                            <h5 class="mb-1">Gamma Exposure Ladder</h5>
-                            <small class="text-secondary">Dealer short gamma di sekitar spot, potensi pergerakan harga cepat.</small>
+                            <h5 class="mb-1">GEX / Dealer Greeks</h5>
+                            <small class="text-secondary">Gamma exposure and dealer positioning across price levels (ts, price_level, gamma_exposure) - 15-60m intervals (if vendor available)</small>
                         </div>
                         <div class="d-flex gap-2">
                             <span class="badge rounded-pill text-bg-danger" x-text="formatGamma(gammaSummary.netGamma)"></span>
                             <span class="badge rounded-pill text-bg-secondary" x-text="`Pivot ${formatPrice(gammaSummary.pivot)}`"></span>
+                            <span class="badge text-bg-warning" x-text="`${selectedTimeframe} intervals`"></span>
                         </div>
                     </div>
-                    <div class="flex-grow-1 position-relative" style="z-index: 1201;">
+                    <div class="flex-grow-1 position-relative" style="z-index: 1201; min-height: 400px;">
                         <canvas id="gammaChart"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xl-4">
-                <div class="df-panel p-3 h-100 d-flex flex-column">
-                    <div class="mb-3">
-                        <h5 class="mb-1">Dealer Positioning</h5>
-                        <small class="text-secondary">Ringkasan narasi dealer terhadap pergerakan volatilitas.</small>
-                    </div>
-                    <div class="d-flex flex-column gap-2">
-                        <template x-for="note in gammaNarratives" :key="note">
-                            <div class="d-flex align-items-start gap-2">
-                                <span class="badge rounded-pill text-bg-primary mt-1">
-                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M5 12l5 5L20 7"/>
-                                    </svg>
-                                </span>
-                                <p class="small text-secondary mb-0" x-text="note"></p>
-                            </div>
-                        </template>
                     </div>
                 </div>
             </div>
@@ -266,6 +202,7 @@
             return {
                 selectedAsset: 'BTC',
                 selectedExchange: 'Deribit',
+                selectedTimeframe: '15m',
 
                 smileChart: null,
                 skewChart: null,
@@ -297,6 +234,17 @@
                 percentFormatter: new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
                 compactFormatter: new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }),
 
+                getTimeRange() {
+                    const ranges = {
+                        '5m': 2,
+                        '15m': 6,
+                        '1h': 24,
+                        '4h': 48,
+                        '1d': 168
+                    };
+                    return ranges[this.selectedTimeframe] || 6;
+                },
+
                 baseProfiles: {
                     BTC: {
                         Deribit: {
@@ -309,10 +257,10 @@
                                 skew: -4.2,
                                 skewChange: -35,
                                 skewNarrative: 'RR25 semakin negatif; pasar membayar perlindungan downside.',
-                                callPutRatio: 1.32,
-                                callPutDelta: 0.14,
-                                cpNarrative: 'Delta call lebih dominan; dealer menjaga posisi long delta untuk hedging.',
-                                gammaHotspot: 48500,
+                                totalOi: 125000,
+                                oiChange: 2.8,
+                                oiNarrative: 'Total OI meningkat seiring dengan aktivitas trading yang tinggi.',
+                                netGamma: -45,
                                 gammaTag: 'Short Gamma',
                                 gammaNarrative: 'Zona short gamma di dekat spot membuat dealer sensitif terhadap pergerakan cepat.'
                             },
@@ -369,10 +317,10 @@
                                 skew: -3.3,
                                 skewChange: -18,
                                 skewNarrative: 'RR25 negatif tetapi lebih landai dari Deribit.',
-                                callPutRatio: 1.18,
-                                callPutDelta: 0.07,
-                                cpNarrative: 'Flow cenderung seimbang; kalender spread mendominasi.',
-                                gammaHotspot: 47200,
+                                totalOi: 98000,
+                                oiChange: 1.5,
+                                oiNarrative: 'OI di OKX relatif stabil dengan aktivitas trading moderat.',
+                                netGamma: -32,
                                 gammaTag: 'Short Gamma',
                                 gammaNarrative: 'Gamma negatif tipis; dealer masih responsif terhadap range trading.'
                             },
@@ -552,6 +500,11 @@
                         this.refreshAll();
                     });
                     this.$watch('selectedExchange', () => {
+                        this.applyProfile();
+                        this.refreshAll();
+                    });
+                    this.$watch('selectedTimeframe', () => {
+                        this.generateIntradayLabels();
                         this.applyProfile();
                         this.refreshAll();
                     });
@@ -1011,6 +964,10 @@
                         return `${(value / 1000).toFixed(1)}k`;
                     }
                     return value.toLocaleString();
+                },
+
+                formatCompact(value) {
+                    return this.compactFormatter.format(value);
                 }
             };
         }
