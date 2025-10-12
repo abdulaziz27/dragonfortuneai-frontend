@@ -1,18 +1,5 @@
-@extends('layouts.app')
-
-@section('content')
-    {{--
-        On-Chain Metrics Dashboard
-        Think like a trader • Build like an engineer • Visualize like a designer
-
-        Interpretasi Trading:
-        - MVRV > 3.7 → Overvalued (distribution zone)
-        - MVRV < 1.0 → Undervalued (accumulation zone)
-        - Exchange outflow → Bullish accumulation
-        - Exchange inflow → Bearish distribution
-        - Puell Multiple > 4 → Miners selling pressure
-        - Reserve Risk → Long-term holder conviction
-    --}}
+<?php $__env->startSection('content'); ?>
+    
 
     <div class="d-flex flex-column h-100 gap-3" x-data="onchainMetricsController()">
         <!-- Page Header -->
@@ -620,12 +607,14 @@
         </div>
 
     </div>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('scripts')
+<?php $__env->startSection('scripts'); ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
-    <script src="{{ asset('js/onchain-metrics-controller.js') }}"></script>
-@endsection
+    <script src="<?php echo e(asset('js/onchain-metrics-controller.js')); ?>"></script>
+<?php $__env->stopSection(); ?>
 
+
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\DATASAID\Said\Bisnis\quantwaru\frontend\dragonfortuneai-frontend\resources\views/onchain-metrics/dashboard.blade.php ENDPATH**/ ?>

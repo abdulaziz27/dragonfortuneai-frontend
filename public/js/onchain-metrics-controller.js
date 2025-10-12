@@ -42,6 +42,11 @@ function onchainMetricsController() {
             miners: false,
             whales: false,
             realizedCap: false,
+            cqMPI: false,
+            cqMinerReserve: false,
+            cqETHGas: false,
+            cqETHStaking: false,
+            cqPrice: false,
         },
 
         // Global Filters
@@ -71,11 +76,25 @@ function onchainMetricsController() {
             miner: null,
             whale: null,
             realizedCap: null,
+            cqMPI: null,
+            cqMinerReserve: null,
+            cqETHGas: null,
+            cqETHStaking: null,
+            cqPrice: null,
         },
 
         // Data storage
         exchangeSummary: [],
         whaleSummary: [],
+        
+        // CryptoQuant data
+        cryptoquant: {
+            mpi: [],
+            minerReserve: [],
+            ethGas: [],
+            ethStaking: [],
+            priceOHLCV: [],
+        },
 
         // Insights
         insights: {
@@ -142,6 +161,11 @@ function onchainMetricsController() {
                     this.loadWhaleHoldings(),
                     this.loadWhaleSummary(),
                     this.loadRealizedCap(),
+                    this.loadCryptoQuantMPI(),
+                    this.loadCryptoQuantMinerReserve(),
+                    this.loadCryptoQuantETHGas(),
+                    this.loadCryptoQuantETHStaking(),
+                    this.loadCryptoQuantPrice(),
                 ]);
 
                 console.log("✅ All data loaded successfully");
@@ -365,11 +389,11 @@ function onchainMetricsController() {
                 }
 
                 console.log(
-                    `📊 Loading Exchange Flows: ${this.apiBaseUrl}/api/onchain/exchange/flows?${params}`
+                    `📊 Loading Exchange Flows: ${this.apiBaseUrl}/api/onchain/flow/exchange-netflow?${params}`
                 );
 
                 const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/exchange/flows?${params}`
+                    `${this.apiBaseUrl}/api/onchain/flow/exchange-netflow?${params}`
                 );
 
                 if (!response.ok) {
@@ -462,11 +486,11 @@ function onchainMetricsController() {
                 });
 
                 console.log(
-                    `📊 Loading Supply Distribution: ${this.apiBaseUrl}/api/onchain/supply/distribution?${params}`
+                    `📊 Loading Supply Distribution: ${this.apiBaseUrl}/api/onchain/supply/lth-sth?${params}`
                 );
 
                 const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/supply/distribution?${params}`
+                    `${this.apiBaseUrl}/api/onchain/supply/lth-sth?${params}`
                 );
 
                 if (!response.ok) {
@@ -557,11 +581,11 @@ function onchainMetricsController() {
                 });
 
                 console.log(
-                    `📊 Loading Chain Health: ${this.apiBaseUrl}/api/onchain/behavioral/chain-health?${params}`
+                    `📊 Loading Chain Health: ${this.apiBaseUrl}/api/onchain/chain-health/reserve-risk?${params}`
                 );
 
                 const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/behavioral/chain-health?${params}`
+                    `${this.apiBaseUrl}/api/onchain/chain-health/reserve-risk?${params}`
                 );
 
                 if (!response.ok) {
@@ -596,11 +620,11 @@ function onchainMetricsController() {
                 });
 
                 console.log(
-                    `📊 Loading Miner Metrics: ${this.apiBaseUrl}/api/onchain/miners/metrics?${params}`
+                    `📊 Loading Miner Metrics: ${this.apiBaseUrl}/api/onchain/mining/miner-netflow?${params}`
                 );
 
                 const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/miners/metrics?${params}`
+                    `${this.apiBaseUrl}/api/onchain/mining/miner-netflow?${params}`
                 );
 
                 if (!response.ok) {
@@ -661,11 +685,11 @@ function onchainMetricsController() {
                 }
 
                 console.log(
-                    `📊 Loading Whale Holdings: ${this.apiBaseUrl}/api/onchain/whales/holdings?${params}`
+                    `📊 Loading Whale Holdings: ${this.apiBaseUrl}/api/onchain/whale/holdings?${params}`
                 );
 
                 const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/whales/holdings?${params}`
+                    `${this.apiBaseUrl}/api/onchain/whale/holdings?${params}`
                 );
 
                 if (!response.ok) {
@@ -698,11 +722,11 @@ function onchainMetricsController() {
                 });
 
                 console.log(
-                    `📊 Loading Whale Summary: ${this.apiBaseUrl}/api/onchain/whales/summary?${params}`
+                    `📊 Loading Whale Summary: ${this.apiBaseUrl}/api/onchain/whale/transactions?${params}`
                 );
 
                 const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/whales/summary?${params}`
+                    `${this.apiBaseUrl}/api/onchain/whale/transactions?${params}`
                 );
 
                 if (!response.ok) {
@@ -1769,6 +1793,321 @@ function onchainMetricsController() {
             if (num > 3) return "Moderate Conviction";
             if (num < 2) return "Weak Conviction";
             return "Neutral";
+        },
+
+        /**
+         * Load CryptoQuant MPI data
+         */
+        async loadCryptoQuantMPI() {
+            this.loadingStates.cqMPI = true;
+            try {
+                const response = await fetch(
+                    `${this.apiBaseUrl}/api/onchain/cq/miners-position-index?limit=30`
+                );
+                const result = await response.json();
+                if (result.data && result.data.length > 0) {
+                    this.cryptoquant.mpi = result.data;
+                    this.renderCQMPIChart();
+                    console.log("✅ CQ MPI loaded:", result.data.length);
+                }
+            } catch (error) {
+                console.error("❌ Error loading CQ MPI:", error);
+            } finally {
+                this.loadingStates.cqMPI = false;
+            }
+        },
+
+        /**
+         * Load CryptoQuant Miner Reserve data
+         */
+        async loadCryptoQuantMinerReserve() {
+            this.loadingStates.cqMinerReserve = true;
+            try {
+                const response = await fetch(
+                    `${this.apiBaseUrl}/api/onchain/cq/miner-reserve?limit=30`
+                );
+                const result = await response.json();
+                if (result.data && result.data.length > 0) {
+                    this.cryptoquant.minerReserve = result.data;
+                    this.renderCQMinerReserveChart();
+                    console.log("✅ CQ Miner Reserve loaded:", result.data.length);
+                }
+            } catch (error) {
+                console.error("❌ Error loading CQ Miner Reserve:", error);
+            } finally {
+                this.loadingStates.cqMinerReserve = false;
+            }
+        },
+
+        /**
+         * Load CryptoQuant ETH Gas Price data
+         */
+        async loadCryptoQuantETHGas() {
+            this.loadingStates.cqETHGas = true;
+            try {
+                const response = await fetch(
+                    `${this.apiBaseUrl}/api/onchain/cq/eth-gas-price?limit=30`
+                );
+                const result = await response.json();
+                if (result.data && result.data.length > 0) {
+                    this.cryptoquant.ethGas = result.data;
+                    this.renderCQETHGasChart();
+                    console.log("✅ CQ ETH Gas loaded:", result.data.length);
+                }
+            } catch (error) {
+                console.error("❌ Error loading CQ ETH Gas:", error);
+            } finally {
+                this.loadingStates.cqETHGas = false;
+            }
+        },
+
+        /**
+         * Load CryptoQuant ETH Staking data
+         */
+        async loadCryptoQuantETHStaking() {
+            this.loadingStates.cqETHStaking = true;
+            try {
+                const response = await fetch(
+                    `${this.apiBaseUrl}/api/onchain/cq/eth-staking-total?limit=30`
+                );
+                const result = await response.json();
+                if (result.data && result.data.length > 0) {
+                    this.cryptoquant.ethStaking = result.data;
+                    this.renderCQETHStakingChart();
+                    console.log("✅ CQ ETH Staking loaded:", result.data.length);
+                }
+            } catch (error) {
+                console.error("❌ Error loading CQ ETH Staking:", error);
+            } finally {
+                this.loadingStates.cqETHStaking = false;
+            }
+        },
+
+        /**
+         * Load CryptoQuant Price OHLCV data
+         */
+        async loadCryptoQuantPrice() {
+            this.loadingStates.cqPrice = true;
+            try {
+                const response = await fetch(
+                    `${this.apiBaseUrl}/api/onchain/cq/price-ohlcv?limit=30`
+                );
+                const result = await response.json();
+                if (result.data && result.data.length > 0) {
+                    this.cryptoquant.priceOHLCV = result.data;
+                    this.renderCQPriceChart();
+                    console.log("✅ CQ Price OHLCV loaded:", result.data.length);
+                }
+            } catch (error) {
+                console.error("❌ Error loading CQ Price OHLCV:", error);
+            } finally {
+                this.loadingStates.cqPrice = false;
+            }
+        },
+
+        /**
+         * Render CryptoQuant MPI Chart
+         */
+        renderCQMPIChart() {
+            if (this.charts.cqMPI) this.charts.cqMPI.destroy();
+            const ctx = this.$refs.cqMPIChart;
+            if (!ctx) return;
+
+            this.charts.cqMPI = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: this.cryptoquant.mpi.map((d) => d.date).reverse(),
+                    datasets: [
+                        {
+                            label: "MPI",
+                            data: this.cryptoquant.mpi.map((d) => d.mpi).reverse(),
+                            borderColor: "rgb(255, 159, 64)",
+                            backgroundColor: "rgba(255, 159, 64, 0.1)",
+                            fill: true,
+                            tension: 0.4,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `MPI: ${context.parsed.y.toFixed(4)}`,
+                            },
+                        },
+                    },
+                    scales: {
+                        y: { beginAtZero: false },
+                    },
+                },
+            });
+        },
+
+        /**
+         * Render CryptoQuant Miner Reserve Chart
+         */
+        renderCQMinerReserveChart() {
+            if (this.charts.cqMinerReserve) this.charts.cqMinerReserve.destroy();
+            const ctx = this.$refs.cqMinerReserveChart;
+            if (!ctx) return;
+
+            this.charts.cqMinerReserve = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: this.cryptoquant.minerReserve.map((d) => d.date).reverse(),
+                    datasets: [
+                        {
+                            label: "Miner Reserve (BTC)",
+                            data: this.cryptoquant.minerReserve.map((d) => d.value).reverse(),
+                            borderColor: "rgb(75, 192, 192)",
+                            backgroundColor: "rgba(75, 192, 192, 0.1)",
+                            fill: true,
+                            tension: 0.4,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `Reserve: ${context.parsed.y.toLocaleString()} BTC`,
+                            },
+                        },
+                    },
+                    scales: {
+                        y: { beginAtZero: false },
+                    },
+                },
+            });
+        },
+
+        /**
+         * Render CryptoQuant ETH Gas Chart
+         */
+        renderCQETHGasChart() {
+            if (this.charts.cqETHGas) this.charts.cqETHGas.destroy();
+            const ctx = this.$refs.cqETHGasChart;
+            if (!ctx) return;
+
+            this.charts.cqETHGas = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: this.cryptoquant.ethGas.map((d) => new Date(d.timestamp).toLocaleDateString()).reverse(),
+                    datasets: [
+                        {
+                            label: "ETH Gas Price (Gwei)",
+                            data: this.cryptoquant.ethGas.map((d) => d.gas_price).reverse(),
+                            borderColor: "rgb(153, 102, 255)",
+                            backgroundColor: "rgba(153, 102, 255, 0.1)",
+                            fill: true,
+                            tension: 0.4,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `Gas: ${context.parsed.y.toFixed(2)} Gwei`,
+                            },
+                        },
+                    },
+                    scales: {
+                        y: { beginAtZero: true },
+                    },
+                },
+            });
+        },
+
+        /**
+         * Render CryptoQuant ETH Staking Chart
+         */
+        renderCQETHStakingChart() {
+            if (this.charts.cqETHStaking) this.charts.cqETHStaking.destroy();
+            const ctx = this.$refs.cqETHStakingChart;
+            if (!ctx) return;
+
+            this.charts.cqETHStaking = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: this.cryptoquant.ethStaking.map((d) => d.date).reverse(),
+                    datasets: [
+                        {
+                            label: "ETH Staking Total",
+                            data: this.cryptoquant.ethStaking.map((d) => d.staking_total).reverse(),
+                            borderColor: "rgb(54, 162, 235)",
+                            backgroundColor: "rgba(54, 162, 235, 0.1)",
+                            fill: true,
+                            tension: 0.4,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `Staked: ${(context.parsed.y / 1e6).toFixed(2)}M ETH`,
+                            },
+                        },
+                    },
+                    scales: {
+                        y: { beginAtZero: false },
+                    },
+                },
+            });
+        },
+
+        /**
+         * Render CryptoQuant Price Chart
+         */
+        renderCQPriceChart() {
+            if (this.charts.cqPrice) this.charts.cqPrice.destroy();
+            const ctx = this.$refs.cqPriceChart;
+            if (!ctx) return;
+
+            this.charts.cqPrice = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: this.cryptoquant.priceOHLCV.map((d) => d.date).reverse(),
+                    datasets: [
+                        {
+                            label: "Close Price",
+                            data: this.cryptoquant.priceOHLCV.map((d) => d.close).reverse(),
+                            borderColor: "rgb(59, 130, 246)",
+                            backgroundColor: "rgba(59, 130, 246, 0.1)",
+                            fill: true,
+                            tension: 0.4,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `$${context.parsed.y.toLocaleString()}`,
+                            },
+                        },
+                    },
+                    scales: {
+                        y: { beginAtZero: false },
+                    },
+                },
+            });
         },
     };
 }

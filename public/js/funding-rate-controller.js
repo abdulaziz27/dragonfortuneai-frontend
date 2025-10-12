@@ -190,8 +190,8 @@ function fundingRateController() {
             // Prepare request params
             const commonRange = {}; // Placeholder to propagate start_time/end_time if later added
 
-            // Execute in parallel
-            const [analytics, exchanges, history] = await Promise.all([
+            // Execute in parallel - NOW INCLUDES OVERVIEW ENDPOINT
+            const [analytics, exchanges, history, overviewData] = await Promise.all([
                 this.fetchAPI("analytics", {
                     symbol: pair,
                     interval,
@@ -205,6 +205,13 @@ function fundingRateController() {
                     limit: 2000,
                     ...commonRange,
                 }),
+                this.fetchAPI("overview", {
+                    symbol: pair,
+                    limit: 100,
+                }).catch(e => {
+                    console.warn("Overview endpoint not available:", e);
+                    return null;
+                })
             ]);
 
             const historyRows = Array.isArray(history?.data)
@@ -266,6 +273,7 @@ function fundingRateController() {
                 exchanges: Array.isArray(exchanges?.data) ? exchanges.data : [],
                 timeseries: resampled,
                 timeseries_by_exchange: limitedByExchange,
+                overview_summary: overviewData?.data || null, // ADD OVERVIEW DATA
             };
 
             // Broadcast overview-ready event

@@ -26,7 +26,7 @@ Route::view('/spot-microstructure/orderbook-snapshots', 'spot-microstructure.ord
 Route::view('/spot-microstructure/vwap-twap', 'spot-microstructure.vwap-twap')->name('spot-microstructure.vwap-twap');
 Route::view('/spot-microstructure/volume-trade-stats', 'spot-microstructure.volume-trade-stats')->name('spot-microstructure.volume-trade-stats');
 
-// On-Chain Metrics Routes
+// On-Chain Metrics Routes (CryptoQuant integrated into main dashboard)
 Route::view('/onchain-metrics', 'onchain-metrics.dashboard')->name('onchain-metrics.index');
 Route::view('/onchain-metrics/dashboard', 'onchain-metrics.dashboard')->name('onchain-metrics.dashboard');
 

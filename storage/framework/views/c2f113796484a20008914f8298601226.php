@@ -1,14 +1,7 @@
-{{--
-    Komponen: Perp-Quarterly Spread Insights Panel
-    Menampilkan trading insights dan market structure analysis
 
-    Props:
-    - $symbol: string (default: 'BTC')
-    - $exchange: string (default: 'Binance')
---}}
 
 <div class="df-panel p-3 h-100"
-     x-data="spreadInsightsPanel('{{ $symbol ?? 'BTC' }}', '{{ $exchange ?? 'Binance' }}')">
+     x-data="spreadInsightsPanel('<?php echo e($symbol ?? 'BTC'); ?>', '<?php echo e($exchange ?? 'Binance'); ?>')">
     <h5 class="mb-3">💡 Trading Insights</h5>
 
     <div class="d-flex flex-column gap-3">
@@ -534,3 +527,4 @@ window.spreadInsightsPanel = spreadInsightsPanel;
 }
 </style>
 
+<?php /**PATH C:\DATASAID\Said\Bisnis\quantwaru\frontend\dragonfortuneai-frontend\resources\views/components/perp-quarterly/insights-panel.blade.php ENDPATH**/ ?>
