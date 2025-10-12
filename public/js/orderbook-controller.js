@@ -36,17 +36,135 @@ function orderbookController() {
         globalSymbol: "BTCUSDT",
         globalExchange: "binance",
         globalLoading: false,
+        
+        // Data storage
+        bookPressureData: [],
+        liquidityData: [],
+        marketDepthData: [],
+        orderbookSnapshot: null,
+        
+        // Chart instances
+        bookPressureChart: null,
+        liquidityChart: null,
 
         // Initialize
         init() {
             console.log("🚀 Orderbook Snapshots Dashboard initialized");
             console.log("📊 Symbol:", this.globalSymbol);
             console.log("🏦 Exchange:", this.globalExchange);
+            
+            // Load all data
+            this.loadAllData();
+            
+            // Auto refresh every 30 seconds
+            setInterval(() => this.loadAllData(), 30000);
+        },
+        
+        // Load all data
+        async loadAllData() {
+            this.globalLoading = true;
+            try {
+                await Promise.all([
+                    this.loadBookPressureData(),
+                    this.loadLiquidityData(),
+                    this.loadMarketDepthData(),
+                    this.loadOrderbookSnapshot()
+                ]);
+            } catch (error) {
+                console.error('❌ Error loading orderbook data:', error);
+            } finally {
+                this.globalLoading = false;
+            }
+        },
+        
+        // Load book pressure data
+        async loadBookPressureData() {
+            try {
+                const response = await fetch(
+                    `${API_BASE_URL}/book-pressure?symbol=${this.globalSymbol}&exchange=${this.globalExchange}&limit=100`
+                );
+                
+                if (!response.ok) {
+                    throw new Error("Failed to fetch book pressure");
+                }
+                
+                const data = await response.json();
+                this.bookPressureData = data.data || [];
+                
+                console.log('✅ Book pressure data loaded:', this.bookPressureData.length, 'records');
+            } catch (error) {
+                console.error('❌ Error loading book pressure data:', error);
+                this.bookPressureData = [];
+            }
+        },
+        
+        // Load liquidity data
+        async loadLiquidityData() {
+            try {
+                const response = await fetch(
+                    `${API_BASE_URL}/orderbook/liquidity?symbol=${this.globalSymbol}&depth=20`
+                );
+                
+                if (!response.ok) {
+                    throw new Error("Failed to fetch liquidity data");
+                }
+                
+                const data = await response.json();
+                this.liquidityData = data.data || [];
+                
+                console.log('✅ Liquidity data loaded:', this.liquidityData.length, 'records');
+            } catch (error) {
+                console.error('❌ Error loading liquidity data:', error);
+                this.liquidityData = [];
+            }
+        },
+        
+        // Load market depth data
+        async loadMarketDepthData() {
+            try {
+                const response = await fetch(
+                    `${API_BASE_URL}/market-depth?symbol=${this.globalSymbol}&exchange=${this.globalExchange}&limit=20`
+                );
+                
+                if (!response.ok) {
+                    throw new Error("Failed to fetch market depth");
+                }
+                
+                const data = await response.json();
+                this.marketDepthData = data.data || [];
+                
+                console.log('✅ Market depth data loaded:', this.marketDepthData.length, 'records');
+            } catch (error) {
+                console.error('❌ Error loading market depth data:', error);
+                this.marketDepthData = [];
+            }
+        },
+        
+        // Load orderbook snapshot
+        async loadOrderbookSnapshot() {
+            try {
+                const response = await fetch(
+                    `${API_BASE_URL}/orderbook/snapshot?symbol=${this.globalSymbol}&depth=15`
+                );
+                
+                if (!response.ok) {
+                    throw new Error("Failed to fetch orderbook snapshot");
+                }
+                
+                const data = await response.json();
+                this.orderbookSnapshot = data.data?.[0] || null;
+                
+                console.log('✅ Orderbook snapshot loaded');
+            } catch (error) {
+                console.error('❌ Error loading orderbook snapshot:', error);
+                this.orderbookSnapshot = null;
+            }
         },
 
         // Update symbol globally
         updateSymbol() {
             console.log("📊 Symbol changed to:", this.globalSymbol);
+            this.loadAllData();
             window.dispatchEvent(
                 new CustomEvent("symbol-changed", {
                     detail: {

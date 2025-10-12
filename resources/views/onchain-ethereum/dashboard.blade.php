@@ -46,6 +46,11 @@
                         <span x-show="!loading">🔄 Refresh All</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
+                    
+                    <!-- Debug Button (temporary) -->
+                    <!-- <button class="btn btn-warning btn-sm" @click="console.log('Test functions:', typeof formatPercentage, typeof getMomentumClass)">
+                        🔍 Test Functions
+                    </button> -->
                 </div>
             </div>
         </div>
@@ -209,5 +214,21 @@
         });
     </script>
     
-    <script src="{{ asset('js/onchain-ethereum-controller.js') }}"></script>
+    <script src="{{ asset('js/onchain-ethereum-controller.js') }}?v={{ time() }}"></script>
+    
+    <!-- Debug script to verify controller is loaded -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔍 Checking if onchainEthereumController is available:', typeof onchainEthereumController);
+            if (typeof onchainEthereumController === 'undefined') {
+                console.error('❌ onchainEthereumController is not defined! Check if the script loaded properly.');
+            } else {
+                console.log('✅ onchainEthereumController is available');
+                // Test if the functions exist
+                const controller = onchainEthereumController();
+                console.log('🔍 formatPercentage function:', typeof controller.formatPercentage);
+                console.log('🔍 getMomentumClass function:', typeof controller.getMomentumClass);
+            }
+        });
+    </script>
 @endsection

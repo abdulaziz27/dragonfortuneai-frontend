@@ -155,8 +155,9 @@ function volumeTradeStatsController() {
                     );
                     this.volumeProfileData = null;
                 } else {
-                    this.volumeProfileData = data;
-                    console.log("✅ Volume Profile loaded");
+                    // API returns array, take first item
+                    this.volumeProfileData = Array.isArray(data.data) && data.data.length > 0 ? data.data[0] : null;
+                    console.log("✅ Volume Profile loaded:", this.volumeProfileData);
                 }
             } catch (error) {
                 console.error("❌ Error loading volume profile:", error);

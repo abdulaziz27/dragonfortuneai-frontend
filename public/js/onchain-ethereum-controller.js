@@ -3,7 +3,10 @@
  * Handles network gas metrics and ETH 2.0 staking data
  */
 
+console.log('🚀 Loading onchain-ethereum-controller.js');
+
 function onchainEthereumController() {
+    console.log('🎯 Creating onchainEthereumController instance');
     return {
         // Global state
         loading: false,
@@ -103,9 +106,8 @@ function onchainEthereumController() {
             );
             const gasLimits = this.gasData.map(item => item.gas_limit_mean);
             
-            // Use chart optimizer if available
-            if (window.OnChainChartOptimizer) {
-                this.gasChart = window.OnChainChartOptimizer.createOptimizedChart(canvas, {
+            const ctx = canvas.getContext('2d');
+            this.gasChart = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
@@ -377,8 +379,6 @@ function onchainEthereumController() {
                 this.loadingStates.staking = false;
             }
         },
-        
-
         
         // Refresh all data
         async refreshAll() {
