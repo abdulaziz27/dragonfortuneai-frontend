@@ -1,15 +1,7 @@
-{{--
-    Komponen: Perp-Quarterly Spread History Chart
-    Menampilkan historical spread movement dengan Chart.js
 
-    Props:
-    - $symbol: string (default: 'BTC')
-    - $exchange: string (default: 'Binance')
-    - $height: string (default: '400px')
---}}
 
 <div class="df-panel p-3 h-100 d-flex flex-column"
-     x-data="spreadHistoryChart('{{ $symbol ?? 'BTC' }}', '{{ $exchange ?? 'Binance' }}')">
+     x-data="spreadHistoryChart('<?php echo e($symbol ?? 'BTC'); ?>', '<?php echo e($exchange ?? 'Binance'); ?>')">
     <!-- Header -->
     <div class="mb-3 flex-shrink-0">
         <div class="d-flex justify-content-between align-items-center">
@@ -25,7 +17,7 @@
     </div>
 
     <!-- Data Display -->
-    <div class="flex-grow-1" style="min-height: {{ $height ?? '400px' }};">
+    <div class="flex-grow-1" style="min-height: <?php echo e($height ?? '400px'); ?>;">
         <!-- Loading Display -->
         <div x-show="loading" class="text-center py-5">
             <div class="spinner-border text-primary mb-2" role="status">
@@ -749,3 +741,4 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
 window.spreadHistoryChart = spreadHistoryChart;
 </script>
 
+<?php /**PATH C:\DATASAID\Said\Bisnis\quantwaru\frontend\dragonfortuneai-frontend\resources\views/components/perp-quarterly/spread-history-chart.blade.php ENDPATH**/ ?>

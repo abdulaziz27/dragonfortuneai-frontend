@@ -1,20 +1,5 @@
-@extends('layouts.app')
-
-@section('content')
-    {{--
-        Perp–Quarterly Spread Analytics Dashboard
-        Think like a trader • Build like an engineer • Visualize like a designer
-
-        Interpretasi Trading:
-        - Spread positif → Perp > Quarterly → Contango structure → Market expects higher prices
-        - Spread negatif → Quarterly > Perp → Backwardation structure → Supply shortage or high demand
-        - Spread widening → Increasing contango/backwardation
-        - Spread narrowing → Convergence approaching (normal menjelang expiry)
-
-        API Endpoints Used:
-        1. /api/perp-quarterly/analytics - Spread analysis, trend, insights
-        2. /api/perp-quarterly/history - Historical spread timeseries
-    --}}
+<?php $__env->startSection('content'); ?>
+    
 
     <div class="d-flex flex-column h-100 gap-3" x-data="perpQuarterlySpreadController()">
         <!-- Page Header -->
@@ -106,7 +91,7 @@
         <!-- Analytics Card (Full Width) -->
         <div class="row g-3">
             <div class="col-12">
-                @include('components.perp-quarterly.analytics-card', ['symbol' => 'BTC', 'exchange' => 'Binance'])
+                <?php echo $__env->make('components.perp-quarterly.analytics-card', ['symbol' => 'BTC', 'exchange' => 'Binance'], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
             </div>
         </div>
 
@@ -114,19 +99,19 @@
         <div class="row g-3">
             <!-- Spread History Chart -->
             <div class="col-lg-8">
-                @include('components.perp-quarterly.spread-history-chart', ['symbol' => 'BTC', 'exchange' => 'Binance', 'height' => '400px'])
+                <?php echo $__env->make('components.perp-quarterly.spread-history-chart', ['symbol' => 'BTC', 'exchange' => 'Binance', 'height' => '400px'], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
             </div>
 
             <!-- Trading Insights Panel -->
             <div class="col-lg-4">
-                @include('components.perp-quarterly.insights-panel', ['symbol' => 'BTC', 'exchange' => 'Binance'])
+                <?php echo $__env->make('components.perp-quarterly.insights-panel', ['symbol' => 'BTC', 'exchange' => 'Binance'], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
             </div>
         </div>
 
         <!-- Spread Data Table (Full Width) -->
         <div class="row g-3">
             <div class="col-12">
-                @include('components.perp-quarterly.spread-table', ['symbol' => 'BTC', 'exchange' => 'Binance', 'limit' => 20])
+                <?php echo $__env->make('components.perp-quarterly.spread-table', ['symbol' => 'BTC', 'exchange' => 'Binance', 'limit' => 20], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
             </div>
         </div>
 
@@ -214,9 +199,9 @@
             </div>
         </div>
     </div>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('scripts')
+<?php $__env->startSection('scripts'); ?>
     <!-- Chart.js - Load BEFORE Alpine components -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
@@ -233,7 +218,7 @@
     </script>
 
     <!-- Load perp-quarterly controller BEFORE Alpine processes x-data -->
-    <script src="{{ asset('js/perp-quarterly-controller.js') }}"></script>
+    <script src="<?php echo e(asset('js/perp-quarterly-controller.js')); ?>"></script>
 
     <style>
         /* Pulse animation for live indicator */
@@ -310,4 +295,6 @@
             color: white;
         }
     </style>
-@endsection
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\DATASAID\Said\Bisnis\quantwaru\frontend\dragonfortuneai-frontend\resources\views/derivatives/perp-quarterly-spread.blade.php ENDPATH**/ ?>

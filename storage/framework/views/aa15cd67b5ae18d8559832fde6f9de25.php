@@ -1,19 +1,6 @@
-{{--
-    Komponen: Perp-Quarterly Spread Analytics Card
-    Menampilkan spread analytics dengan visualisasi dinamis
 
-    Props:
-    - $symbol: string (default: 'BTC')
-    - $exchange: string (default: 'Binance')
 
-    Interpretasi:
-    - Spread positif → Perp > Quarterly → Contango → Market expects higher prices
-    - Spread negatif → Quarterly > Perp → Backwardation → Supply shortage or high demand
-    - Spread widening → Increasing contango/backwardation
-    - Spread narrowing → Convergence approaching
---}}
-
-<div class="df-panel p-4" x-data="spreadAnalyticsCard('{{ $symbol ?? 'BTC' }}', '{{ $exchange ?? 'Binance' }}')">
+<div class="df-panel p-4" x-data="spreadAnalyticsCard('<?php echo e($symbol ?? 'BTC'); ?>', '<?php echo e($exchange ?? 'Binance'); ?>')">
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div class="d-flex align-items-center gap-2">
@@ -460,3 +447,4 @@ window.spreadAnalyticsCard = spreadAnalyticsCard;
 }
 </style>
 
+<?php /**PATH C:\DATASAID\Said\Bisnis\quantwaru\frontend\dragonfortuneai-frontend\resources\views/components/perp-quarterly/analytics-card.blade.php ENDPATH**/ ?>

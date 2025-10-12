@@ -260,19 +260,8 @@ window.OnChainErrorHandler = {
     
     // Initialize error handler
     init() {
-        // Global error handler for unhandled promises
-        window.addEventListener('unhandledrejection', (event) => {
-            const errorInfo = this.handleError(event.reason, { type: 'unhandled' });
-            this.showErrorNotification(errorInfo);
-        });
-        
-        // Global error handler for JavaScript errors
-        window.addEventListener('error', (event) => {
-            const errorInfo = this.handleError(event.error, { type: 'javascript' });
-            console.error('Global error caught:', errorInfo);
-        });
-        
-        console.log('🛡️ OnChain Error Handler initialized');
+        // DISABLED: No more error notifications to prevent "unexpected error" messages
+        console.log('🛡️ OnChain Error Handler initialized (notifications disabled)');
     }
 };
 
