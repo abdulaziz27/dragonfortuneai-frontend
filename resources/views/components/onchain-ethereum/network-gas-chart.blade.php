@@ -12,6 +12,17 @@
     
     <div style="height: 350px; position: relative;">
         <canvas x-ref="gasChart"></canvas>
+        
+        <!-- Empty State -->
+        <div x-show="!loadingStates.gas && (!gasData || gasData.length === 0)" 
+             class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="mb-3">
+                <path d="M3 3v18h18"/>
+                <path d="M7 12l3-3 3 3 5-5"/>
+            </svg>
+            <p class="mb-0">No gas data available</p>
+            <small>Try refreshing or adjusting the time window</small>
+        </div>
     </div>
     
     <!-- Gas Metrics Legend -->

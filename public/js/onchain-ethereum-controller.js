@@ -22,94 +22,97 @@ function onchainEthereumController() {
             staking: false
         },
         
-        // Chart IDs for DOM storage (NO chart instances in Alpine data!)
-        gasChartId: 'gasChart_' + Math.random().toString(36).substr(2, 9),
-        stakingChartId: 'stakingChart_' + Math.random().toString(36).substr(2, 9),
+        // Chart instances (stored in Alpine data like working controller)
+        gasChart: null,
+        stakingChart: null,
         
         // Initialize controller
         init() {
             console.log('🚀 Initializing Ethereum On-Chain Metrics Controller');
             
-            // Wait for Chart.js to be available
-            this.waitForChartJS().then(() => {
-                this.initializeCharts();
-                this.loadAllData();
-                
-                // Auto refresh every 60 seconds
-                setInterval(() => this.refreshAll(), 60000);
-            });
+            // Load shared state
+            this.loadSharedState();
+            
+            // Subscribe to shared state changes
+            this.subscribeToSharedState();
+            
+            this.loadAllData();
+            
+            // Auto refresh every 60 seconds
+            setInterval(() => this.refreshAll(), 60000);
         },
         
-        // Wait for Chart.js to load
-        async waitForChartJS() {
-            return new Promise((resolve) => {
-                const checkChart = () => {
-                    if (typeof Chart !== 'undefined' && Chart.registry && Chart.registry.getScale('time')) {
-                        resolve();
-                    } else {
-                        setTimeout(checkChart, 100);
+        // Load shared state
+        loadSharedState() {
+            if (window.OnChainSharedState) {
+                const sharedFilters = window.OnChainSharedState.getAllFilters();
+                this.selectedWindow = sharedFilters.selectedWindow;
+                this.selectedLimit = sharedFilters.selectedLimit;
+            }
+        },
+        
+        // Subscribe to shared state changes
+        subscribeToSharedState() {
+            if (window.OnChainSharedState) {
+                // Subscribe to window changes
+                window.OnChainSharedState.subscribe('selectedWindow', (value) => {
+                    if (this.selectedWindow !== value) {
+                        this.selectedWindow = value;
+                        this.refreshAll();
                     }
-                };
-                checkChart();
+                });
+                
+                // Subscribe to limit changes
+                window.OnChainSharedState.subscribe('selectedLimit', (value) => {
+                    if (this.selectedLimit !== value) {
+                        this.selectedLimit = value;
+                        this.refreshAll();
+                    }
+                });
+            }
+        },
+        
+        // Update shared state when local state changes
+        updateSharedState() {
+            if (window.OnChainSharedState) {
+                window.OnChainSharedState.setFilter('selectedWindow', this.selectedWindow);
+                window.OnChainSharedState.setFilter('selectedLimit', this.selectedLimit);
+            }
+        },
+        
+        // Render gas metrics chart
+        renderGasChart() {
+            const canvas = this.$refs.gasChart;
+            if (!canvas) return;
+            
+            // Destroy existing chart
+            if (this.gasChart) {
+                this.gasChart.destroy();
+                this.gasChart = null;
+            }
+            
+            if (!this.gasData.length) return;
+            
+            const labels = this.gasData.map(item => {
+                const date = new Date(item.timestamp);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             });
-        },
-        
-        // Helper methods for DOM-based chart storage
-        getGasChart() {
-            const canvas = this.$refs.gasChart;
-            return canvas ? canvas._chartInstance : null;
-        },
-        
-        setGasChart(chartInstance) {
-            const canvas = this.$refs.gasChart;
-            if (canvas) canvas._chartInstance = chartInstance;
-        },
-        
-        getStakingChart() {
-            const canvas = this.$refs.stakingChart;
-            return canvas ? canvas._chartInstance : null;
-        },
-        
-        setStakingChart(chartInstance) {
-            const canvas = this.$refs.stakingChart;
-            if (canvas) canvas._chartInstance = chartInstance;
-        },
-        
-        // Initialize all charts
-        initializeCharts() {
-            // Use setTimeout to ensure DOM is ready
-            setTimeout(() => {
-                this.initGasChart();
-                this.initStakingChart();
-            }, 100);
-        },
-        
-        // Initialize gas metrics chart
-        initGasChart() {
-            const canvas = this.$refs.gasChart;
-            if (!canvas) {
-                console.warn('Gas chart canvas not found');
-                return;
-            }
+            const gasPrices = this.gasData.map(item => item.gas_price_mean);
+            const gasUsedPercent = this.gasData.map(item => 
+                (item.gas_used_mean / item.gas_limit_mean) * 100
+            );
+            const gasLimits = this.gasData.map(item => item.gas_limit_mean);
             
-            const ctx = canvas.getContext('2d');
-            
-            // Destroy existing chart if any
-            const existingChart = this.getGasChart();
-            if (existingChart) {
-                existingChart.destroy();
-            }
-            
-            // Create chart outside Alpine reactivity using queueMicrotask
-            queueMicrotask(() => {
-                const chartInstance = new Chart(ctx, {
+            // Use chart optimizer if available
+            if (window.OnChainChartOptimizer) {
+                this.gasChart = window.OnChainChartOptimizer.createOptimizedChart(canvas, {
                 type: 'line',
                 data: {
-                    labels: [],
+                    labels: labels,
                     datasets: [
                         {
                             label: 'Gas Price (Gwei)',
-                            data: [],
+                            data: gasPrices,
                             borderColor: '#3b82f6',
                             backgroundColor: 'rgba(59, 130, 246, 0.1)',
                             yAxisID: 'y',
@@ -117,7 +120,7 @@ function onchainEthereumController() {
                         },
                         {
                             label: 'Gas Used %',
-                            data: [],
+                            data: gasUsedPercent,
                             borderColor: '#22c55e',
                             backgroundColor: 'rgba(34, 197, 94, 0.1)',
                             yAxisID: 'y1',
@@ -125,7 +128,7 @@ function onchainEthereumController() {
                         },
                         {
                             label: 'Gas Limit (M)',
-                            data: [],
+                            data: gasLimits,
                             borderColor: '#f59e0b',
                             backgroundColor: 'rgba(245, 158, 11, 0.1)',
                             yAxisID: 'y2',
@@ -198,39 +201,37 @@ function onchainEthereumController() {
                         }
                     }
                 }
-                });
-                
-                // Store in DOM, not in Alpine data
-                this.setGasChart(chartInstance);
             });
         },
         
-        // Initialize staking deposits chart
-        initStakingChart() {
+        // Render staking deposits chart
+        renderStakingChart() {
             const canvas = this.$refs.stakingChart;
-            if (!canvas) {
-                console.warn('Staking chart canvas not found');
-                return;
+            if (!canvas) return;
+            
+            // Destroy existing chart
+            if (this.stakingChart) {
+                this.stakingChart.destroy();
+                this.stakingChart = null;
             }
+            
+            if (!this.stakingData.length) return;
+            
+            const labels = this.stakingData.map(item => {
+                const date = new Date(item.timestamp);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            });
+            const stakingInflows = this.stakingData.map(item => item.staking_inflow_total);
             
             const ctx = canvas.getContext('2d');
-            
-            // Destroy existing chart if any
-            const existingChart = this.getStakingChart();
-            if (existingChart) {
-                existingChart.destroy();
-            }
-            
-            // Create chart outside Alpine reactivity using queueMicrotask
-            queueMicrotask(() => {
-                const chartInstance = new Chart(ctx, {
+            this.stakingChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: [],
+                    labels: labels,
                     datasets: [
                         {
                             label: 'Staking Inflow (ETH)',
-                            data: [],
+                            data: stakingInflows,
                             borderColor: '#8b5cf6',
                             backgroundColor: 'rgba(139, 92, 246, 0.2)',
                             fill: true,
@@ -277,10 +278,6 @@ function onchainEthereumController() {
                         }
                     }
                 }
-                });
-                
-                // Store in DOM, not in Alpine data
-                this.setStakingChart(chartInstance);
             });
         },
         
@@ -303,19 +300,36 @@ function onchainEthereumController() {
         async loadGasData() {
             this.loadingStates.gas = true;
             try {
-                const [gasResponse, summaryResponse] = await Promise.all([
-                    this.fetchAPI(`/api/onchain/eth/network-gas?window=${this.selectedWindow}&limit=${this.selectedLimit}`),
-                    this.fetchAPI(`/api/onchain/eth/network-gas/summary?window=${this.selectedWindow}&limit=${this.selectedLimit}`)
-                ]);
+                const operation = async () => {
+                    const [gasResponse, summaryResponse] = await Promise.all([
+                        this.fetchAPI(`/api/onchain/eth/network-gas?window=${this.selectedWindow}&limit=${this.selectedLimit}`),
+                        this.fetchAPI(`/api/onchain/eth/network-gas/summary?window=${this.selectedWindow}&limit=${this.selectedLimit}`)
+                    ]);
+                    return { gasResponse, summaryResponse };
+                };
+                
+                const { gasResponse, summaryResponse } = window.OnChainErrorHandler 
+                    ? await window.OnChainErrorHandler.retryWithBackoff(operation, { component: 'gas-data' })
+                    : await operation();
                 
                 this.gasData = gasResponse.data || [];
                 this.gasSummary = summaryResponse.data || null;
                 
-                this.updateGasChart();
+                this.renderGasChart();
                 
                 console.log('✅ Gas data loaded:', this.gasData.length, 'records');
             } catch (error) {
                 console.error('❌ Error loading gas data:', error);
+                
+                // Handle error with error handler
+                if (window.OnChainErrorHandler) {
+                    const errorInfo = window.OnChainErrorHandler.handleError(error, { 
+                        component: 'gas-data',
+                        action: 'load'
+                    });
+                    window.OnChainErrorHandler.showErrorNotification(errorInfo);
+                }
+                
                 this.gasData = [];
                 this.gasSummary = null;
             } finally {
@@ -327,19 +341,36 @@ function onchainEthereumController() {
         async loadStakingData() {
             this.loadingStates.staking = true;
             try {
-                const [stakingResponse, summaryResponse] = await Promise.all([
-                    this.fetchAPI(`/api/onchain/eth/staking-deposits?window=${this.selectedWindow}&limit=${this.selectedLimit}`),
-                    this.fetchAPI(`/api/onchain/eth/staking-deposits/summary?window=${this.selectedWindow}&limit=${this.selectedLimit}`)
-                ]);
+                const operation = async () => {
+                    const [stakingResponse, summaryResponse] = await Promise.all([
+                        this.fetchAPI(`/api/onchain/eth/staking-deposits?window=${this.selectedWindow}&limit=${this.selectedLimit}`),
+                        this.fetchAPI(`/api/onchain/eth/staking-deposits/summary?window=${this.selectedWindow}&limit=${this.selectedLimit}`)
+                    ]);
+                    return { stakingResponse, summaryResponse };
+                };
+                
+                const { stakingResponse, summaryResponse } = window.OnChainErrorHandler 
+                    ? await window.OnChainErrorHandler.retryWithBackoff(operation, { component: 'staking-data' })
+                    : await operation();
                 
                 this.stakingData = stakingResponse.data || [];
                 this.stakingSummary = summaryResponse.data || null;
                 
-                this.updateStakingChart();
+                this.renderStakingChart();
                 
                 console.log('✅ Staking data loaded:', this.stakingData.length, 'records');
             } catch (error) {
                 console.error('❌ Error loading staking data:', error);
+                
+                // Handle error with error handler
+                if (window.OnChainErrorHandler) {
+                    const errorInfo = window.OnChainErrorHandler.handleError(error, { 
+                        component: 'staking-data',
+                        action: 'load'
+                    });
+                    window.OnChainErrorHandler.showErrorNotification(errorInfo);
+                }
+                
                 this.stakingData = [];
                 this.stakingSummary = null;
             } finally {
@@ -347,54 +378,11 @@ function onchainEthereumController() {
             }
         },
         
-        // Update gas chart with new data
-        updateGasChart() {
-            const chart = this.getGasChart();
-            if (!chart || !this.gasData.length) return;
-            
-            const labels = this.gasData.map(item => {
-                const date = new Date(item.timestamp);
-                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            });
-            const gasPrices = this.gasData.map(item => item.gas_price_mean);
-            const gasUsedPercent = this.gasData.map(item => 
-                (item.gas_used_mean / item.gas_limit_mean) * 100
-            );
-            const gasLimits = this.gasData.map(item => item.gas_limit_mean);
-            
-            // Update chart data outside Alpine reactivity
-            queueMicrotask(() => {
-                chart.data.labels = labels;
-                chart.data.datasets[0].data = gasPrices;
-                chart.data.datasets[1].data = gasUsedPercent;
-                chart.data.datasets[2].data = gasLimits;
-                
-                chart.update('none');
-            });
-        },
-        
-        // Update staking chart with new data
-        updateStakingChart() {
-            const chart = this.getStakingChart();
-            if (!chart || !this.stakingData.length) return;
-            
-            const labels = this.stakingData.map(item => {
-                const date = new Date(item.timestamp);
-                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            });
-            const stakingInflows = this.stakingData.map(item => item.staking_inflow_total);
-            
-            // Update chart data outside Alpine reactivity
-            queueMicrotask(() => {
-                chart.data.labels = labels;
-                chart.data.datasets[0].data = stakingInflows;
-                
-                chart.update('none');
-            });
-        },
+
         
         // Refresh all data
         async refreshAll() {
+            this.updateSharedState();
             await this.loadAllData();
         },
         
@@ -408,9 +396,9 @@ function onchainEthereumController() {
             await this.loadStakingData();
         },
         
-        // Fetch API helper
-        async fetchAPI(endpoint) {
-            try {
+        // Fetch API helper with caching
+        async fetchAPI(endpoint, useCache = true) {
+            const fetchFunction = async () => {
                 const baseMeta = document.querySelector('meta[name="api-base-url"]');
                 const configuredBase = (baseMeta?.content || '').trim();
                 
@@ -433,9 +421,18 @@ function onchainEthereumController() {
                 const data = await response.json();
                 console.log(`✅ Data received:`, data);
                 return data;
-            } catch (error) {
-                console.error(`❌ API Error for ${endpoint}:`, error);
-                throw error;
+            };
+
+            // Use cache helper if available
+            if (window.OnChainCacheHelper && useCache) {
+                return await window.OnChainCacheHelper.cachedFetch(
+                    endpoint,
+                    null,
+                    fetchFunction,
+                    { useCache: true, useDebounce: true }
+                );
+            } else {
+                return await fetchFunction();
             }
         },
         

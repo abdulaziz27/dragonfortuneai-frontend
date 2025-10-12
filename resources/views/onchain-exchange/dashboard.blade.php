@@ -269,6 +269,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     
+    <!-- Chart initialization helper -->
+    <script src="{{ asset('js/chart-init-helper.js') }}"></script>
+    
     <!-- Wait for Chart.js to load before initializing -->
     <script>
         window.chartJsReady = new Promise((resolve) => {

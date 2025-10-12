@@ -12,6 +12,16 @@
     
     <div style="height: 350px; position: relative;">
         <canvas x-ref="stakingChart"></canvas>
+        
+        <!-- Empty State -->
+        <div x-show="!loadingStates.staking && (!stakingData || stakingData.length === 0)" 
+             class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="mb-3">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            <p class="mb-0">No staking data available</p>
+            <small>Try refreshing or adjusting the time window</small>
+        </div>
     </div>
     
     <!-- Staking Metrics Summary -->

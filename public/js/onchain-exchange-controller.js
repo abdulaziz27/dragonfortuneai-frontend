@@ -25,94 +25,120 @@ function onchainExchangeController() {
             indicators: false
         },
 
-        // Chart IDs for DOM storage (NO chart instances in Alpine data!)
-        reservesChartId: 'reservesChart_' + Math.random().toString(36).substr(2, 9),
-        indicatorsChartId: 'indicatorsChart_' + Math.random().toString(36).substr(2, 9),
+        // Chart instances (stored in Alpine data like working controller)
+        reservesChart: null,
+        indicatorsChart: null,
 
         // Initialize controller
         init() {
             console.log('🚀 Initializing Exchange Metrics Controller');
+            
+            // Load shared state
+            this.loadSharedState();
+            
+            // Subscribe to shared state changes
+            this.subscribeToSharedState();
+            
+            this.loadAllData();
 
-            // Wait for Chart.js to be available
-            this.waitForChartJS().then(() => {
-                this.initializeCharts();
-                this.loadAllData();
-
-                // Auto refresh every 60 seconds
-                setInterval(() => this.refreshAll(), 60000);
-            });
+            // Auto refresh every 60 seconds
+            setInterval(() => this.refreshAll(), 60000);
         },
-
-        // Wait for Chart.js to load
-        async waitForChartJS() {
-            return new Promise((resolve) => {
-                const checkChart = () => {
-                    if (typeof Chart !== 'undefined') {
-                        resolve();
-                    } else {
-                        setTimeout(checkChart, 100);
+        
+        // Load shared state
+        loadSharedState() {
+            if (window.OnChainSharedState) {
+                const sharedFilters = window.OnChainSharedState.getAllFilters();
+                this.selectedAsset = sharedFilters.selectedAsset;
+                this.selectedWindow = sharedFilters.selectedWindow;
+                this.selectedLimit = sharedFilters.selectedLimit;
+                this.selectedExchange = sharedFilters.selectedExchange;
+            }
+        },
+        
+        // Subscribe to shared state changes
+        subscribeToSharedState() {
+            if (window.OnChainSharedState) {
+                // Subscribe to asset changes
+                window.OnChainSharedState.subscribe('selectedAsset', (value) => {
+                    if (this.selectedAsset !== value) {
+                        this.selectedAsset = value;
+                        this.refreshAll();
                     }
-                };
-                checkChart();
-            });
+                });
+                
+                // Subscribe to window changes
+                window.OnChainSharedState.subscribe('selectedWindow', (value) => {
+                    if (this.selectedWindow !== value) {
+                        this.selectedWindow = value;
+                        this.refreshAll();
+                    }
+                });
+                
+                // Subscribe to limit changes
+                window.OnChainSharedState.subscribe('selectedLimit', (value) => {
+                    if (this.selectedLimit !== value) {
+                        this.selectedLimit = value;
+                        this.refreshAll();
+                    }
+                });
+                
+                // Subscribe to exchange changes
+                window.OnChainSharedState.subscribe('selectedExchange', (value) => {
+                    if (this.selectedExchange !== value) {
+                        this.selectedExchange = value;
+                        this.refreshAll();
+                    }
+                });
+            }
+        },
+        
+        // Update shared state when local state changes
+        updateSharedState() {
+            if (window.OnChainSharedState) {
+                window.OnChainSharedState.setFilter('selectedAsset', this.selectedAsset);
+                window.OnChainSharedState.setFilter('selectedWindow', this.selectedWindow);
+                window.OnChainSharedState.setFilter('selectedLimit', this.selectedLimit);
+                window.OnChainSharedState.setFilter('selectedExchange', this.selectedExchange);
+            }
         },
 
-        // Helper methods for DOM-based chart storage
-        getReservesChart() {
-            const canvas = this.$refs.reservesChart;
-            return canvas ? canvas._chartInstance : null;
-        },
-
-        setReservesChart(chartInstance) {
-            const canvas = this.$refs.reservesChart;
-            if (canvas) canvas._chartInstance = chartInstance;
-        },
-
-        getIndicatorsChart() {
-            const canvas = this.$refs.indicatorsChart;
-            return canvas ? canvas._chartInstance : null;
-        },
-
-        setIndicatorsChart(chartInstance) {
-            const canvas = this.$refs.indicatorsChart;
-            if (canvas) canvas._chartInstance = chartInstance;
-        },
-
-        // Initialize all charts
-        initializeCharts() {
-            // Use setTimeout to ensure DOM is ready
-            setTimeout(() => {
-                this.initReservesChart();
-                this.initIndicatorsChart();
-            }, 100);
-        },
-
-        // Initialize reserves chart
-        initReservesChart() {
+        // Render reserves chart
+        renderReservesChart() {
+            console.log('🎨 Rendering reserves chart...');
             const canvas = this.$refs.reservesChart;
             if (!canvas) {
-                console.warn('Reserves chart canvas not found');
+                console.warn('❌ Reserves chart canvas not found');
                 return;
             }
-
-            const ctx = canvas.getContext('2d');
-
-            // Destroy existing chart if any
-            const existingChart = this.getReservesChart();
-            if (existingChart) {
-                existingChart.destroy();
+            
+            // Destroy existing chart
+            if (this.reservesChart) {
+                this.reservesChart.destroy();
+                this.reservesChart = null;
             }
-
-            // Create chart outside Alpine reactivity using queueMicrotask
-            queueMicrotask(() => {
-                const chartInstance = new Chart(ctx, {
+            
+            if (!this.reservesData.length) {
+                console.warn('❌ No reserves data to render');
+                return;
+            }
+            
+            const labels = this.reservesData.map(item => {
+                const date = new Date(item.timestamp);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            });
+            const reserves = this.reservesData.map(item => item.reserve);
+            const usdValues = this.reservesData.map(item => item.reserve_usd);
+            
+            const ctx = canvas.getContext('2d');
+            this.reservesChart = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: [],
+                        labels: labels,
                         datasets: [
                             {
                                 label: 'Reserve Amount',
-                                data: [],
+                                data: reserves,
                                 borderColor: '#3b82f6',
                                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
                                 yAxisID: 'y',
@@ -120,7 +146,7 @@ function onchainExchangeController() {
                             },
                             {
                                 label: 'USD Value',
-                                data: [],
+                                data: usdValues,
                                 borderColor: '#22c55e',
                                 backgroundColor: 'rgba(34, 197, 94, 0.1)',
                                 yAxisID: 'y1',
@@ -185,39 +211,46 @@ function onchainExchangeController() {
                             }
                         }
                     }
-                });
-
-                // Store in DOM, not in Alpine data
-                this.setReservesChart(chartInstance);
             });
+            
+            console.log('✅ Reserves chart created successfully');
         },
 
-        // Initialize indicators chart
-        initIndicatorsChart() {
+        // Render indicators chart
+        renderIndicatorsChart() {
+            console.log('🎨 Rendering indicators chart...');
             const canvas = this.$refs.indicatorsChart;
             if (!canvas) {
-                console.warn('Indicators chart canvas not found');
+                console.warn('❌ Indicators chart canvas not found');
                 return;
             }
-
-            const ctx = canvas.getContext('2d');
-
-            // Destroy existing chart if any
-            const existingChart = this.getIndicatorsChart();
-            if (existingChart) {
-                existingChart.destroy();
+            
+            // Destroy existing chart
+            if (this.indicatorsChart) {
+                this.indicatorsChart.destroy();
+                this.indicatorsChart = null;
             }
-
-            // Create chart outside Alpine reactivity using queueMicrotask
-            queueMicrotask(() => {
-                const chartInstance = new Chart(ctx, {
+            
+            if (!this.indicatorsData.length) {
+                console.warn('❌ No indicators data to render');
+                return;
+            }
+            
+            const labels = this.indicatorsData.map(item => {
+                const date = new Date(item.timestamp);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            });
+            const leverageRatios = this.indicatorsData.map(item => item.estimated_leverage_ratio);
+            
+            const ctx = canvas.getContext('2d');
+            this.indicatorsChart = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: [],
+                        labels: labels,
                         datasets: [
                             {
                                 label: 'Leverage Ratio',
-                                data: [],
+                                data: leverageRatios,
                                 borderColor: '#8b5cf6',
                                 backgroundColor: 'rgba(139, 92, 246, 0.2)',
                                 fill: true,
@@ -263,11 +296,9 @@ function onchainExchangeController() {
                             }
                         }
                     }
-                });
-
-                // Store in DOM, not in Alpine data
-                this.setIndicatorsChart(chartInstance);
             });
+            
+            console.log('✅ Indicators chart created successfully');
         },
 
         // Load all data
@@ -299,6 +330,13 @@ function onchainExchangeController() {
                     params.append('exchange', this.selectedExchange);
                 }
 
+                console.log('🔍 Loading reserves with params:', {
+                    asset: this.selectedAsset,
+                    window: this.selectedWindow,
+                    limit: this.selectedLimit,
+                    exchange: this.selectedExchange
+                });
+
                 const [reservesResponse, summaryResponse] = await Promise.all([
                     this.fetchAPI(`/api/onchain/exchange/reserves?${params}`),
                     this.fetchAPI(`/api/onchain/exchange/reserves/summary?${params}`)
@@ -308,7 +346,13 @@ function onchainExchangeController() {
                 this.reserveSummary = summaryResponse.data || null;
                 this.exchangeList = this.reserveSummary?.exchanges || [];
 
-                this.updateReservesChart();
+                console.log('📊 Reserves data structure:', {
+                    dataLength: this.reservesData.length,
+                    sampleData: this.reservesData.slice(0, 2),
+                    summary: this.reserveSummary
+                });
+
+                this.renderReservesChart();
 
                 console.log('✅ Reserves data loaded:', this.reservesData.length, 'records');
             } catch (error) {
@@ -324,8 +368,9 @@ function onchainExchangeController() {
         async loadIndicatorsData() {
             this.loadingStates.indicators = true;
             try {
+                // Use XRP as default for market indicators as per API documentation
                 const params = new URLSearchParams({
-                    asset: this.selectedAsset,
+                    asset: 'XRP', // API default for market indicators
                     window: this.selectedWindow,
                     limit: this.selectedLimit.toString()
                 });
@@ -333,6 +378,13 @@ function onchainExchangeController() {
                 if (this.selectedExchange) {
                     params.append('exchange', this.selectedExchange);
                 }
+
+                console.log('🔍 Loading indicators with params:', {
+                    asset: 'XRP',
+                    window: this.selectedWindow,
+                    limit: this.selectedLimit,
+                    exchange: this.selectedExchange
+                });
 
                 const response = await this.fetchAPI(`/api/onchain/market/indicators?${params}`);
 
@@ -342,7 +394,13 @@ function onchainExchangeController() {
                     this.currentLeverageRatio = this.indicatorsData[0].estimated_leverage_ratio || 0;
                 }
 
-                this.updateIndicatorsChart();
+                console.log('📊 Indicators data structure:', {
+                    dataLength: this.indicatorsData.length,
+                    sampleData: this.indicatorsData.slice(0, 2),
+                    currentLeverageRatio: this.currentLeverageRatio
+                });
+
+                this.renderIndicatorsChart();
 
                 console.log('✅ Indicators data loaded:', this.indicatorsData.length, 'records');
             } catch (error) {
@@ -354,50 +412,11 @@ function onchainExchangeController() {
             }
         },
 
-        // Update reserves chart
-        updateReservesChart() {
-            const chart = this.getReservesChart();
-            if (!chart || !this.reservesData.length) return;
 
-            const labels = this.reservesData.map(item => {
-                const date = new Date(item.timestamp);
-                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            });
-            const reserves = this.reservesData.map(item => item.reserve);
-            const usdValues = this.reservesData.map(item => item.reserve_usd);
-
-            // Update chart data outside Alpine reactivity
-            queueMicrotask(() => {
-                chart.data.labels = labels;
-                chart.data.datasets[0].data = reserves;
-                chart.data.datasets[1].data = usdValues;
-
-                chart.update('none');
-            });
-        },
-
-        // Update indicators chart
-        updateIndicatorsChart() {
-            const chart = this.getIndicatorsChart();
-            if (!chart || !this.indicatorsData.length) return;
-
-            const labels = this.indicatorsData.map(item => {
-                const date = new Date(item.timestamp);
-                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            });
-            const leverageRatios = this.indicatorsData.map(item => item.estimated_leverage_ratio);
-
-            // Update chart data outside Alpine reactivity
-            queueMicrotask(() => {
-                chart.data.labels = labels;
-                chart.data.datasets[0].data = leverageRatios;
-
-                chart.update('none');
-            });
-        },
 
         // Refresh all data
         async refreshAll() {
+            this.updateSharedState();
             await this.loadAllData();
         },
 

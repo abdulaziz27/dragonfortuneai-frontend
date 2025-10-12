@@ -12,6 +12,18 @@
     
     <div style="height: 350px; position: relative;">
         <canvas x-ref="reservesChart"></canvas>
+        
+        <!-- Empty State -->
+        <div x-show="!loadingStates.reserves && (!reservesData || reservesData.length === 0)" 
+             class="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="mb-3">
+                <rect x="3" y="4" width="18" height="4"/>
+                <rect x="3" y="10" width="18" height="4"/>
+                <rect x="3" y="16" width="18" height="4"/>
+            </svg>
+            <p class="mb-0">No reserves data available</p>
+            <small>Try selecting a different asset or exchange</small>
+        </div>
     </div>
     
     <!-- Reserves Metrics Legend -->
