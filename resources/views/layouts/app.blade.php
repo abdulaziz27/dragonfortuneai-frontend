@@ -194,7 +194,7 @@
                             </a>
                         </li>
                         <li class="df-sidebar-menu-item">
-                            <a href="/macro-overlay/dashboard" class="df-sidebar-menu-button {{ request()->routeIs('macro-overlay.*') ? 'active' : '' }}" @click="closeSidebar()">
+                            <a href="/macro-overlay" class="df-sidebar-menu-button {{ request()->routeIs('macro-overlay.*') ? 'active' : '' }}" @click="closeSidebar()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <circle cx="12" cy="12" r="10"/>
                                     <path d="M2 12h20"/>

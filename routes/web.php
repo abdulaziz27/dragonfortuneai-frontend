@@ -40,7 +40,10 @@ Route::view('/etf-institutional/dashboard', 'etf-institutional.dashboard')->name
 Route::view('/volatility-regime/dashboard', 'volatility-regime.dashboard')->name('volatility-regime.dashboard');
 
 // Macro Overlay Routes
-Route::view('/macro-overlay/dashboard', 'macro-overlay.dashboard')->name('macro-overlay.dashboard');
+Route::view('/macro-overlay', 'macro-overlay.raw-dashboard')->name('macro-overlay.index');
+Route::view('/macro-overlay/dashboard', 'macro-overlay.raw-dashboard')->name('macro-overlay.dashboard');
+Route::view('/macro-overlay/raw-dashboard', 'macro-overlay.raw-dashboard')->name('macro-overlay.raw-dashboard');
+Route::view('/macro-overlay/dashboard-legacy', 'macro-overlay.dashboard-legacy')->name('macro-overlay.dashboard-legacy');
 
 // Sentiment & Flow Routes
 Route::view('/sentiment-flow/dashboard', 'sentiment-flow.dashboard')->name('sentiment-flow.dashboard');
