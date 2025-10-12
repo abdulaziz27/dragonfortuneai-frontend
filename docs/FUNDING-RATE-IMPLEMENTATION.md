@@ -18,7 +18,7 @@ Membangun dashboard funding rate yang:
 ### Base URL Configuration
 
 ```env
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 ```
 
 Konfigurasi ini dibaca oleh `config/services.php` dan di-expose ke frontend via meta tag di `layouts/app.blade.php`:
@@ -546,7 +546,7 @@ Components update state & re-render
 
 ```env
 # Required
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 
 # Optional (Laravel defaults)
 APP_NAME="DragonFortune AI"

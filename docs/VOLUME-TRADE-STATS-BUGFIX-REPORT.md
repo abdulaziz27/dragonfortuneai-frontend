@@ -10,7 +10,7 @@
 
 ```
 Failed to load resource: the server responded with a status of 404 (NOT FOUND)
-URL: http://202.155.90.20:8000/api/spot-microstructure/volume-profile?symbol=BTCUSDT&timeframe=5m&limit=1000
+URL: https://test.dragonfortune.ai/api/spot-microstructure/volume-profile?symbol=BTCUSDT&timeframe=5m&limit=1000
 ```
 
 ### Console Output
@@ -30,11 +30,11 @@ URL: http://202.155.90.20:8000/api/spot-microstructure/volume-profile?symbol=BTC
 
 ```bash
 # With timeframe parameter (FAILED)
-curl "http://202.155.90.20:8000/api/spot-microstructure/volume-profile?symbol=BTCUSDT&timeframe=5m&limit=1000"
+curl "https://test.dragonfortune.ai/api/spot-microstructure/volume-profile?symbol=BTCUSDT&timeframe=5m&limit=1000"
 # Response: {"error":"No trade statistics available"}
 
 # Without timeframe parameter (SUCCESS)
-curl "http://202.155.90.20:8000/api/spot-microstructure/volume-profile?symbol=BTCUSDT&limit=1000"
+curl "https://test.dragonfortune.ai/api/spot-microstructure/volume-profile?symbol=BTCUSDT&limit=1000"
 # Response: HTTP 200 + valid data
 ```
 
@@ -151,7 +151,7 @@ getBuySellInsight() {
 ### After Fix (v1.0.1)
 
 ```bash
-curl -X GET "http://202.155.90.20:8000/api/spot-microstructure/volume-profile?symbol=BTCUSDT&limit=1000"
+curl -X GET "https://test.dragonfortune.ai/api/spot-microstructure/volume-profile?symbol=BTCUSDT&limit=1000"
 
 Response:
 {

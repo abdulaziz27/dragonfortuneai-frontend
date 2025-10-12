@@ -4,10 +4,10 @@
 
 ### Pre-requisites
 
-1. Backend API harus running di `http://202.155.90.20:8000`
+1. Backend API harus running di `https://test.dragonfortune.ai`
 2. Set `API_BASE_URL` di `.env`:
     ```
-    API_BASE_URL=http://202.155.90.20:8000
+    API_BASE_URL=https://test.dragonfortune.ai
     ```
 3. Laravel development server running: `php artisan serve`
 
@@ -332,7 +332,7 @@ Basis Range         $500.00    Range between min and max      Volatility
 **Symptoms:**
 
 ```
-Access to fetch at 'http://202.155.90.20:8000/api/basis/...'
+Access to fetch at 'https://test.dragonfortune.ai/api/basis/...'
 from origin 'http://localhost:8000' has been blocked by CORS policy
 ```
 

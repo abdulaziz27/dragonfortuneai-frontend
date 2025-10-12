@@ -6,7 +6,7 @@
 
 ```bash
 # Edit .env file
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 ```
 
 ### 2. Clear Cache
@@ -162,7 +162,7 @@ echo $API_BASE_URL
 php artisan config:clear
 
 # Test API directly
-curl http://202.155.90.20:8000/api/long-short-ratio/analytics?symbol=BTCUSDT&limit=100
+curl https://test.dragonfortune.ai/api/long-short-ratio/analytics?symbol=BTCUSDT&limit=100
 ```
 
 ### Charts not rendering
@@ -316,7 +316,7 @@ tail -f storage/logs/laravel.log
 ### API Health
 
 ```bash
-curl http://202.155.90.20:8000/api/long-short-ratio/analytics?symbol=BTCUSDT&limit=10
+curl https://test.dragonfortune.ai/api/long-short-ratio/analytics?symbol=BTCUSDT&limit=10
 ```
 
 ---

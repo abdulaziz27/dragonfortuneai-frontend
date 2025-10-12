@@ -7,7 +7,7 @@
 Mixed Content: The page at '<URL>' was loaded over HTTPS, but requested an insecure resource '<URL>'. This request has been blocked; the content must be served over HTTPS.
 ```
 
-**Root Cause:** Multiple files menggunakan hardcode HTTP URL (`http://202.155.90.20:8000`) sebagai fallback, yang menyebabkan mixed content error di VPS HTTPS.
+**Root Cause:** Multiple files menggunakan hardcode HTTP URL (`https://test.dragonfortune.ai`) sebagai fallback, yang menyebabkan mixed content error di VPS HTTPS.
 
 ## Files Fixed
 
@@ -16,7 +16,7 @@ Mixed Content: The page at '<URL>' was loaded over HTTPS, but requested an insec
 #### ✅ `public/js/macro-overlay-raw-controller.js`
 ```javascript
 // BEFORE
-this.baseUrl = metaTag ? metaTag.content : "http://202.155.90.20:8000";
+this.baseUrl = metaTag ? metaTag.content : "https://test.dragonfortune.ai";
 
 // AFTER
 this.baseUrl = metaTag ? metaTag.content : "";
@@ -25,7 +25,7 @@ this.baseUrl = metaTag ? metaTag.content : "";
 #### ✅ `public/js/volume-trade-stats-controller.js`
 ```javascript
 // BEFORE
-return `http://202.155.90.20:8000${endpoint}`;
+return `https://test.dragonfortune.ai${endpoint}`;
 
 // AFTER
 return endpoint;
@@ -34,7 +34,7 @@ return endpoint;
 #### ✅ `public/js/trades-controller.js`
 ```javascript
 // BEFORE
-return "http://202.155.90.20:8000";
+return "https://test.dragonfortune.ai";
 
 // AFTER
 return "";
@@ -43,7 +43,7 @@ return "";
 #### ✅ `public/js/orderbook-controller.js`
 ```javascript
 // BEFORE
-return "http://202.155.90.20:8000";
+return "https://test.dragonfortune.ai";
 
 // AFTER
 return "";
@@ -52,7 +52,7 @@ return "";
 #### ✅ `public/js/long-short-ratio-controller.js`
 ```javascript
 // BEFORE
-this.baseUrl = metaTag ? metaTag.content : "http://202.155.90.20:8000";
+this.baseUrl = metaTag ? metaTag.content : "https://test.dragonfortune.ai";
 
 // AFTER
 this.baseUrl = metaTag ? metaTag.content : "";
@@ -61,7 +61,7 @@ this.baseUrl = metaTag ? metaTag.content : "";
 #### ✅ `public/js/onchain-metrics-controller.js`
 ```javascript
 // BEFORE
-apiBaseUrl: document.querySelector('meta[name="api-base-url"]')?.content || "http://202.155.90.20:8000",
+apiBaseUrl: document.querySelector('meta[name="api-base-url"]')?.content || "https://test.dragonfortune.ai",
 
 // AFTER
 apiBaseUrl: document.querySelector('meta[name="api-base-url"]')?.content || "",
@@ -72,7 +72,7 @@ apiBaseUrl: document.querySelector('meta[name="api-base-url"]')?.content || "",
 #### ✅ `resources/views/components/liquidations/liquidation-stream.blade.php`
 ```javascript
 // BEFORE
-return "http://202.155.90.20:8000";
+return "https://test.dragonfortune.ai";
 
 // AFTER
 return "";
@@ -81,7 +81,7 @@ return "";
 #### ✅ `resources/views/components/liquidations/heatmap-chart.blade.php`
 ```javascript
 // BEFORE
-let apiUrl = `http://202.155.90.20:8000/api/liquidations/pair-history?...`;
+let apiUrl = `https://test.dragonfortune.ai/api/liquidations/pair-history?...`;
 
 // AFTER
 const getApiBaseUrl = () => {
@@ -96,7 +96,7 @@ let apiUrl = `${getApiBaseUrl()}/api/liquidations/pair-history?...`;
 #### ✅ `resources/views/components/liquidations/coin-list-table.blade.php`
 ```javascript
 // BEFORE
-const apiUrl = `http://202.155.90.20:8000/api/liquidations/coin-list?...`;
+const apiUrl = `https://test.dragonfortune.ai/api/liquidations/coin-list?...`;
 
 // AFTER
 const getApiBaseUrl = () => {
@@ -111,7 +111,7 @@ const apiUrl = `${getApiBaseUrl()}/api/liquidations/coin-list?...`;
 #### ✅ `resources/views/components/liquidations/exchange-comparison.blade.php`
 ```javascript
 // BEFORE
-const apiUrl = `http://202.155.90.20:8000/api/liquidations/exchange-list?...`;
+const apiUrl = `https://test.dragonfortune.ai/api/liquidations/exchange-list?...`;
 
 // AFTER
 const getApiBaseUrl = () => {
@@ -126,7 +126,7 @@ const apiUrl = `${getApiBaseUrl()}/api/liquidations/exchange-list?...`;
 #### ✅ `resources/views/components/liquidations/historical-chart.blade.php`
 ```javascript
 // BEFORE
-let apiUrl = `http://202.155.90.20:8000/api/liquidations/pair-history?...`;
+let apiUrl = `https://test.dragonfortune.ai/api/liquidations/pair-history?...`;
 
 // AFTER
 const getApiBaseUrl = () => {
@@ -150,8 +150,8 @@ let apiUrl = `${getApiBaseUrl()}/api/liquidations/pair-history?...`;
 ### Before Fix:
 ```javascript
 // ❌ Problematic pattern
-const baseUrl = metaTag ? metaTag.content : "http://202.155.90.20:8000";
-// Results in: http://202.155.90.20:8000/api/endpoint (HTTP from HTTPS page = Mixed Content)
+const baseUrl = metaTag ? metaTag.content : "https://test.dragonfortune.ai";
+// Results in: https://test.dragonfortune.ai/api/endpoint (HTTP from HTTPS page = Mixed Content)
 ```
 
 ### After Fix:
@@ -166,7 +166,7 @@ const baseUrl = metaTag ? metaTag.content : "";
 ## Configuration Flow
 
 1. **Meta Tag:** `<meta name="api-base-url" content="{{ config('services.api.base_url') }}">`
-2. **Config:** `config/services.php` → `'base_url' => env('API_BASE_URL', 'http://202.155.90.20:8000')`
+2. **Config:** `config/services.php` → `'base_url' => env('API_BASE_URL', 'https://test.dragonfortune.ai')`
 3. **Environment Variables:**
    - **Local:** `API_BASE_URL` tidak set → menggunakan relative URL
    - **VPS:** `API_BASE_URL=https://yourdomain.com` → menggunakan configured URL

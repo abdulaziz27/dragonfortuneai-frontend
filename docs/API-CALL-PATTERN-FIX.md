@@ -30,7 +30,7 @@ async fetchAPI(endpoint, params = {}) {
         url = `${normalizedBase}/api/open-interest/${endpoint}?${queryString}`;
     } else {
         // ❌ Hardcode HTTP fallback
-        url = `http://202.155.90.20:8000/api/open-interest/${endpoint}?${queryString}`;
+        url = `https://test.dragonfortune.ai/api/open-interest/${endpoint}?${queryString}`;
     }
 }
 ```
@@ -71,7 +71,7 @@ if (configuredBase) {
 
 ### Configuration Flow:
 1. **Meta Tag:** `<meta name="api-base-url" content="{{ config('services.api.base_url') }}">`
-2. **Config:** `config/services.php` → `'base_url' => env('API_BASE_URL', 'http://202.155.90.20:8000')`
+2. **Config:** `config/services.php` → `'base_url' => env('API_BASE_URL', 'https://test.dragonfortune.ai')`
 3. **Environment:** 
    - **Lokal:** `API_BASE_URL` tidak set → menggunakan relative URL
    - **VPS:** `API_BASE_URL=https://yourdomain.com` → menggunakan configured URL

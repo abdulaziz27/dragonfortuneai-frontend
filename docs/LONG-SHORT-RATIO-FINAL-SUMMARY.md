@@ -371,7 +371,7 @@ dragonfortuneai-tradingdash-laravel/
 Tambahkan di `.env` file:
 
 ```env
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 ```
 
 ### 2. **Clear Config Cache**

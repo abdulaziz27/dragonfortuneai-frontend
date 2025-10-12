@@ -286,7 +286,7 @@ URL: http://your-domain/onchain-metrics
 
 ## 🐛 Known Limitations
 
-1. **API Dependency**: Requires backend running at `http://202.155.90.20:8000`
+1. **API Dependency**: Requires backend running at `https://test.dragonfortune.ai`
 2. **Data Availability**: Some endpoints may return empty for certain filters
 3. **Performance**: Large datasets (365d) may take time to render
 4. **Browser Support**: Requires ES6+ support

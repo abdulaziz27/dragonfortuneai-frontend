@@ -8,7 +8,7 @@
 -   [ ] NPM assets compiled (`npm run dev` or `npm run build`)
 -   [ ] API base URL configured in `.env`:
     ```env
-    API_BASE_URL=http://202.155.90.20:8000
+    API_BASE_URL=https://test.dragonfortune.ai
     ```
 -   [ ] Browser console open (F12) for debugging
 
@@ -320,33 +320,33 @@ Open browser console and run:
 ```javascript
 // Test analytics endpoint
 fetch(
-    "http://202.155.90.20:8000/api/liquidations/analytics?symbol=BTCUSDT&interval=1m&limit=2000"
+    "https://test.dragonfortune.ai/api/liquidations/analytics?symbol=BTCUSDT&interval=1m&limit=2000"
 )
     .then((r) => r.json())
     .then((d) => console.log("✓ Analytics:", d));
 
 // Test coin-list endpoint
 fetch(
-    "http://202.155.90.20:8000/api/liquidations/coin-list?symbol=BTC&limit=1000"
+    "https://test.dragonfortune.ai/api/liquidations/coin-list?symbol=BTC&limit=1000"
 )
     .then((r) => r.json())
     .then((d) => console.log("✓ Coin List:", d));
 
 // Test exchange-list endpoint
 fetch(
-    "http://202.155.90.20:8000/api/liquidations/exchange-list?symbol=BTC&range_str=1h"
+    "https://test.dragonfortune.ai/api/liquidations/exchange-list?symbol=BTC&range_str=1h"
 )
     .then((r) => r.json())
     .then((d) => console.log("✓ Exchange List:", d));
 
 // Test orders endpoint
-fetch("http://202.155.90.20:8000/api/liquidations/orders?limit=500")
+fetch("https://test.dragonfortune.ai/api/liquidations/orders?limit=500")
     .then((r) => r.json())
     .then((d) => console.log("✓ Orders:", d));
 
 // Test pair-history endpoint
 fetch(
-    "http://202.155.90.20:8000/api/liquidations/pair-history?symbol=BTCUSDT&interval=1m&limit=2000&with_price=true"
+    "https://test.dragonfortune.ai/api/liquidations/pair-history?symbol=BTCUSDT&interval=1m&limit=2000&with_price=true"
 )
     .then((r) => r.json())
     .then((d) => console.log("✓ Pair History:", d));

@@ -272,7 +272,7 @@ const futuresSymbol = `${symbol}USDT_240628`;
 Sistem mendukung flexible API base URL melalui meta tag:
 
 ```html
-<meta name="api-base-url" content="http://202.155.90.20:8000" />
+<meta name="api-base-url" content="https://test.dragonfortune.ai" />
 ```
 
 Jika tidak ada, akan menggunakan relative URL (untuk development dengan proxy).

@@ -114,7 +114,7 @@ Filters yang tersedia di bagian atas halaman:
 
 ```javascript
 apiBaseUrl: document.querySelector('meta[name="api-base-url"]')?.content ||
-    "http://202.155.90.20:8000";
+    "https://test.dragonfortune.ai";
 ```
 
 ### Endpoints Consumed
@@ -368,7 +368,7 @@ loadMinerMetrics();
 
 ## 🐛 Known Limitations
 
-1. **API Dependency**: Requires backend API to be running at `http://202.155.90.20:8000`
+1. **API Dependency**: Requires backend API to be running at `https://test.dragonfortune.ai`
 2. **Data Availability**: Some endpoints may return empty data for certain filters
 3. **Performance**: Large datasets (365+ days) may take time to render
 4. **Browser Support**: Requires modern browser with ES6+ support
@@ -415,9 +415,9 @@ loadMinerMetrics();
 
 ```bash
 # Test each endpoint
-curl -X GET "http://202.155.90.20:8000/api/onchain/valuation/mvrv?limit=30"
-curl -X GET "http://202.155.90.20:8000/api/onchain/exchange/flows?asset=BTC&limit=30"
-curl -X GET "http://202.155.90.20:8000/api/onchain/supply/distribution?limit=30"
+curl -X GET "https://test.dragonfortune.ai/api/onchain/valuation/mvrv?limit=30"
+curl -X GET "https://test.dragonfortune.ai/api/onchain/exchange/flows?asset=BTC&limit=30"
+curl -X GET "https://test.dragonfortune.ai/api/onchain/supply/distribution?limit=30"
 # ... dan seterusnya
 ```
 

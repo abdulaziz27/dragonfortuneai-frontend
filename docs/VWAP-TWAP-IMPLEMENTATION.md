@@ -322,7 +322,7 @@ Navigate to: `/spot-microstructure/vwap-twap`
 Set API base URL in `.env`:
 
 ```env
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 ```
 
 Or leave empty for relative URLs:

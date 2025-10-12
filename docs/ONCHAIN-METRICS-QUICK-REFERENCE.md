@@ -265,7 +265,7 @@ const data = await response.json();
 
 ### Backend
 
--   **API Base URL**: `http://202.155.90.20:8000`
+-   **API Base URL**: `https://test.dragonfortune.ai`
 -   **Response Format**: JSON
 -   **Date Format**: GMT strings
 

@@ -83,7 +83,7 @@ Pastikan `.env` file memiliki konfigurasi berikut:
 
 ```env
 # API Base URL untuk backend
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 
 # Atau jika menggunakan localhost untuk development
 # API_BASE_URL=http://localhost:8000
@@ -258,7 +258,7 @@ function longShortRatioData() {
 
 1. Check API base URL di `.env`:
     ```env
-    API_BASE_URL=http://202.155.90.20:8000
+    API_BASE_URL=https://test.dragonfortune.ai
     ```
 2. Clear config cache:
     ```bash
@@ -268,7 +268,7 @@ function longShortRatioData() {
 3. Check browser console for CORS errors
 4. Verify API is accessible:
     ```bash
-    curl http://202.155.90.20:8000/api/long-short-ratio/analytics?symbol=BTCUSDT&limit=100
+    curl https://test.dragonfortune.ai/api/long-short-ratio/analytics?symbol=BTCUSDT&limit=100
     ```
 
 ### Problem: Charts not rendering

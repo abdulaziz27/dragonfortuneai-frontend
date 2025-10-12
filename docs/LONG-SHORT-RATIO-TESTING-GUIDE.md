@@ -14,7 +14,7 @@ grep API_BASE_URL .env
 Should show:
 
 ```
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 ```
 
 2. **Clear Caches**
@@ -62,8 +62,8 @@ http://your-domain/derivatives/long-short-ratio
 Filter updated: symbol = BTCUSDT
 Filter updated: interval = 1h
 Filter updated: ratioType = accounts
-📡 Fetching analytics from: http://202.155.90.20:8000/api/long-short-ratio/analytics...
-📡 Fetching top accounts from: http://202.155.90.20:8000/api/long-short-ratio/top-accounts...
+📡 Fetching analytics from: https://test.dragonfortune.ai/api/long-short-ratio/analytics...
+📡 Fetching top accounts from: https://test.dragonfortune.ai/api/long-short-ratio/top-accounts...
 📊 Creating charts with X data points
 ✅ Charts created successfully
 📊 Exchange data prepared: {Binance: {...}, Bybit: {...}, OKX: {...}}
@@ -320,7 +320,7 @@ console.log("Exchange data:", data.exchangeData);
 
 -   API might be returning no data for that symbol/exchange
 -   Try different symbol (BTCUSDT usually has data)
--   Check API directly: `curl http://202.155.90.20:8000/api/long-short-ratio/top-accounts?symbol=BTCUSDT&limit=10`
+-   Check API directly: `curl https://test.dragonfortune.ai/api/long-short-ratio/top-accounts?symbol=BTCUSDT&limit=10`
 
 ---
 
@@ -359,8 +359,8 @@ Filter updated: symbol = BTCUSDT
 Filter updated: exchange = null
 Filter updated: interval = 1h
 Filter updated: ratioType = accounts
-📡 Fetching analytics from: http://202.155.90.20:8000/api/long-short-ratio/analytics?symbol=BTCUSDT&interval=1h&ratio_type=accounts&limit=2000
-📡 Fetching top accounts from: http://202.155.90.20:8000/api/long-short-ratio/top-accounts?symbol=BTCUSDT&interval=1h&limit=2000
+📡 Fetching analytics from: https://test.dragonfortune.ai/api/long-short-ratio/analytics?symbol=BTCUSDT&interval=1h&ratio_type=accounts&limit=2000
+📡 Fetching top accounts from: https://test.dragonfortune.ai/api/long-short-ratio/top-accounts?symbol=BTCUSDT&interval=1h&limit=2000
 Data loaded successfully: {analytics: {...}, timeseries: Array(100)}
 📊 Creating charts with 100 data points
 ✅ Charts created successfully

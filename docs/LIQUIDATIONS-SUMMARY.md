@@ -320,7 +320,7 @@ Navigate to: http://localhost/derivatives/liquidations
 Set in `.env`:
 
 ```env
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 ```
 
 Already configured in:

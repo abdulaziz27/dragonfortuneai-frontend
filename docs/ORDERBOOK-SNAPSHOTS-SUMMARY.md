@@ -199,7 +199,7 @@ resources/views/components/orderbook/
 
 ### API Configuration
 
--   Base URL: `http://202.155.90.20:8000`
+-   Base URL: `https://test.dragonfortune.ai`
 -   Configured via meta tag: `<meta name="api-base-url">`
 -   Can be overridden via ENV: `API_BASE_URL`
 

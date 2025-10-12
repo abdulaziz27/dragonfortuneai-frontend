@@ -312,14 +312,14 @@ Based on insights:
 Set in `.env`:
 
 ```env
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 ```
 
 Or in `config/services.php`:
 
 ```php
 'api' => [
-    'base_url' => env('API_BASE_URL', 'http://202.155.90.20:8000'),
+    'base_url' => env('API_BASE_URL', 'https://test.dragonfortune.ai'),
 ],
 ```
 

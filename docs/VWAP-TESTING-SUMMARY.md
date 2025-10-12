@@ -143,7 +143,7 @@ window.dispatchEvent(
 
 ```bash
 # Set API base URL
-API_BASE="http://202.155.90.20:8000"
+API_BASE="https://test.dragonfortune.ai"
 
 # Test historical VWAP
 curl -X GET "${API_BASE}/api/spot-microstructure/vwap?symbol=BTCUSDT&timeframe=5min&exchange=binance&limit=10" \
@@ -197,7 +197,7 @@ Collection settings:
         }
     ],
     "variables": {
-        "API_BASE": "http://202.155.90.20:8000"
+        "API_BASE": "https://test.dragonfortune.ai"
     }
 }
 ```

@@ -147,7 +147,7 @@ Shows last 20 records with:
 ### Environment Variable
 
 ```env
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 ```
 
 ### Services Config

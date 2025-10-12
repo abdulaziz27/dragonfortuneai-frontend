@@ -223,7 +223,7 @@ API base URL diambil dari meta tag:
 <meta name="api-base-url" content="{{ config('services.api.base_url') }}" />
 ```
 
-Default: `http://202.155.90.20:8000`
+Default: `https://test.dragonfortune.ai`
 
 ## 📱 Features
 
@@ -302,7 +302,7 @@ Dashboard → Spot Microstructure → Orderbook Snapshots
 ### Environment Variables
 
 ```env
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 ```
 
 ### Component Customization
@@ -311,7 +311,7 @@ Setiap component dapat di-customize melalui Alpine.js x-data attributes di blade
 
 ## 📝 Notes
 
--   Semua API menggunakan base URL dari backend: `http://202.155.90.20:8000`
+-   Semua API menggunakan base URL dari backend: `https://test.dragonfortune.ai`
 -   Dashboard fully reactive dengan Alpine.js
 -   No page refresh required untuk updates
 -   Console logs untuk debugging (dapat di-disable di production)

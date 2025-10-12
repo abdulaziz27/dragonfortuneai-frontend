@@ -312,11 +312,11 @@ window.dispatchEvent(
 
 ```bash
 # Test historical endpoint
-curl -X GET "http://202.155.90.20:8000/api/spot-microstructure/vwap?symbol=BTCUSDT&timeframe=5min&limit=10" \
+curl -X GET "https://test.dragonfortune.ai/api/spot-microstructure/vwap?symbol=BTCUSDT&timeframe=5min&limit=10" \
   -H "accept: application/json"
 
 # Test latest endpoint
-curl -X GET "http://202.155.90.20:8000/api/spot-microstructure/vwap/latest?symbol=BTCUSDT&timeframe=5min" \
+curl -X GET "https://test.dragonfortune.ai/api/spot-microstructure/vwap/latest?symbol=BTCUSDT&timeframe=5min" \
   -H "accept: application/json"
 ```
 

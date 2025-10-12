@@ -672,7 +672,7 @@
 
                         const baseMeta = document.querySelector('meta[name="api-base-url"]');
                         const configuredBase = (baseMeta?.content || "").trim();
-                        const apiBase = configuredBase ? configuredBase : 'http://202.155.90.20:8000';
+                        const apiBase = configuredBase ? configuredBase : 'https://test.dragonfortune.ai';
                         const url = `${apiBase}/api/open-interest/exchange?${params.toString()}`;
 
 
@@ -825,7 +825,7 @@
 
                         const baseMeta = document.querySelector('meta[name="api-base-url"]');
                         const configuredBase = (baseMeta?.content || "").trim();
-                        const apiBase = configuredBase ? configuredBase : 'http://202.155.90.20:8000';
+                        const apiBase = configuredBase ? configuredBase : 'https://test.dragonfortune.ai';
                         const url = `${apiBase}/api/open-interest/overview?${params.toString()}`;
 
 

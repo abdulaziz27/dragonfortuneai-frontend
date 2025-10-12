@@ -268,10 +268,10 @@ window.dispatchEvent(new CustomEvent("refresh-all"));
 
 ```bash
 # Test historical data
-curl "http://202.155.90.20:8000/api/spot-microstructure/vwap?symbol=BTCUSDT&timeframe=5min&limit=10" | jq
+curl "https://test.dragonfortune.ai/api/spot-microstructure/vwap?symbol=BTCUSDT&timeframe=5min&limit=10" | jq
 
 # Test latest data
-curl "http://202.155.90.20:8000/api/spot-microstructure/vwap/latest?symbol=BTCUSDT&timeframe=5min" | jq
+curl "https://test.dragonfortune.ai/api/spot-microstructure/vwap/latest?symbol=BTCUSDT&timeframe=5min" | jq
 ```
 
 ---
@@ -429,7 +429,7 @@ Setiap bias level memberikan:
 Pastikan `API_BASE_URL` di `.env` sudah di-set:
 
 ```env
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 ```
 
 Atau kosongkan untuk relative URLs:

@@ -199,7 +199,7 @@ const symbol = localStorage.getItem("liquidations_symbol") || "BTC";
 
 ```bash
 # .env file
-API_BASE_URL=http://202.155.90.20:8000
+API_BASE_URL=https://test.dragonfortune.ai
 
 # Access in blade
 <meta name="api-base-url" content="{{ config('services.api.base_url') }}">
