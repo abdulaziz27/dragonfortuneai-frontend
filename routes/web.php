@@ -30,6 +30,11 @@ Route::view('/spot-microstructure/volume-trade-stats', 'spot-microstructure.volu
 Route::view('/onchain-metrics', 'onchain-metrics.dashboard')->name('onchain-metrics.index');
 Route::view('/onchain-metrics/dashboard', 'onchain-metrics.dashboard')->name('onchain-metrics.dashboard');
 
+// Advanced On-Chain Metrics Routes
+Route::view('/onchain-ethereum', 'onchain-ethereum.dashboard')->name('onchain-ethereum.dashboard');
+Route::view('/onchain-exchange', 'onchain-exchange.dashboard')->name('onchain-exchange.dashboard');
+Route::view('/onchain-mining-price', 'onchain-mining-price.dashboard')->name('onchain-mining-price.dashboard');
+
 // Options Intelligence Route
 Route::view('/options-metrics/dashboard', 'options-metrics.dashboard')->name('options-metrics.dashboard');
 
