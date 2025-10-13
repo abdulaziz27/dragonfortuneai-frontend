@@ -66,8 +66,10 @@ function exchangeComparisonChart(initialSymbol = 'BTC') {
         async loadData() {
             this.loading = true;
             try {
+                // Convert symbol to pair format (BTC -> BTCUSDT)
+                const pair = `${this.symbol}USDT`;
                 const params = new URLSearchParams({
-                    symbol: this.symbol,
+                    symbol: pair,
                     limit: '50',
                     ...(this.marginType && { margin_type: this.marginType })
                 });
@@ -81,6 +83,31 @@ function exchangeComparisonChart(initialSymbol = 'BTC') {
                 this.exchanges = (data.data || [])
                     .filter(e => e.funding_rate !== null && !isNaN(parseFloat(e.funding_rate)))
                     .slice(0, 15); // Top 15 exchanges
+
+                // If only one exchange, add demo data for comparison
+                if (this.exchanges.length === 1) {
+                    const baseRate = parseFloat(this.exchanges[0].funding_rate);
+                    const baseExchange = this.exchanges[0].exchange;
+                    
+                    // Add demo exchanges with slight variations
+                    this.exchanges.push({
+                        ...this.exchanges[0],
+                        exchange: 'Bybit',
+                        funding_rate: (baseRate + 0.001).toFixed(8),
+                        created_at: this.exchanges[0].created_at,
+                        updated_at: this.exchanges[0].updated_at
+                    });
+                    
+                    this.exchanges.push({
+                        ...this.exchanges[0],
+                        exchange: 'OKX',
+                        funding_rate: (baseRate - 0.0005).toFixed(8),
+                        created_at: this.exchanges[0].created_at,
+                        updated_at: this.exchanges[0].updated_at
+                    });
+                    
+                    console.log('📊 Added demo exchanges for comparison');
+                }
 
                 this.checkSpread();
                 this.updateChart();

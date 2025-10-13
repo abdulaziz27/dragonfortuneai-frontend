@@ -256,9 +256,11 @@ function exchangeFundingTable(initialSymbol = 'BTC', initialLimit = 20) {
         async loadExchangeData() {
             this.loading = true;
             try {
+                // Convert symbol to pair format (BTC -> BTCUSDT)
+                const pair = `${this.symbol}USDT`;
                 const params = new URLSearchParams({
                     limit: this.limit,
-                    ...(this.symbol && { symbol: this.symbol }),
+                    ...(pair && { symbol: pair }),
                     ...(this.marginType && { margin_type: this.marginType })
                 });
 

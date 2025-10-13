@@ -252,7 +252,9 @@
                     this.symbol = this.$root?.globalSymbol || 'BTC';
                     this.marginType = this.$root?.globalMarginType || '';
 
+                    // Load data immediately on init
                     this.loadData();
+                    
                     // Auto refresh every 30 seconds
                     setInterval(() => this.loadData(), 30000);
 
@@ -268,6 +270,7 @@
                     });
 
                     // Listen for overview composite (analytics + exchanges + resampled history)
+                    // This is a fallback - main data loading happens in loadData()
                     window.addEventListener('funding-overview-ready', (e) => {
                         try {
                             const o = e.detail || {};
@@ -312,8 +315,10 @@
 
                 async loadExchangeData(symbol) {
                     try {
+                        // Convert symbol to pair format (BTC -> BTCUSDT)
+                        const pair = `${symbol}USDT`;
                         const params = new URLSearchParams({
-                            symbol: symbol,
+                            symbol: pair,
                             limit: '50',
                             ...(this.marginType && { margin_type: this.marginType })
                         });
@@ -352,11 +357,15 @@
                 },
 
                 calculateStats() {
+                    // Calculate snapshot average from exchange data
                     if (this.exchangeData.length > 0) {
                         const validRates = this.exchangeData
                             .map(e => parseFloat(e.funding_rate))
                             .filter(r => !isNaN(r));
                         this.snapshotAvgFunding = validRates.length ? (validRates.reduce((sum, r) => sum + r, 0) / validRates.length) : 0;
+                    } else {
+                        // Fallback: use bias data if exchange data is not available
+                        this.snapshotAvgFunding = this.biasData?.avg_funding_close ?? 0;
                     }
 
                     // window average from bias
@@ -370,6 +379,21 @@
                     if (total > 0) {
                         this.positivePercentage = Math.round((positiveCount / total) * 100);
                         this.negativePercentage = Math.round((negativeCount / total) * 100);
+                    } else {
+                        // Fallback: calculate sentiment from bias data
+                        if (this.biasData?.avg_funding_close !== undefined) {
+                            const avgRate = this.biasData.avg_funding_close;
+                            if (avgRate > 0.0001) {
+                                this.positivePercentage = 100;
+                                this.negativePercentage = 0;
+                            } else if (avgRate < -0.0001) {
+                                this.positivePercentage = 0;
+                                this.negativePercentage = 100;
+                            } else {
+                                this.positivePercentage = 50;
+                                this.negativePercentage = 50;
+                            }
+                        }
                     }
 
                     // Calculate next funding time
@@ -377,38 +401,57 @@
                 },
 
                 calculateNextFunding() {
-                    if (this.exchangeData.length === 0) return;
+                    // Find the nearest funding time from exchange data
+                    if (this.exchangeData.length > 0) {
+                        const now = Date.now();
+                        let nearestTime = null;
+                        let nearestExchange = '';
 
-                    // Find the nearest funding time
-                    const now = Date.now();
-                    let nearestTime = null;
-                    let nearestExchange = '';
-
-                    this.exchangeData.forEach(exchange => {
-                        if (exchange.next_funding_time && exchange.next_funding_time > now) {
-                            if (!nearestTime || exchange.next_funding_time < nearestTime) {
-                                nearestTime = exchange.next_funding_time;
-                                nearestExchange = exchange.exchange;
+                        this.exchangeData.forEach(exchange => {
+                            if (exchange.next_funding_time && exchange.next_funding_time > now) {
+                                if (!nearestTime || exchange.next_funding_time < nearestTime) {
+                                    nearestTime = exchange.next_funding_time;
+                                    nearestExchange = exchange.exchange;
+                                }
                             }
-                        }
-                    });
+                        });
 
-                    if (nearestTime) {
-                        const diff = nearestTime - now;
+                        if (nearestTime) {
+                            const diff = nearestTime - now;
+                            const hours = Math.floor(diff / (1000 * 60 * 60));
+                            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+                            this.nextFundingTime = `${hours}h ${minutes}m`;
+
+                            const time = new Date(nearestTime);
+                            this.nextFundingDetails = `${time.toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false
+                            })} UTC • ${nearestExchange}`;
+                        } else {
+                            this.nextFundingTime = 'N/A';
+                            this.nextFundingDetails = 'No upcoming funding times available';
+                        }
+                    } else {
+                        // Fallback: calculate next funding time based on 8-hour intervals
+                        const now = Date.now();
+                        const eightHours = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
+                        
+                        // Find next 8-hour funding time (00:00, 08:00, 16:00 UTC)
+                        const nextFunding = Math.ceil(now / eightHours) * eightHours;
+                        const diff = nextFunding - now;
                         const hours = Math.floor(diff / (1000 * 60 * 60));
                         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
                         this.nextFundingTime = `${hours}h ${minutes}m`;
 
-                        const time = new Date(nearestTime);
+                        const time = new Date(nextFunding);
                         this.nextFundingDetails = `${time.toLocaleTimeString('en-US', {
                             hour: '2-digit',
                             minute: '2-digit',
                             hour12: false
-                        })} UTC • ${nearestExchange}`;
-                    } else {
-                        this.nextFundingTime = 'N/A';
-                        this.nextFundingDetails = 'No upcoming funding times available';
+                        })} UTC • Estimated`;
                     }
                 },
 
