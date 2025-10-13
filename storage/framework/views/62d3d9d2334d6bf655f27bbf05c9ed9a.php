@@ -1,33 +1,5 @@
-@extends('layouts.app')
-
-@section('content')
-    {{--
-        Macro Overlay (Raw) Dashboard
-        Think like a trader • Build like an engineer • Visualize like a designer
-
-        Blueprint Implementation:
-        - DXY, Yields, Fed Funds, CPI, NFP, M2, RRP, TGA
-        - Fields: date/ts, metric, value
-        - Cadence: DXY/Yields harian, CPI/NFP event-based, M2/RRP/TGA sesuai publikasi
-
-        API Endpoints Consumed:
-        1. /api/macro-overlay/raw - Raw macro data
-        2. /api/macro-overlay/summary - Summary statistics
-        3. /api/macro-overlay/analytics - Comprehensive analytics
-        4. /api/macro-overlay/enhanced-analytics - Correlation & volatility analysis
-        5. /api/macro-overlay/available-metrics - Available metrics info
-        6. /api/macro-overlay/events - Economic events (CPI, NFP)
-        7. /api/macro-overlay/events-summary - Events statistics
-
-        Trading Insights:
-        - DXY ↑ → USD strong → BTC tends down (inverse correlation -0.72)
-        - Yields ↑ → Risk-off → Crypto bearish
-        - Fed Funds ↑ → Higher cost of capital → Leverage down
-        - CPI high → Inflation → Fed hawkish → Risk assets down
-        - M2 ↑ → Liquidity ↑ → Risk assets bullish (+0.81 correlation)
-        - RRP ↓ → Money flows to market → Bullish signal
-        - NFP strong → Fed hawkish → Risk-off
-    --}}
+<?php $__env->startSection('content'); ?>
+    
 
     <div class="d-flex flex-column h-100 gap-3" x-data="macroOverlayRawController()">
         <!-- Page Header -->
@@ -658,12 +630,12 @@
             <span class="text-secondary">Loading data...</span>
         </div>
     </div>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('scripts')
+<?php $__env->startSection('scripts'); ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="{{ asset('js/macro-overlay-raw-controller.js') }}"></script>
+    <script src="<?php echo e(asset('js/macro-overlay-raw-controller.js')); ?>"></script>
 
     <script>
         function macroOverlayRawController() {
@@ -1091,4 +1063,6 @@
             }
         }
     </style>
-@endsection
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\DATASAID\Said\Bisnis\quantwaru\frontend\dragonfortuneai-frontend\resources\views/macro-overlay/raw-dashboard.blade.php ENDPATH**/ ?>

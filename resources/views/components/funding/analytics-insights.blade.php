@@ -52,8 +52,8 @@
                 </div>
                 <div class="small">
                     Recent average (<span x-text="formatRate(trend?.recent_avg)">--</span>)
-                    <template x-if="trend?.direction === 'increasing'">is higher</template>
-                    <template x-if="trend?.direction === 'decreasing'">is lower</template>
+                    <template x-if="trend && trend.direction === 'increasing'">is higher</template>
+                    <template x-if="trend && trend.direction === 'decreasing'">is lower</template>
                     than older average (<span x-text="formatRate(trend?.older_avg)">--</span>).
                     Change: <span x-text="formatRate(trend?.change)">--</span>
                 </div>
@@ -163,14 +163,14 @@ function analyticsInsights(initialSymbol = 'BTC') {
         },
 
         getTrendAlertClass() {
-            if (!this.trend) return 'alert-secondary';
+            if (!this.trend || !this.trend.direction) return 'alert-secondary';
             if (this.trend.direction === 'increasing') return 'alert-success';
             if (this.trend.direction === 'decreasing') return 'alert-danger';
             return 'alert-secondary';
         },
 
         getTrendIcon() {
-            if (!this.trend) return '📊';
+            if (!this.trend || !this.trend.direction) return '📊';
             if (this.trend.direction === 'increasing') return '📈';
             if (this.trend.direction === 'decreasing') return '📉';
             return '➡️';

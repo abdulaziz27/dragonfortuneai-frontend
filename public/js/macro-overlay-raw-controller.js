@@ -69,6 +69,9 @@ class MacroOverlayRawController {
             }
         });
         
+        // Add cache-busting parameter to prevent caching issues
+        url.searchParams.append('_t', Date.now());
+        
         return url.toString();
     }
 
@@ -84,7 +87,10 @@ class MacroOverlayRawController {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
                 }
             });
 
@@ -123,26 +129,41 @@ class MacroOverlayRawController {
 
     /**
      * 2. GET /api/macro-overlay/summary
-     * Fetch summary statistics - API has SQL bug, use fallback data
+     * Fetch summary statistics
      */
     async fetchSummary(customFilters = {}) {
-        // Note: Summary API has SQL bug with parameters, always use fallback
-        console.warn('⚠️ Summary API has SQL bug, using fallback data');
-        
-        // Return fallback data structure
-        const fallbackData = {
-            data: {
-                count: 101, // From successful test without parameters
-                avg_value: null,
-                max_value: null,
-                min_value: null,
-                trend: 'neutral',
-                earliest_value: null,
-                latest_value: null
-            }
+        const params = {
+            metric: customFilters.metric || this.filters.metric,
+            source: customFilters.source || this.filters.source,
+            days_back: customFilters.days_back || 90
         };
-        this.cache.summary = fallbackData;
-        return fallbackData;
+
+        console.log('🔍 fetchSummary called with params:', params);
+
+        try {
+            const data = await this.fetchAPI('/api/macro-overlay/summary', params);
+            console.log('✅ Summary API success:', data);
+            this.cache.summary = data;
+            return data;
+        } catch (error) {
+            console.error('❌ Summary API failed:', error);
+            
+            // Return fallback data structure
+            const fallbackData = {
+                data: {
+                    count: 0,
+                    avg_value: null,
+                    max_value: null,
+                    min_value: null,
+                    trend: 'neutral',
+                    earliest_value: null,
+                    latest_value: null
+                }
+            };
+            console.log('🔄 Using fallback data:', fallbackData);
+            this.cache.summary = fallbackData;
+            return fallbackData;
+        }
     }
 
     /**
