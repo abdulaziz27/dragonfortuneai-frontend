@@ -61,25 +61,15 @@ function perpQuarterlySpreadController() {
             // Setup global error handlers
             this.setupGlobalErrorHandlers();
 
-            // Initialize with fallback data immediately to prevent "unexpected error"
-            this.overview = this.getFallbackOverview();
-            this.globalLoading = false;
+            this.globalLoading = true;
 
             // Wait for DOM to be fully ready before loading data
             this.waitForDOMReady().then(() => {
                 // Prime overview on load with delay to prevent race conditions
                 setTimeout(() => {
                     this.loadOverview().catch((e) => {
-                        console.warn("Initial overview load failed:", e);
-                        // Retry once after delay
-                        setTimeout(() => {
-                            this.loadOverview().catch((e) => {
-                                console.error("Retry overview load failed:", e);
-                                // Use fallback data
-                                this.overview = this.getFallbackOverview();
-                                this.globalLoading = false;
-                            });
-                        }, 2000);
+                        console.error("Initial overview load failed:", e);
+                        this.globalLoading = false;
                     });
                 }, 500);
             });
@@ -108,18 +98,12 @@ function perpQuarterlySpreadController() {
             window.addEventListener('unhandledrejection', (event) => {
                 console.error('❌ Unhandled promise rejection:', event.reason);
                 event.preventDefault(); // Prevent default error handling
-                
-                // Ensure fallback data is always available
-                this.overview = this.getFallbackOverview();
                 this.globalLoading = false;
             });
 
             // Handle general JavaScript errors
             window.addEventListener('error', (event) => {
                 console.error('❌ JavaScript error:', event.error);
-                
-                // Ensure fallback data is always available
-                this.overview = this.getFallbackOverview();
                 this.globalLoading = false;
             });
         },
@@ -328,10 +312,6 @@ function perpQuarterlySpreadController() {
                 // Set loading state
                 this.globalLoading = true;
 
-                // Ensure fallback data is available during loading
-                if (!this.overview) {
-                    this.overview = this.getFallbackOverview();
-                }
 
                 console.log("🔄 Loading Perp-Quarterly Overview:", {
                     base,
@@ -354,7 +334,7 @@ function perpQuarterlySpreadController() {
                         perp_symbol: perpSymbol,
                     }, 2).catch(e => {
                         console.warn("Analytics API failed, using fallback:", e.message);
-                        return this.getFallbackAnalytics();
+                        return null;
                     }),
                     this.fetchAPIWithRetry("history", {
                         exchange,
@@ -365,7 +345,7 @@ function perpQuarterlySpreadController() {
                         perp_symbol: perpSymbol,
                     }, 2).catch(e => {
                         console.warn("History API failed, using fallback:", e.message);
-                        return this.getFallbackHistory();
+                        return null;
                     }),
                 ]);
 
@@ -398,7 +378,7 @@ function perpQuarterlySpreadController() {
                             history?.meta?.quarterly_symbol || `${base}${quote}`,
                         last_updated: Date.now(),
                     },
-                    analytics: analytics || this.getFallbackAnalytics(),
+                    analytics: analytics,
                     timeseries: normalizedTimeseries,
                 };
 
@@ -430,102 +410,11 @@ function perpQuarterlySpreadController() {
                 // Clear loading state
                 this.globalLoading = false;
                 
-                // Return fallback data
-                this.overview = this.getFallbackOverview();
-                window.dispatchEvent(
-                    new CustomEvent("perp-quarterly-overview-ready", {
-                        detail: this.overview,
-                    })
-                );
-                return this.overview;
+                // Let the error propagate
+                throw error;
             }
         },
 
-        // Fallback analytics data
-        getFallbackAnalytics() {
-            return {
-                spread_bps: 12.5,
-                spread_abs: 0.125,
-                perp_symbol: `${this.globalSymbol}${this.globalQuote}_PERP`,
-                quarterly_symbol: `${this.globalSymbol}${this.globalQuote}`,
-                exchange: this.globalExchange,
-                last_updated: new Date().toISOString()
-            };
-        },
-
-        // Fallback history data
-        getFallbackHistory() {
-            const now = Date.now();
-            const data = [];
-
-            // Generate 50 sample data points
-            for (let i = 0; i < 50; i++) {
-                const timestamp = new Date(now - (i * 60 * 60 * 1000)); // 1 hour intervals
-                data.push({
-                    ts: timestamp.toISOString(),
-                    exchange: this.globalExchange,
-                    perp_symbol: `${this.globalSymbol}${this.globalQuote}_PERP`,
-                    quarterly_symbol: `${this.globalSymbol}${this.globalQuote}`,
-                    spread_abs: (Math.random() - 0.5) * 0.5, // Random spread between -0.25 and 0.25
-                    spread_bps: (Math.random() - 0.5) * 50, // Random spread between -25 and 25 bps
-                });
-            }
-
-            return { data: data.reverse() }; // Reverse to get chronological order
-        },
-
-        // Fallback overview data
-        getFallbackOverview() {
-            try {
-                return {
-                    meta: {
-                        base: this.globalSymbol || "BTC",
-                        quote: this.globalQuote || "USDT",
-                        exchange: this.globalExchange || "Binance",
-                        interval: this.globalInterval || "5m",
-                        perp_symbol: `${this.globalSymbol || "BTC"}${this.globalQuote || "USDT"}_PERP`,
-                        quarterly_symbol: `${this.globalSymbol || "BTC"}${this.globalQuote || "USDT"}_241227`,
-                        last_updated: Date.now(),
-                    },
-                    analytics: this.getFallbackAnalytics(),
-                    timeseries: this.getFallbackHistory().data.map(r => ({
-                        ts: r.ts,
-                        exchange: r.exchange,
-                        perp_symbol: r.perp_symbol,
-                        quarterly_symbol: r.quarterly_symbol,
-                        spread_abs: parseFloat(r.spread_abs) || 0,
-                        spread_bps: parseFloat(r.spread_bps) || 0,
-                    })),
-                };
-            } catch (error) {
-                console.error("❌ Error in getFallbackOverview:", error);
-                // Return minimal fallback data
-                return {
-                    meta: {
-                        base: "BTC",
-                        quote: "USDT",
-                        exchange: "Binance",
-                        interval: "5m",
-                        perp_symbol: "BTCUSDT_PERP",
-                        quarterly_symbol: "BTCUSDT_241227",
-                        last_updated: Date.now(),
-                    },
-                    analytics: {
-                        spread_bps: { current: 15.5, avg: 12.3 },
-                        spread_abs: { current: 69.8, avg: 55.4 },
-                        insights: [{ type: "contango", severity: "low", message: "Normal market structure" }]
-                    },
-                    timeseries: [{
-                        ts: Date.now(),
-                        exchange: "Binance",
-                        perp_symbol: "BTCUSDT_PERP",
-                        quarterly_symbol: "BTCUSDT_241227",
-                        spread_abs: 69.8,
-                        spread_bps: 15.5
-                    }],
-                };
-            }
-        },
 
         // Update URL with all filters
         updateURL() {

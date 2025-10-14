@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid">
+<div class="container-fluid" x-data="putCallRatioController()">
     <!-- Header Section -->
     <div class="row mb-4">
         <div class="col-12">
@@ -11,18 +11,26 @@
                     <p class="text-muted mb-0">Sentiment of hedging vs speculation in options market</p>
                 </div>
                 <div class="d-flex gap-2">
-                    <select class="form-select form-select-sm" style="width: auto;">
+                    <select class="form-select form-select-sm" style="width: auto;" x-model="selectedAsset">
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
+                    </select>
+                    <select class="form-select form-select-sm" style="width: auto;" x-model="selectedExchange">
+                        <option value="Deribit">Deribit</option>
+                        <option value="OKX">OKX</option>
+                    </select>
+                    <select class="form-select form-select-sm" style="width: auto;" x-model="selectedTimeframe">
                         <option value="24h">24 Hours</option>
                         <option value="7d" selected>7 Days</option>
                         <option value="30d">30 Days</option>
                         <option value="90d">90 Days</option>
                     </select>
-                    <button class="btn btn-outline-secondary btn-sm">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="btn btn-outline-secondary btn-sm" @click="loadData()" :disabled="loading">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
                             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                             <path d="M3 3v5h5"/>
                         </svg>
-                        Refresh
+                        <span x-text="loading ? 'Loading...' : 'Refresh'"></span>
                     </button>
                 </div>
             </div>
@@ -45,7 +53,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">Current Ratio</h6>
-                            <h4 class="mb-0 text-success">0.85</h4>
+                            <h4 class="mb-0 text-success" x-text="formatRatio(metrics.currentRatio)">Loading...</h4>
                             <small class="text-muted">Put/Call</small>
                         </div>
                     </div>
@@ -66,7 +74,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">Call Volume</h6>
-                            <h4 class="mb-0 text-info">$12.4M</h4>
+                            <h4 class="mb-0 text-info" x-text="formatCurrency(metrics.callVolume)">Loading...</h4>
                             <small class="text-muted">24h volume</small>
                         </div>
                     </div>
@@ -87,7 +95,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">Put Volume</h6>
-                            <h4 class="mb-0 text-warning">$10.5M</h4>
+                            <h4 class="mb-0 text-warning" x-text="formatCurrency(metrics.putVolume)">Loading...</h4>
                             <small class="text-muted">24h volume</small>
                         </div>
                     </div>
@@ -108,7 +116,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">Sentiment</h6>
-                            <h4 class="mb-0 text-primary">Bullish</h4>
+                            <h4 class="mb-0 text-primary" x-text="metrics.sentiment">Loading...</h4>
                             <small class="text-muted">Market bias</small>
                         </div>
                     </div>
@@ -451,9 +459,103 @@
     </div>
 </div>
 
+<script src="/js/options-metrics-controller.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Put/Call Ratio chart initialized');
-});
+function putCallRatioController() {
+    return {
+        // API Controller instance
+        apiController: null,
+        
+        // UI State
+        selectedAsset: 'BTC',
+        selectedExchange: 'Deribit',
+        selectedTimeframe: '7d',
+        loading: false,
+        error: null,
+
+        // Data from API
+        metrics: {
+            currentRatio: null,
+            callVolume: null,
+            putVolume: null,
+            sentiment: 'Loading...'
+        },
+        
+        oiData: [],
+        oiTimeseries: [],
+
+        async init() {
+            console.log('🚀 Initializing Put/Call Ratio page...');
+            
+            // Initialize API controller
+            this.apiController = new OptionsMetricsController();
+            
+            // Load initial data
+            await this.loadData();
+            
+            // Setup watchers
+            this.$watch('selectedAsset', () => this.loadData());
+            this.$watch('selectedExchange', () => this.loadData());
+            this.$watch('selectedTimeframe', () => this.loadData());
+        },
+
+        async loadData() {
+            if (!this.apiController) return;
+            
+            this.loading = true;
+            this.error = null;
+            
+            try {
+                console.log(`📊 Loading PCR data for ${this.selectedAsset} on ${this.selectedExchange}...`);
+                
+                // Fetch OI summary
+                const oiSummary = await this.apiController.fetchOISummary(this.selectedExchange, this.selectedAsset);
+                if (oiSummary && oiSummary.headline) {
+                    const headline = oiSummary.headline;
+                    this.metrics.callVolume = headline.call_volume || 0;
+                    this.metrics.putVolume = headline.put_volume || 0;
+                    this.metrics.currentRatio = this.metrics.putVolume / this.metrics.callVolume;
+                    this.metrics.sentiment = this.metrics.currentRatio > 1 ? 'Bearish' : 'Bullish';
+                }
+                
+                // Fetch OI by expiry
+                const oiByExpiry = await this.apiController.fetchOIByExpiry(this.selectedExchange, this.selectedAsset);
+                if (oiByExpiry) {
+                    this.oiData = oiByExpiry;
+                }
+                
+                // Fetch OI timeseries
+                const oiTimeseries = await this.apiController.fetchOITimeseries(this.selectedExchange, this.selectedAsset, '29 Mar 24');
+                if (oiTimeseries) {
+                    this.oiTimeseries = oiTimeseries;
+                }
+                
+                console.log('✅ PCR data loaded successfully');
+                
+            } catch (error) {
+                this.error = error.message;
+                console.error('❌ Error loading PCR data:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        // Utility functions
+        formatRatio(value) {
+            if (value === null || value === undefined) return 'N/A';
+            return value.toFixed(2);
+        },
+
+        formatCurrency(value) {
+            if (value === null || value === undefined) return 'N/A';
+            if (value >= 1000000) {
+                return `$${(value / 1000000).toFixed(1)}M`;
+            } else if (value >= 1000) {
+                return `$${(value / 1000).toFixed(1)}K`;
+            }
+            return `$${value.toFixed(0)}`;
+        }
+    };
+}
 </script>
 @endsection

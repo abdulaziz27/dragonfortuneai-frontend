@@ -157,18 +157,8 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
             window.addEventListener('perp-quarterly-overview-ready', (e) => {
                 if (e.detail?.timeseries) {
                     this.updateChartFromOverview(e.detail.timeseries);
-                } else {
-                    // Use fallback data if no timeseries available
-                    this.safeUpdateChart(this.getFallbackData());
                 }
             });
-
-            // Initialize with fallback data immediately
-            setTimeout(() => {
-                if (!this.chart || this.chart.data.datasets[0].data.length === 0) {
-                    this.safeUpdateChart(this.getFallbackData());
-                }
-            }, 1000);
         },
 
         initChart() {
@@ -375,10 +365,7 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
                 this.loading = false;
                 this.chartInitializing = false;
                 
-                // Wait for Chart.js to fully initialize before loading data
-                setTimeout(() => {
-                    this.safeUpdateChart(this.getFallbackData());
-                }, 300);
+                // Chart initialized, ready for data
                 
             } catch (error) {
                 console.error('❌ Error creating chart:', error);
@@ -392,13 +379,7 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
                 }, 1000);
             }
             
-            // Ensure chart has data after a short delay
-            setTimeout(() => {
-                if (!this.chart || this.chart.data.datasets[0].data.length === 0) {
-                    console.log('📊 Chart empty, loading fallback data');
-                    this.safeUpdateChart(this.getFallbackData());
-                }
-            }, 300);
+            // Chart ready for data
         },
 
         async loadData() {
@@ -437,22 +418,14 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
                 const chartData = data.data || [];
                 console.log('📡 Chart data length:', chartData.length);
                 
-                // Use fallback data if no real data available
-                if (chartData.length === 0) {
-                    console.log('📊 No real data available, using fallback data');
-                    this.chartData = this.getFallbackData();
-                    this.dataPoints = this.chartData.length;
-                } else {
-                    this.chartData = chartData;
-                    this.dataPoints = chartData.length;
-                }
+                this.chartData = chartData;
+                this.dataPoints = chartData.length;
                 
                 console.log('✅ Spread history loaded:', this.dataPoints, 'points');
             } catch (error) {
                 console.error('❌ Error loading spread history:', error);
-                // Use fallback data instead of empty array
-                this.chartData = this.getFallbackData();
-                this.dataPoints = this.chartData.length;
+                this.chartData = [];
+                this.dataPoints = 0;
             } finally {
                 this.loading = false;
             }
@@ -518,8 +491,8 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
 
             // Ensure we have data
             if (!historyData || historyData.length === 0) {
-                console.warn('⚠️ No data provided, using fallback');
-                historyData = this.getFallbackData();
+                console.warn('⚠️ No data provided');
+                return;
             }
 
             console.log('📊 Updating chart with', historyData.length, 'data points');
@@ -687,32 +660,6 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
             }
         },
 
-        getFallbackData() {
-            // Generate sample spread history data
-            const fallbackData = [];
-            const currentTime = Date.now();
-            const intervalMs = 5 * 60 * 1000; // 5 minutes in milliseconds
-            
-            for (let i = 0; i < 50; i++) {
-                const timestamp = currentTime - (i * intervalMs);
-                // Generate realistic spread values around 15 bps with some variation
-                const baseSpread = 15.5;
-                const variation = (Math.random() - 0.5) * 20; // ±10 bps variation
-                const spreadBps = Math.round((baseSpread + variation) * 100) / 100;
-                
-                fallbackData.push({
-                    ts: timestamp,
-                    exchange: this.exchange,
-                    perp_symbol: `${this.symbol}${this.quote}_PERP`,
-                    quarterly_symbol: `${this.symbol}${this.quote}_241227`,
-                    spread_abs: Math.round(spreadBps * 45000 / 10000 * 100) / 100, // Convert bps to absolute
-                    spread_bps: spreadBps
-                });
-            }
-            
-            console.log('📊 Generated fallback data:', fallbackData.length, 'points');
-            return fallbackData.reverse(); // Return in chronological order
-        },
 
         formatTime(timestamp) {
             if (!timestamp) return '--';

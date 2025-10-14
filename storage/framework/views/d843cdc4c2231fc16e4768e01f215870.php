@@ -195,24 +195,61 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script src="/js/options-metrics-controller.js"></script>
     <script>
+        // Wait for OptionsMetricsController to be available
+        function waitForOptionsMetricsController() {
+            return new Promise((resolve) => {
+                if (typeof OptionsMetricsController !== 'undefined') {
+                    resolve();
+                } else {
+                    setTimeout(() => waitForOptionsMetricsController().then(resolve), 100);
+                }
+            });
+        }
+        
         function optionsMetricsController() {
             return {
+                // API Controller instance
+                apiController: null,
+                
+                // UI State
                 selectedAsset: 'BTC',
                 selectedExchange: 'Deribit',
                 selectedTimeframe: '15m',
+                loading: false,
+                error: null,
 
+                // Chart instances
                 smileChart: null,
                 skewChart: null,
                 oiVolumeChart: null,
                 gammaChart: null,
 
-                metrics: {},
-                termStructure: [],
-                topStrikes: [],
-                gammaNarratives: [],
+                // Data from API
+                metrics: {
+                    atmIv: null,
+                    ivChange: null,
+                    ivNarrative: 'Loading...',
+                    skew: null,
+                    skewChange: null,
+                    skewNarrative: 'Loading...',
+                    totalOi: null,
+                    oiChange: null,
+                    oiNarrative: 'Loading...',
+                    netGamma: null,
+                    gammaTag: 'Loading...',
+                    gammaNarrative: 'Loading...'
+                },
+                
+                // Chart data
+                smileDatasets: {},
+                skewDatasets: {},
+                oiSeries: [],
+                gammaData: { labels: [], exposures: [], netGamma: 0 },
                 gammaSummary: {},
 
+                // Chart configuration
                 smileTenors: ['7D', '14D', '30D', '90D'],
                 smilePalette: {
                     '7D': '#3b82f6',
@@ -224,11 +261,7 @@
                 rrTenors: ['7D', '14D', '30D', '90D'],
                 intradayLabels: [],
 
-                smileDatasets: [],
-                skewDatasets: [],
-                oiSeries: [],
-                gammaData: { labels: [], exposures: [], netGamma: 0 },
-
+                // Formatters
                 percentFormatter: new Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
                 compactFormatter: new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }),
 
@@ -243,269 +276,31 @@
                     return ranges[this.selectedTimeframe] || 6;
                 },
 
-                baseProfiles: {
-                    BTC: {
-                        Deribit: {
-                            spot: 48500,
-                            spotLabel: '48.5k',
-                            metrics: {
-                                atmIv: 68.4,
-                                ivChange: 3.1,
-                                ivNarrative: 'Volatilitas ATM 30D menanjak karena demand call weekly melonjak.',
-                                skew: -4.2,
-                                skewChange: -35,
-                                skewNarrative: 'RR25 semakin negatif; pasar membayar perlindungan downside.',
-                                totalOi: 125000,
-                                oiChange: 2.8,
-                                oiNarrative: 'Total OI meningkat seiring dengan aktivitas trading yang tinggi.',
-                                netGamma: -45,
-                                gammaTag: 'Short Gamma',
-                                gammaNarrative: 'Zona short gamma di dekat spot membuat dealer sensitif terhadap pergerakan cepat.'
-                            },
-                            smile: {
-                                baseOffset: { '7D': 7.6, '14D': 5.1, '30D': 2.4, '90D': -0.6 },
-                                curvature: { '7D': 2.1, '14D': 1.8, '30D': 1.4, '90D': 1.0 },
-                                callTilt: 1.8,
-                                putTilt: 2.5
-                            },
-                            rr25: {
-                                base: -4.0,
-                                amplitude: { '7D': 0.7, '14D': 0.6, '30D': 0.45, '90D': 0.3 },
-                                drift: { '7D': 0.3, '14D': 0.2, '30D': 0.1, '90D': 0.05 }
-                            },
-                            termTemplate: [
-                                { tenor: '7D', atmOffset: 11.2, rrOffset: -0.8, flow: '+2.1k call' },
-                                { tenor: '14D', atmOffset: 8.4, rrOffset: -0.6, flow: '+1.3k call' },
-                                { tenor: '30D', atmOffset: 6.0, rrOffset: -0.4, flow: '+0.6k put' },
-                                { tenor: '60D', atmOffset: 3.4, rrOffset: -0.2, flow: '+0.5k put' },
-                                { tenor: '90D', atmOffset: 1.6, rrOffset: 0.0, flow: '+0.3k put' }
-                            ],
-                            topStrikes: [
-                                { label: '50k Call', oi: '12.7k OI', flow: '+1.5k', insight: 'Permintaan tinggi menjaga gamma area resistance.' },
-                                { label: '48k Put', oi: '10.2k OI', flow: '+1.1k', insight: 'Proteksi downside bertambah pasca sesi Asia.' },
-                                { label: '55k Call', oi: '8.4k OI', flow: '+0.8k', insight: 'Wing call jauh mencerminkan ekspektasi breakout.' }
-                            ],
-                            gamma: {
-                                pivot: 49200,
-                                offsets: [-4, -3, -2, -1, 0, 1, 2, 3, 4],
-                                step: 500,
-                                baseMagnitude: 120,
-                                flipIndex: 1,
-                                decay: 0.85
-                            },
-                            oiTemplate: [
-                                { expiry: '29 Mar 24', callOi: 18600, putOi: 14800, callVol: 5200, putVol: 3900 },
-                                { expiry: '26 Apr 24', callOi: 21400, putOi: 17600, callVol: 4800, putVol: 3600 },
-                                { expiry: '31 May 24', callOi: 19100, putOi: 20600, callVol: 3500, putVol: 4100 },
-                                { expiry: '28 Jun 24', callOi: 16700, putOi: 22100, callVol: 3000, putVol: 4300 }
-                            ],
-                            gammaNarratives: [
-                                'Zona short gamma 47k-49k; dealer agresif mengejar delta saat spot bergerak cepat.',
-                                'Bertahan di atas pivot 49.2k meredam penjualan gamma dan mendorong stabilisasi.',
-                                'Breakout di atas 50k memicu hedging buy tambahan dari dealer short gamma.'
-                            ]
-                        },
-                        OKX: {
-                            spot: 47800,
-                            spotLabel: '47.8k',
-                            metrics: {
-                                atmIv: 64.9,
-                                ivChange: 2.1,
-                                ivNarrative: 'IV 30D stabil; desk Asia memilih strategi carry short vol.',
-                                skew: -3.3,
-                                skewChange: -18,
-                                skewNarrative: 'RR25 negatif tetapi lebih landai dari Deribit.',
-                                totalOi: 98000,
-                                oiChange: 1.5,
-                                oiNarrative: 'OI di OKX relatif stabil dengan aktivitas trading moderat.',
-                                netGamma: -32,
-                                gammaTag: 'Short Gamma',
-                                gammaNarrative: 'Gamma negatif tipis; dealer masih responsif terhadap range trading.'
-                            },
-                            smile: {
-                                baseOffset: { '7D': 6.8, '14D': 4.4, '30D': 2.0, '90D': -0.8 },
-                                curvature: { '7D': 1.9, '14D': 1.6, '30D': 1.2, '90D': 0.9 },
-                                callTilt: 1.4,
-                                putTilt: 2.1
-                            },
-                            rr25: {
-                                base: -3.0,
-                                amplitude: { '7D': 0.5, '14D': 0.45, '30D': 0.35, '90D': 0.25 },
-                                drift: { '7D': 0.2, '14D': 0.15, '30D': 0.1, '90D': 0.05 }
-                            },
-                            termTemplate: [
-                                { tenor: '7D', atmOffset: 9.6, rrOffset: -0.5, flow: '+1.6k call' },
-                                { tenor: '14D', atmOffset: 7.0, rrOffset: -0.4, flow: '+0.9k call' },
-                                { tenor: '30D', atmOffset: 4.8, rrOffset: -0.2, flow: '+0.4k put' },
-                                { tenor: '60D', atmOffset: 2.6, rrOffset: -0.1, flow: '+0.3k put' },
-                                { tenor: '90D', atmOffset: 1.0, rrOffset: 0.0, flow: '+0.2k put' }
-                            ],
-                            topStrikes: [
-                                { label: '48k Call', oi: '9.9k OI', flow: '+1.2k', insight: 'Call dekat spot ramai, mencerminkan chase upside.' },
-                                { label: '45k Put', oi: '7.1k OI', flow: '+0.7k', insight: 'Put proteksi ringan untuk treasury desk.' },
-                                { label: '52k Call', oi: '5.8k OI', flow: '+0.4k', insight: 'Wing jauh hanya dibeli tipis, fokus pada strike dekat.' }
-                            ],
-                            gamma: {
-                                pivot: 48600,
-                                offsets: [-4, -3, -2, -1, 0, 1, 2, 3, 4],
-                                step: 500,
-                                baseMagnitude: 100,
-                                flipIndex: 1,
-                                decay: 0.8
-                            },
-                            oiTemplate: [
-                                { expiry: '29 Mar 24', callOi: 14800, putOi: 12100, callVol: 4300, putVol: 3200 },
-                                { expiry: '26 Apr 24', callOi: 17000, putOi: 15100, callVol: 3900, putVol: 3100 },
-                                { expiry: '31 May 24', callOi: 15400, putOi: 16300, callVol: 3100, putVol: 3400 },
-                                { expiry: '28 Jun 24', callOi: 14100, putOi: 17900, callVol: 2700, putVol: 3600 }
-                            ],
-                            gammaNarratives: [
-                                'Gamma negatif lebih tipis; dealer Asia leluasa menjaga delta netral.',
-                                'Pivot 48.6k menjadi garis demarkasi arah hedging.',
-                                'Break di bawah 46k dapat memicu penjualan tambahan dari dealer.'
-                            ]
-                        }
-                    },
-                    ETH: {
-                        Deribit: {
-                            spot: 3200,
-                            spotLabel: '3.2k',
-                            metrics: {
-                                atmIv: 72.8,
-                                ivChange: 2.6,
-                                ivNarrative: 'IV ETH naik seiring narasi ETF institutional flow.',
-                                skew: -2.9,
-                                skewChange: -24,
-                                skewNarrative: 'RR25 melebar negatif; demand put melindungi level 3k.',
-                                callPutRatio: 1.22,
-                                callPutDelta: 0.09,
-                                cpNarrative: 'Call tenor dekat aktif; dealer menjaga net long delta.',
-                                gammaHotspot: 3200,
-                                gammaTag: 'Short Gamma',
-                                gammaNarrative: 'Dealer short gamma di area spot; breakout memicu chase beli.'
-                            },
-                            smile: {
-                                baseOffset: { '7D': 8.4, '14D': 5.8, '30D': 3.0, '90D': -0.4 },
-                                curvature: { '7D': 2.4, '14D': 2.0, '30D': 1.5, '90D': 1.1 },
-                                callTilt: 2.0,
-                                putTilt: 2.8
-                            },
-                            rr25: {
-                                base: -2.6,
-                                amplitude: { '7D': 0.6, '14D': 0.55, '30D': 0.4, '90D': 0.25 },
-                                drift: { '7D': 0.25, '14D': 0.18, '30D': 0.12, '90D': 0.06 }
-                            },
-                            termTemplate: [
-                                { tenor: '7D', atmOffset: 12.0, rrOffset: -0.6, flow: '+1.8k call' },
-                                { tenor: '14D', atmOffset: 8.8, rrOffset: -0.4, flow: '+1.1k call' },
-                                { tenor: '30D', atmOffset: 6.2, rrOffset: -0.3, flow: '+0.5k put' },
-                                { tenor: '60D', atmOffset: 3.7, rrOffset: -0.1, flow: '+0.3k put' },
-                                { tenor: '90D', atmOffset: 1.8, rrOffset: 0.0, flow: '+0.2k put' }
-                            ],
-                            topStrikes: [
-                                { label: '3.4k Call', oi: '9.8k OI', flow: '+1.0k', insight: 'Call dekat spot diburu untuk mengejar narasi ETF.' },
-                                { label: '3.0k Put', oi: '8.2k OI', flow: '+0.9k', insight: 'Put proteksi menjaga area psikologis 3k.' },
-                                { label: '3.6k Call', oi: '6.6k OI', flow: '+0.6k', insight: 'Wing jauh aktif, mengantisipasi squeeze bullish.' }
-                            ],
-                            gamma: {
-                                pivot: 3270,
-                                offsets: [-4, -3, -2, -1, 0, 1, 2, 3, 4],
-                                step: 100,
-                                baseMagnitude: 95,
-                                flipIndex: 1,
-                                decay: 0.75
-                            },
-                            oiTemplate: [
-                                { expiry: '29 Mar 24', callOi: 15800, putOi: 13200, callVol: 4700, putVol: 3600 },
-                                { expiry: '26 Apr 24', callOi: 19400, putOi: 16900, callVol: 4400, putVol: 3300 },
-                                { expiry: '31 May 24', callOi: 17800, putOi: 19100, callVol: 3200, putVol: 3700 },
-                                { expiry: '28 Jun 24', callOi: 16400, putOi: 21200, callVol: 2800, putVol: 4000 }
-                            ],
-                            gammaNarratives: [
-                                'Dealer short gamma kuat di 3.1k-3.3k; volatilitas mudah meningkat.',
-                                'Pivot gamma 3.27k menjadi trigger hedging beli jika ditembus.',
-                                'Wing positif baru muncul di atas 3.4k, membuka ruang squeeze lebih jauh.'
-                            ]
-                        },
-                        OKX: {
-                            spot: 3120,
-                            spotLabel: '3.12k',
-                            metrics: {
-                                atmIv: 69.8,
-                                ivChange: 1.8,
-                                ivNarrative: 'IV ETH di OKX naik moderat; spread terhadap Deribit menyempit.',
-                                skew: -2.1,
-                                skewChange: -16,
-                                skewNarrative: 'RR25 lebih landai; demand proteksi relatif terukur.',
-                                callPutRatio: 1.08,
-                                callPutDelta: 0.04,
-                                cpNarrative: 'Call-put hampir seimbang, strategi relative value dominan.',
-                                gammaHotspot: 3120,
-                                gammaTag: 'Short Gamma',
-                                gammaNarrative: 'Gamma negatif ringan; dealer nyaman menjaga range.'
-                            },
-                            smile: {
-                                baseOffset: { '7D': 7.4, '14D': 4.9, '30D': 2.4, '90D': -0.6 },
-                                curvature: { '7D': 2.0, '14D': 1.7, '30D': 1.3, '90D': 1.0 },
-                                callTilt: 1.7,
-                                putTilt: 2.4
-                            },
-                            rr25: {
-                                base: -1.8,
-                                amplitude: { '7D': 0.45, '14D': 0.4, '30D': 0.3, '90D': 0.22 },
-                                drift: { '7D': 0.2, '14D': 0.15, '30D': 0.1, '90D': 0.05 }
-                            },
-                            termTemplate: [
-                                { tenor: '7D', atmOffset: 9.8, rrOffset: -0.4, flow: '+1.3k call' },
-                                { tenor: '14D', atmOffset: 7.2, rrOffset: -0.3, flow: '+0.7k call' },
-                                { tenor: '30D', atmOffset: 5.0, rrOffset: -0.1, flow: '+0.3k put' },
-                                { tenor: '60D', atmOffset: 3.1, rrOffset: -0.1, flow: '+0.2k put' },
-                                { tenor: '90D', atmOffset: 1.5, rrOffset: 0.0, flow: '+0.1k put' }
-                            ],
-                            topStrikes: [
-                                { label: '3.1k Call', oi: '8.4k OI', flow: '+0.8k', insight: 'Call dekat spot aktif mengikuti momentum.' },
-                                { label: '2.9k Put', oi: '6.9k OI', flow: '+0.6k', insight: 'Put proteksi ringan untuk menjaga downside.' },
-                                { label: '3.4k Call', oi: '5.4k OI', flow: '+0.4k', insight: 'Wing jauh tetap hidup namun dengan ukuran kecil.' }
-                            ],
-                            gamma: {
-                                pivot: 3210,
-                                offsets: [-4, -3, -2, -1, 0, 1, 2, 3, 4],
-                                step: 90,
-                                baseMagnitude: 80,
-                                flipIndex: 1,
-                                decay: 0.7
-                            },
-                            oiTemplate: [
-                                { expiry: '29 Mar 24', callOi: 13400, putOi: 11200, callVol: 3600, putVol: 2800 },
-                                { expiry: '26 Apr 24', callOi: 15100, putOi: 13900, callVol: 3300, putVol: 2900 },
-                                { expiry: '31 May 24', callOi: 13900, putOi: 15200, callVol: 2700, putVol: 3000 },
-                                { expiry: '28 Jun 24', callOi: 13100, putOi: 17300, callVol: 2500, putVol: 3300 }
-                            ],
-                            gammaNarratives: [
-                                'Gamma negatif ringan membuat pasar lebih tenang, cocok range trading.',
-                                'Pivot 3.21k menjadi patokan arah hedging dealer.',
-                                'Lonjakan di atas 3.3k memaksa dealer mengejar delta ke sisi beli.'
-                            ]
-                        }
-                    }
-                },
-
-                init() {
+                async init() {
+                    console.log('🚀 Initializing Options Metrics Dashboard...');
+                    
+                    // Wait for OptionsMetricsController to be available
+                    await waitForOptionsMetricsController();
+                    console.log('✅ OptionsMetricsController is now available');
+                    
+                    // Initialize API controller
+                    this.apiController = new OptionsMetricsController();
+                    
+                    // Generate chart labels
                     this.generateIntradayLabels();
-                    this.applyProfile();
-                    this.$watch('selectedAsset', () => {
-                        this.applyProfile();
-                        this.refreshAll();
-                    });
-                    this.$watch('selectedExchange', () => {
-                        this.applyProfile();
-                        this.refreshAll();
-                    });
+                    
+                    // Load initial data
+                    await this.loadDashboardData();
+                    
+                    // Setup watchers
+                    this.$watch('selectedAsset', () => this.loadDashboardData());
+                    this.$watch('selectedExchange', () => this.loadDashboardData());
                     this.$watch('selectedTimeframe', () => {
                         this.generateIntradayLabels();
-                        this.applyProfile();
-                        this.refreshAll();
+                        this.loadDashboardData();
                     });
+                    
+                    // Wait for Chart.js and render charts
                     this.waitForChart(() => this.renderAllCharts());
                 },
 
@@ -520,28 +315,138 @@
                     this.intradayLabels = labels;
                 },
 
-                applyProfile() {
-                    const profile = this.currentProfile();
-                    this.metrics = profile.metrics;
-                    this.termStructure = this.generateTermStructure(profile);
-                    this.topStrikes = profile.topStrikes;
-                    this.gammaNarratives = profile.gammaNarratives;
-                    this.smileDatasets = this.generateSmileSeries(profile);
-                    this.skewDatasets = this.generateRR25Series(profile);
-                    this.oiSeries = this.generateOiByExpiry(profile);
-                    this.gammaData = this.generateGamma(profile);
-                    this.gammaSummary = {
-                        netGamma: this.gammaData.netGamma,
-                        pivot: profile.gamma.pivot
-                    };
+                async loadDashboardData() {
+                    if (!this.apiController) return;
+                    
+                    this.loading = true;
+                    this.error = null;
+                    
+                    try {
+                        console.log(`📊 Loading data for ${this.selectedAsset} on ${this.selectedExchange}...`);
+                        
+                        // Fetch all dashboard data
+                        const data = await this.apiController.fetchDashboardData(this.selectedExchange, this.selectedAsset);
+                        
+                        if (data) {
+                            this.updateMetricsFromAPI(data);
+                            this.updateChartDataFromAPI(data);
+                            console.log('✅ Dashboard data loaded successfully');
+                        } else {
+                            this.error = 'Failed to load data from API';
+                            console.error('❌ No data received from API');
+                        }
+                        
+                    } catch (error) {
+                        this.error = error.message;
+                        console.error('❌ Error loading dashboard data:', error);
+                    } finally {
+                        this.loading = false;
+                    }
                 },
 
-                currentProfile() {
-                    return this.baseProfiles[this.selectedAsset][this.selectedExchange];
+                updateMetricsFromAPI(data) {
+                    // Debug logging to see actual data structure
+                    console.log('🔍 Received data structure:', data);
+                    console.log('🔍 IV Summary:', data.ivSummary);
+                    console.log('🔍 Skew Summary:', data.skewSummary);
+                    console.log('🔍 OI Summary:', data.oiSummary);
+                    console.log('🔍 Dealer Greeks:', data.dealerGreeksSummary);
+                    
+                    // DEEP DEBUG - Show actual field names and values
+                    if (data.ivSummary && data.ivSummary.data) {
+                        console.log('🔬 IV Data Fields:', Object.keys(data.ivSummary.data));
+                        console.log('🔬 IV Data Values:', data.ivSummary.data);
+                    }
+                    
+                    if (data.skewSummary && data.skewSummary.data && data.skewSummary.data.length > 0) {
+                        console.log('🔬 Skew Data Fields:', Object.keys(data.skewSummary.data[0]));
+                        console.log('🔬 Skew Data Values:', data.skewSummary.data[0]);
+                    } else {
+                        console.log('⚠️ Skew data is empty array');
+                    }
+                    
+                    if (data.oiSummary && data.oiSummary.data) {
+                        console.log('🔬 OI Data Fields:', Object.keys(data.oiSummary.data));
+                        console.log('🔬 OI Data Values:', data.oiSummary.data);
+                    }
+                    
+                    if (data.dealerGreeksSummary && data.dealerGreeksSummary.data) {
+                        console.log('🔬 Gamma Data Fields:', Object.keys(data.dealerGreeksSummary.data));
+                        console.log('🔬 Gamma Data Values:', data.dealerGreeksSummary.data);
+                    }
+                    
+                    // Update IV metrics
+                    if (data.ivSummary && data.ivSummary.data && data.ivSummary.data.headline) {
+                        const iv = data.ivSummary.data.headline;
+                        this.metrics.atmIv = iv.atm_iv;
+                        this.metrics.ivChange = iv.term_slope || 0;
+                        this.metrics.ivNarrative = `ATM IV: ${this.formatPercent(iv.atm_iv)}. Term structure slope: ${this.formatDelta(iv.term_slope || 0, 'pts')}`;
+                    }
+                    
+                    // Update Skew metrics
+                    if (data.skewSummary && data.skewSummary.data && data.skewSummary.data.length > 0) {
+                        const latest = data.skewSummary.data[0];
+                        this.metrics.skew = latest.rr25?.avg || 0;
+                        this.metrics.skewChange = 0; // Calculate from timeseries if available
+                        this.metrics.skewNarrative = `25D Risk Reversal: ${this.formatDelta(latest.rr25?.avg || 0, '%')}`;
+                    }
+                    
+                    // Update OI metrics
+                    if (data.oiSummary && data.oiSummary.data && data.oiSummary.data.headline) {
+                        const oi = data.oiSummary.data.headline;
+                        this.metrics.totalOi = oi.total_oi;
+                        this.metrics.oiChange = 0; // Calculate from timeseries if available
+                        this.metrics.oiNarrative = `Total OI: ${this.formatCompact(oi.total_oi)}`;
+                    }
+                    
+                    // Update Gamma metrics
+                    if (data.dealerGreeksSummary && data.dealerGreeksSummary.data && data.dealerGreeksSummary.data.summary) {
+                        const gamma = data.dealerGreeksSummary.data.summary;
+                        this.metrics.netGamma = gamma.gamma_net || 0;
+                        this.metrics.gammaTag = (gamma.gamma_net || 0) >= 0 ? 'Long Gamma' : 'Short Gamma';
+                        this.metrics.gammaNarrative = `Net Gamma: ${this.formatGamma(gamma.gamma_net || 0)}`;
+                    }
                 },
 
-                refreshAll() {
+                updateChartDataFromAPI(data) {
+                    // Update IV Smile data
+                    if (data.ivSmile && data.ivSmile.data) {
+                        console.log('🎯 IV Smile raw data:', data.ivSmile.data);
+                        this.smileDatasets = this.apiController.transformIVSmileData(data.ivSmile.data);
+                        console.log('🎯 IV Smile transformed data:', this.smileDatasets);
+                    } else {
+                        console.log('❌ No IV Smile data available');
+                    }
+                    
+                    // Update Skew data
+                    if (data.skewHistory && data.skewHistory.data) {
+                        console.log('🎯 Skew History raw data:', data.skewHistory.data);
+                        this.skewDatasets = this.apiController.transformSkewData(data.skewHistory.data);
+                        console.log('🎯 Skew History transformed data:', this.skewDatasets);
+                    } else {
+                        console.log('❌ No Skew History data available');
+                    }
+                    
+                    // Update OI data
+                    if (data.oiByExpiry && data.oiByExpiry.data) {
+                        this.oiSeries = this.apiController.transformOIData(data.oiByExpiry.data);
+                    }
+                    
+                    // Update Gamma data
+                    if (data.dealerGreeksGex && data.dealerGreeksGex.data) {
+                        const gammaData = this.apiController.transformGammaData(data.dealerGreeksGex.data);
+                        this.gammaData = {
+                            labels: gammaData.map(item => this.formatPriceLevel(item.priceLevel)),
+                            exposures: gammaData.map(item => item.gammaExposure / 1000), // Convert to k
+                            netGamma: gammaData.reduce((sum, item) => sum + item.gammaExposure, 0) / 1000
+                        };
+                    }
+                },
+
+                async refreshAll() {
+                    console.log('🔄 Refreshing all data...');
                     this.destroyCharts();
+                    await this.loadDashboardData();
                     this.waitForChart(() => this.renderAllCharts());
                 },
 
@@ -581,11 +486,26 @@
 
                 renderSmileChart() {
                     const ctx = document.getElementById('ivSmileChart');
-                    if (!ctx) return;
+                    console.log('🎯 renderSmileChart called');
+                    console.log('🎯 ctx:', ctx);
+                    console.log('🎯 smileDatasets:', this.smileDatasets);
+                    console.log('🎯 smileDatasets keys:', this.smileDatasets ? Object.keys(this.smileDatasets) : 'null');
+                    
+                    if (!ctx) {
+                        console.log('❌ No chart context found');
+                        return;
+                    }
+                    if (!this.smileDatasets || Object.keys(this.smileDatasets).length === 0) {
+                        console.log('❌ No smile datasets available');
+                        return;
+                    }
 
-                    const datasets = this.smileTenors.map((tenor) => ({
+                    const datasets = this.smileTenors.map((tenor) => {
+                        const tenorData = this.smileDatasets[tenor] || [];
+                        console.log(`🎯 Tenor ${tenor} data:`, tenorData);
+                        return {
                         label: tenor,
-                        data: this.smileDatasets[tenor],
+                            data: tenorData.map(item => item.iv), // Extract IV values
                         borderColor: this.smilePalette[tenor],
                         backgroundColor: this.smilePalette[tenor] + '33',
                         tension: 0.35,
@@ -593,12 +513,19 @@
                         pointRadius: 3,
                         pointHoverRadius: 5,
                         fill: false
-                    }));
+                        };
+                    });
+
+                    // Get actual strike prices from data for labels
+                    const firstTenor = this.smileTenors.find(tenor => this.smileDatasets[tenor] && this.smileDatasets[tenor].length > 0);
+                    const strikeLabels = firstTenor ? this.smileDatasets[firstTenor].map(item => `$${Math.round(item.strike)}`) : [];
+                    
+                    console.log('🎯 Strike labels:', strikeLabels);
 
                     this.smileChart = new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: this.relativeStrikes.map((strike) => `${strike}%`),
+                            labels: strikeLabels,
                             datasets
                         },
                         options: {
@@ -638,23 +565,47 @@
 
                 renderSkewChart() {
                     const ctx = document.getElementById('skewChart');
-                    if (!ctx) return;
+                    console.log('🎯 renderSkewChart called');
+                    console.log('🎯 ctx:', ctx);
+                    console.log('🎯 skewDatasets:', this.skewDatasets);
+                    console.log('🎯 skewDatasets length:', this.skewDatasets ? this.skewDatasets.length : 'null');
+                    
+                    if (!ctx) {
+                        console.log('❌ No skew chart context found');
+                        return;
+                    }
+                    if (!this.skewDatasets || this.skewDatasets.length === 0) {
+                        console.log('❌ No skew datasets available');
+                        return;
+                    }
 
                     const colors = ['#38bdf8', '#10b981', '#f59e0b', '#8b5cf6'];
-                    const datasets = this.rrTenors.map((tenor, idx) => ({
+                    const datasets = this.rrTenors.map((tenor, idx) => {
+                        const tenorData = this.skewDatasets.filter(item => item.tenor === tenor);
+                        console.log(`🎯 Tenor ${tenor} skew data:`, tenorData);
+                        return {
                         label: tenor,
-                        data: this.skewDatasets[tenor],
+                            data: tenorData.map(item => item.rr25 * 100), // Convert to percentage
                         borderColor: colors[idx % colors.length],
                         backgroundColor: colors[idx % colors.length] + '33',
                         tension: 0.35,
                         borderWidth: 2,
                         fill: false
-                    }));
+                        };
+                    });
+
+                    // Generate labels from actual data timestamps
+                    const timeLabels = this.skewDatasets.map(item => {
+                        const date = new Date(item.timestamp);
+                        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    });
+                    
+                    console.log('🎯 Skew time labels:', timeLabels);
 
                     this.skewChart = new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: this.intradayLabels,
+                            labels: timeLabels,
                             datasets
                         },
                         options: {
@@ -694,7 +645,7 @@
 
                 renderOiVolumeChart() {
                     const ctx = document.getElementById('oiVolumeChart');
-                    if (!ctx) return;
+                    if (!ctx || !this.oiSeries || this.oiSeries.length === 0) return;
 
                     this.oiVolumeChart = new Chart(ctx, {
                         data: {
@@ -790,7 +741,7 @@
 
                 renderGammaChart() {
                     const ctx = document.getElementById('gammaChart');
-                    if (!ctx) return;
+                    if (!ctx || !this.gammaData || this.gammaData.exposures.length === 0) return;
 
                     this.gammaChart = new Chart(ctx, {
                         type: 'bar',
@@ -844,91 +795,14 @@
                     });
                 },
 
-                generateTermStructure(profile) {
-                    return profile.termTemplate.map((item) => ({
-                        tenor: item.tenor,
-                        atmIv: profile.metrics.atmIv + item.atmOffset,
-                        rr25: profile.rr25.base + item.rrOffset,
-                        flow: item.flow
-                    }));
-                },
-
-                generateSmileSeries(profile) {
-                    const result = {};
-                    this.smileTenors.forEach((tenor) => {
-                        const baseAtm = profile.metrics.atmIv + profile.smile.baseOffset[tenor];
-                        const curvature = profile.smile.curvature[tenor];
-                        result[tenor] = this.relativeStrikes.map((strike) => {
-                            if (strike === 0) {
-                                return parseFloat(baseAtm.toFixed(1));
-                            }
-                            const absStrike = Math.abs(strike);
-                            const normalized = Math.pow(absStrike / 10, 1.08);
-                            const tilt = strike > 0
-                                ? profile.smile.callTilt * (absStrike / 40)
-                                : profile.smile.putTilt * (absStrike / 40);
-                            const value = baseAtm + normalized * curvature + tilt;
-                            return parseFloat(value.toFixed(1));
-                        });
-                    });
-                    return result;
-                },
-
-                generateRR25Series(profile) {
-                    const result = {};
-                    this.rrTenors.forEach((tenor, idx) => {
-                        const base = profile.rr25.base;
-                        const amplitude = profile.rr25.amplitude[tenor];
-                        const drift = profile.rr25.drift[tenor];
-                        result[tenor] = this.intradayLabels.map((_, index) => {
-                            const wave = Math.sin((index / (this.intradayLabels.length - 1)) * Math.PI * 1.4 + idx * 0.35);
-                            const value = base + amplitude * wave + drift * (index / this.intradayLabels.length);
-                            return parseFloat(value.toFixed(2));
-                        });
-                    });
-                    return result;
-                },
-
-                generateOiByExpiry(profile) {
-                    return profile.oiTemplate.map((item, index) => {
-                        const modulation = 1 + 0.03 * Math.sin(index * 0.8);
-                        const callOi = Math.round(item.callOi * modulation);
-                        const putOi = Math.round(item.putOi * (2 - modulation));
-                        const callVol = Math.round(item.callVol * modulation);
-                        const putVol = Math.round(item.putVol * (1.8 - modulation));
-                        return {
-                            expiry: item.expiry,
-                            callOi,
-                            putOi,
-                            callVol,
-                            putVol,
-                            totalVol: callVol + putVol
-                        };
-                    });
-                },
-
-                generateGamma(profile) {
-                    const labels = [];
-                    const exposures = [];
-                    const { offsets, step, baseMagnitude, flipIndex, decay, pivot } = profile.gamma;
-                    offsets.forEach((offset) => {
-                        const priceLevel = pivot + offset * step;
-                        labels.push(this.formatPriceLevel(priceLevel));
-                        const distance = Math.abs(offset);
-                        const magnitude = baseMagnitude * Math.pow(1.25, distance) * Math.exp(-distance * decay * 0.1);
-                        const sign = offset <= flipIndex ? -1 : 1;
-                        const value = Math.round(magnitude * sign);
-                        exposures.push(value);
-                    });
-                    const netGamma = exposures.reduce((acc, value) => acc + value, 0);
-                    return { labels, exposures, netGamma };
-                },
-
+                // Utility functions
                 formatPercent(value) {
-                    return `${this.percentFormatter.format(value)}%`;
+                    if (value === null || value === undefined) return 'N/A';
+                    return `${parseFloat(value).toFixed(1)}%`;
                 },
 
                 formatDelta(value, suffix = '') {
+                    if (value === null || value === undefined) return 'N/A';
                     let formatted;
                     if (suffix === 'bps') {
                         formatted = Math.round(value);
@@ -941,11 +815,8 @@
                     return `${sign}${formatted}${suffix ? ` ${suffix}` : ''}`;
                 },
 
-                formatMultiplier(value) {
-                    return `${value.toFixed(2)}x`;
-                },
-
                 formatPrice(value) {
+                    if (value === null || value === undefined) return 'N/A';
                     if (value >= 1000) {
                         return `${(value / 1000).toFixed(1)}k`;
                     }
@@ -953,11 +824,13 @@
                 },
 
                 formatGamma(value) {
+                    if (value === null || value === undefined) return 'N/A';
                     const sign = value > 0 ? '+' : '';
                     return `${sign}${value}k gamma`;
                 },
 
                 formatPriceLevel(value) {
+                    if (value === null || value === undefined) return 'N/A';
                     if (value >= 1000) {
                         return `${(value / 1000).toFixed(1)}k`;
                     }
@@ -965,6 +838,7 @@
                 },
 
                 formatCompact(value) {
+                    if (value === null || value === undefined) return 'N/A';
                     return this.compactFormatter.format(value);
                 }
             };

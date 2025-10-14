@@ -162,26 +162,20 @@ function spreadAnalyticsCard(initialSymbol = 'BTC', initialExchange = 'Binance')
         loading: false,
 
         // Analytics data
-        currentSpread: 15.5,
-        currentSpreadBps: 15.5,
-        avgSpread: 12.3,
-        avgSpreadBps: 12.3,
-        minSpread: -5.2,
-        maxSpread: 28.7,
-        stdDev: 8.1,
-        marketStructure: 'Contango',
-        trendDirection: '↗️',
-        trendChange: 2.1,
-        perpSymbol: 'BTCUSDT_PERP',
-        quarterlySymbol: 'BTCUSDT_241227',
-        dataPoints: 50,
-        insights: [
-            {
-                type: 'contango',
-                severity: 'low',
-                message: 'Normal contango structure. Market expects gradual price appreciation.'
-            }
-        ],
+        currentSpread: null,
+        currentSpreadBps: null,
+        avgSpread: null,
+        avgSpreadBps: null,
+        minSpread: null,
+        maxSpread: null,
+        stdDev: null,
+        marketStructure: null,
+        trendDirection: null,
+        trendChange: null,
+        perpSymbol: null,
+        quarterlySymbol: null,
+        dataPoints: 0,
+        insights: [],
         lastUpdate: 'Loading...',
 
         init() {
@@ -353,24 +347,18 @@ function spreadAnalyticsCard(initialSymbol = 'BTC', initialExchange = 'Binance')
         },
 
         resetData() {
-            // Use fallback data instead of null to prevent Alpine.js errors
-            this.currentSpread = 15.5;
-            this.currentSpreadBps = 15.5;
-            this.avgSpread = 12.3;
-            this.avgSpreadBps = 12.3;
-            this.minSpread = -5.2;
-            this.maxSpread = 28.7;
-            this.stdDev = 8.1;
-            this.marketStructure = 'Contango';
-            this.trendDirection = '↗️';
-            this.trendChange = 2.1;
-            this.insights = [
-                {
-                    type: 'contango',
-                    severity: 'low',
-                    message: 'Normal contango structure. Market expects gradual price appreciation.'
-                }
-            ];
+            // Reset to null - no dummy data
+            this.currentSpread = null;
+            this.currentSpreadBps = null;
+            this.avgSpread = null;
+            this.avgSpreadBps = null;
+            this.minSpread = null;
+            this.maxSpread = null;
+            this.stdDev = null;
+            this.marketStructure = null;
+            this.trendDirection = null;
+            this.trendChange = null;
+            this.insights = [];
         },
 
         refresh() {

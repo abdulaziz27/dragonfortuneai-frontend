@@ -37,7 +37,7 @@ return [
 
     // Custom API base URL for frontend fetches (used by deployment envs)
     'api' => [
-        'base_url' => env('API_BASE_URL', 'https://test.dragonfortune.ai'),
+        'base_url' => env('API_BASE_URL', 'http://localhost:5000'),
     ],
 
 ];

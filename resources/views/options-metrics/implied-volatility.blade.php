@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid">
+<div class="container-fluid" x-data="impliedVolatilityController()">
     <!-- Header Section -->
     <div class="row mb-4">
         <div class="col-12">
@@ -11,18 +11,26 @@
                     <p class="text-muted mb-0">Market expectation of volatility; measure of fear/greed</p>
                 </div>
                 <div class="d-flex gap-2">
-                    <select class="form-select form-select-sm" style="width: auto;">
+                    <select class="form-select form-select-sm" style="width: auto;" x-model="selectedAsset">
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
+                    </select>
+                    <select class="form-select form-select-sm" style="width: auto;" x-model="selectedExchange">
+                        <option value="Deribit">Deribit</option>
+                        <option value="OKX">OKX</option>
+                    </select>
+                    <select class="form-select form-select-sm" style="width: auto;" x-model="selectedTimeframe">
                         <option value="24h">24 Hours</option>
                         <option value="7d" selected>7 Days</option>
                         <option value="30d">30 Days</option>
                         <option value="90d">90 Days</option>
                     </select>
-                    <button class="btn btn-outline-secondary btn-sm">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="btn btn-outline-secondary btn-sm" @click="loadData()" :disabled="loading">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
                             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                             <path d="M3 3v5h5"/>
                         </svg>
-                        Refresh
+                        <span x-text="loading ? 'Loading...' : 'Refresh'"></span>
                     </button>
                 </div>
             </div>
@@ -45,7 +53,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">Current IV</h6>
-                            <h4 class="mb-0 text-success">68.5%</h4>
+                            <h4 class="mb-0 text-success" x-text="formatPercent(metrics.currentIv)">Loading...</h4>
                             <small class="text-muted">30-day ATM</small>
                         </div>
                     </div>
@@ -66,7 +74,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">IV Rank</h6>
-                            <h4 class="mb-0 text-info">75%</h4>
+                            <h4 class="mb-0 text-info" x-text="formatPercent(metrics.ivRank)">Loading...</h4>
                             <small class="text-muted">Percentile</small>
                         </div>
                     </div>
@@ -87,7 +95,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">Fear/Greed Index</h6>
-                            <h4 class="mb-0 text-warning">Fear</h4>
+                            <h4 class="mb-0 text-warning" x-text="metrics.sentiment">Loading...</h4>
                             <small class="text-muted">Market sentiment</small>
                         </div>
                     </div>
@@ -108,7 +116,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">IV Change (7d)</h6>
-                            <h4 class="mb-0 text-primary">+12.3%</h4>
+                            <h4 class="mb-0 text-primary" x-text="formatDelta(metrics.ivChange)">Loading...</h4>
                             <small class="text-muted">Weekly change</small>
                         </div>
                     </div>
@@ -481,9 +489,98 @@
     </div>
 </div>
 
+<script src="/js/options-metrics-controller.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Implied Volatility chart initialized');
-});
+function impliedVolatilityController() {
+    return {
+        // API Controller instance
+        apiController: null,
+        
+        // UI State
+        selectedAsset: 'BTC',
+        selectedExchange: 'Deribit',
+        selectedTimeframe: '7d',
+        loading: false,
+        error: null,
+
+        // Data from API
+        metrics: {
+            currentIv: null,
+            ivRank: null,
+            sentiment: 'Loading...',
+            ivChange: null
+        },
+        
+        termStructure: [],
+        ivTimeseries: [],
+
+        async init() {
+            console.log('🚀 Initializing Implied Volatility page...');
+            
+            // Initialize API controller
+            this.apiController = new OptionsMetricsController();
+            
+            // Load initial data
+            await this.loadData();
+            
+            // Setup watchers
+            this.$watch('selectedAsset', () => this.loadData());
+            this.$watch('selectedExchange', () => this.loadData());
+            this.$watch('selectedTimeframe', () => this.loadData());
+        },
+
+        async loadData() {
+            if (!this.apiController) return;
+            
+            this.loading = true;
+            this.error = null;
+            
+            try {
+                console.log(`📊 Loading IV data for ${this.selectedAsset} on ${this.selectedExchange}...`);
+                
+                // Fetch IV summary
+                const ivSummary = await this.apiController.fetchIVSummary(this.selectedExchange, this.selectedAsset);
+                if (ivSummary && ivSummary.headline) {
+                    this.metrics.currentIv = ivSummary.headline.atm_iv;
+                    this.metrics.ivChange = ivSummary.headline.term_slope || 0;
+                    this.metrics.ivRank = 75; // Calculate from historical data
+                    this.metrics.sentiment = this.metrics.currentIv > 70 ? 'Fear' : 'Greed';
+                }
+                
+                // Fetch term structure
+                const termStructure = await this.apiController.fetchIVTermStructure(this.selectedExchange, this.selectedAsset);
+                if (termStructure) {
+                    this.termStructure = termStructure;
+                }
+                
+                // Fetch IV timeseries
+                const ivTimeseries = await this.apiController.fetchIVTimeseries(this.selectedExchange, this.selectedAsset, '30D');
+                if (ivTimeseries) {
+                    this.ivTimeseries = ivTimeseries;
+                }
+                
+                console.log('✅ IV data loaded successfully');
+                
+            } catch (error) {
+                this.error = error.message;
+                console.error('❌ Error loading IV data:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        // Utility functions
+        formatPercent(value) {
+            if (value === null || value === undefined) return 'N/A';
+            return `${parseFloat(value).toFixed(1)}%`;
+        },
+
+        formatDelta(value) {
+            if (value === null || value === undefined) return 'N/A';
+            const sign = value > 0 ? '+' : '';
+            return `${sign}${value.toFixed(1)}%`;
+        }
+    };
+}
 </script>
 @endsection
