@@ -137,27 +137,21 @@ function spreadInsightsPanel(initialSymbol = 'BTC', initialExchange = 'Binance')
         loading: false,
 
         // Analytics data
-        marketStructure: 'Contango',
-        structureDescription: 'Perp > Quarterly',
-        structureInterpretation: 'Normal contango structure. Market expects higher prices in future.',
-        trendDirection: '↗️ Widening',
-        trendChange: 2.1,
-        trendInterpretation: 'Spread is expanding. Divergence between contracts increasing.',
-        arbitrageScore: 25,
-        arbitrageMessage: 'Small arbitrage window. May not cover fees.',
-        avgSpread: 12.3,
-        minSpread: -5.2,
-        maxSpread: 28.7,
-        volatility: 8.1,
-        perpSymbol: 'BTCUSDT_PERP',
-        quarterlySymbol: 'BTCUSDT_241227',
-        insights: [
-            {
-                type: 'contango',
-                severity: 'low',
-                message: 'Normal contango structure. Market expects gradual price appreciation.'
-            }
-        ],
+        marketStructure: null,
+        structureDescription: null,
+        structureInterpretation: null,
+        trendDirection: null,
+        trendChange: null,
+        trendInterpretation: null,
+        arbitrageScore: 0,
+        arbitrageMessage: null,
+        avgSpread: null,
+        minSpread: null,
+        maxSpread: null,
+        volatility: null,
+        perpSymbol: null,
+        quarterlySymbol: null,
+        insights: [],
 
         init() {
             console.log('🔍 Insights panel initialized');
@@ -259,36 +253,22 @@ function spreadInsightsPanel(initialSymbol = 'BTC', initialExchange = 'Binance')
                 console.log('✅ Insights loaded');
             } catch (error) {
                 console.error('❌ Error loading insights:', error);
-                // Use fallback data to prevent Alpine.js errors
-                this.avgSpread = 12.3;
-                this.currentSpread = 15.5;
-                this.marketStructure = 'Contango';
-                this.structureDescription = 'Perp > Quarterly';
-                this.structureInterpretation = 'Normal contango structure. Market expects higher prices in future.';
-                this.trendDirection = '↗️ Widening';
-                this.trendChange = 2.1;
-                this.trendInterpretation = 'Spread is expanding. Divergence between contracts increasing.';
-                this.arbitrageScore = 25;
-                this.arbitrageMessage = 'Small arbitrage window. May not cover fees.';
-                this.minSpread = -5.2;
-                this.maxSpread = 28.7;
-                this.volatility = 8.1;
-                this.perpSymbol = 'BTCUSDT_PERP';
-                this.quarterlySymbol = 'BTCUSDT_241227';
-                this.insights = [
-                    {
-                        type: 'contango',
-                        severity: 'low',
-                        message: 'Normal contango structure. Market expects gradual price appreciation.'
-                    }
-                ];
-                console.log('🔍 Applied fallback data');
-                console.log('🔍 Fallback values:', {
-                    avgSpread: this.avgSpread,
-                    marketStructure: this.marketStructure,
-                    trendDirection: this.trendDirection,
-                    arbitrageScore: this.arbitrageScore
-                });
+                // Reset to null values - no dummy data
+                this.avgSpread = null;
+                this.marketStructure = null;
+                this.structureDescription = null;
+                this.structureInterpretation = null;
+                this.trendDirection = null;
+                this.trendChange = null;
+                this.trendInterpretation = null;
+                this.arbitrageScore = 0;
+                this.arbitrageMessage = null;
+                this.minSpread = null;
+                this.maxSpread = null;
+                this.volatility = null;
+                this.perpSymbol = null;
+                this.quarterlySymbol = null;
+                this.insights = [];
             } finally {
                 this.loading = false;
             }
@@ -384,13 +364,7 @@ function spreadInsightsPanel(initialSymbol = 'BTC', initialExchange = 'Binance')
 
             // Process insights from API
             console.log('🔍 Processing insights:', data.insights);
-            this.insights = Array.isArray(data.insights) ? data.insights : [
-                {
-                    type: 'contango',
-                    severity: 'low',
-                    message: 'Normal contango structure. Market expects gradual price appreciation.'
-                }
-            ];
+            this.insights = Array.isArray(data.insights) ? data.insights : [];
             console.log('🔍 Final insights:', this.insights);
         },
 

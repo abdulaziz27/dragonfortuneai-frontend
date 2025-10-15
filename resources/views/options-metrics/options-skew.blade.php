@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid">
+<div class="container-fluid" x-data="optionsSkewController()">
     <!-- Header Section -->
     <div class="row mb-4">
         <div class="col-12">
@@ -11,18 +11,26 @@
                     <p class="text-muted mb-0">Protection bias analysis - call/put preference</p>
                 </div>
                 <div class="d-flex gap-2">
-                    <select class="form-select form-select-sm" style="width: auto;">
+                    <select class="form-select form-select-sm" style="width: auto;" x-model="selectedAsset">
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
+                    </select>
+                    <select class="form-select form-select-sm" style="width: auto;" x-model="selectedExchange">
+                        <option value="Deribit">Deribit</option>
+                        <option value="OKX">OKX</option>
+                    </select>
+                    <select class="form-select form-select-sm" style="width: auto;" x-model="selectedTimeframe">
                         <option value="24h">24 Hours</option>
                         <option value="7d" selected>7 Days</option>
                         <option value="30d">30 Days</option>
                         <option value="90d">90 Days</option>
                     </select>
-                    <button class="btn btn-outline-secondary btn-sm">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="btn btn-outline-secondary btn-sm" @click="loadData()" :disabled="loading">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
                             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                             <path d="M3 3v5h5"/>
                         </svg>
-                        Refresh
+                        <span x-text="loading ? 'Loading...' : 'Refresh'"></span>
                     </button>
                 </div>
             </div>
@@ -45,7 +53,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">25d Risk Reversal</h6>
-                            <h4 class="mb-0 text-success">-0.15</h4>
+                            <h4 class="mb-0 text-success" x-text="formatDelta(metrics.rr25)">Loading...</h4>
                             <small class="text-muted">Put skew</small>
                         </div>
                     </div>
@@ -66,7 +74,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">Put Skew</h6>
-                            <h4 class="mb-0 text-info">0.85</h4>
+                            <h4 class="mb-0 text-info" x-text="formatPercent(metrics.putSkew)">Loading...</h4>
                             <small class="text-muted">25d Put IV</small>
                         </div>
                     </div>
@@ -87,7 +95,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">Call Skew</h6>
-                            <h4 class="mb-0 text-warning">0.70</h4>
+                            <h4 class="mb-0 text-warning" x-text="formatPercent(metrics.callSkew)">Loading...</h4>
                             <small class="text-muted">25d Call IV</small>
                         </div>
                     </div>
@@ -108,7 +116,7 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             <h6 class="card-title mb-1">Skew Level</h6>
-                            <h4 class="mb-0 text-primary">High</h4>
+                            <h4 class="mb-0 text-primary" x-text="metrics.skewLevel">Loading...</h4>
                             <small class="text-muted">Protection demand</small>
                         </div>
                     </div>
@@ -530,9 +538,98 @@
     </div>
 </div>
 
+<script src="/js/options-metrics-controller.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Options Skew chart initialized');
-});
+function optionsSkewController() {
+    return {
+        // API Controller instance
+        apiController: null,
+        
+        // UI State
+        selectedAsset: 'BTC',
+        selectedExchange: 'Deribit',
+        selectedTimeframe: '7d',
+        loading: false,
+        error: null,
+
+        // Data from API
+        metrics: {
+            rr25: null,
+            putSkew: null,
+            callSkew: null,
+            skewLevel: 'Loading...'
+        },
+        
+        skewHistory: [],
+        skewRegime: null,
+
+        async init() {
+            console.log('🚀 Initializing Options Skew page...');
+            
+            // Initialize API controller
+            this.apiController = new OptionsMetricsController();
+            
+            // Load initial data
+            await this.loadData();
+            
+            // Setup watchers
+            this.$watch('selectedAsset', () => this.loadData());
+            this.$watch('selectedExchange', () => this.loadData());
+            this.$watch('selectedTimeframe', () => this.loadData());
+        },
+
+        async loadData() {
+            if (!this.apiController) return;
+            
+            this.loading = true;
+            this.error = null;
+            
+            try {
+                console.log(`📊 Loading skew data for ${this.selectedAsset} on ${this.selectedExchange}...`);
+                
+                // Fetch skew summary
+                const skewSummary = await this.apiController.fetchSkewSummary(this.selectedExchange, this.selectedAsset);
+                if (skewSummary && skewSummary.length > 0) {
+                    const latest = skewSummary[0];
+                    this.metrics.rr25 = latest.rr25?.avg || 0;
+                    this.metrics.putSkew = latest.put_iv?.avg || 0;
+                    this.metrics.callSkew = latest.call_iv?.avg || 0;
+                    this.metrics.skewLevel = Math.abs(this.metrics.rr25) > 0.1 ? 'High' : 'Low';
+                }
+                
+                // Fetch skew history
+                const skewHistory = await this.apiController.fetchSkewHistory(this.selectedExchange, this.selectedAsset, '30D');
+                if (skewHistory) {
+                    this.skewHistory = skewHistory;
+                }
+                
+                // Fetch skew regime
+                const skewRegime = await this.apiController.fetchSkewRegime(this.selectedExchange, this.selectedAsset);
+                if (skewRegime) {
+                    this.skewRegime = skewRegime;
+                }
+                
+                console.log('✅ Skew data loaded successfully');
+                
+            } catch (error) {
+                this.error = error.message;
+                console.error('❌ Error loading skew data:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        // Utility functions
+        formatPercent(value) {
+            if (value === null || value === undefined) return 'N/A';
+            return `${parseFloat(value).toFixed(2)}`;
+        },
+
+        formatDelta(value) {
+            if (value === null || value === undefined) return 'N/A';
+            return `${value.toFixed(2)}`;
+        }
+    };
+}
 </script>
 @endsection
