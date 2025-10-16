@@ -5,11 +5,11 @@
     Props:
     - $symbol: string (default: 'BTC')
     - $exchange: string (default: 'Binance')
-    - $limit: int (default: 20)
+    - $limit: int (default: 50)
 --}}
 
 <div class="df-panel p-3"
-     x-data="spreadDataTable('{{ $symbol ?? 'BTC' }}', '{{ $exchange ?? 'Binance' }}', {{ $limit ?? 20 }})">
+     x-data="spreadDataTable('{{ $symbol ?? 'BTC' }}', '{{ $exchange ?? 'Binance' }}', {{ $limit ?? 50 }})">
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
@@ -87,7 +87,7 @@
 </div>
 
 <script>
-function spreadDataTable(initialSymbol = 'BTC', initialExchange = 'Binance', displayLimit = 20) {
+function spreadDataTable(initialSymbol = 'BTC', initialExchange = 'Binance', displayLimit = 50) {
     return {
         symbol: initialSymbol,
         quote: 'USDT',
@@ -195,18 +195,27 @@ function spreadDataTable(initialSymbol = 'BTC', initialExchange = 'Binance', dis
 
         updateTable(data) {
             this.totalPoints = data.length;
-            // Sort by timestamp desc and take limit
+            // Sort by timestamp descending (newest first)
             this.tableData = data
-                .sort((a, b) => b.ts - a.ts)
-                .slice(0, this.limit);
+                .sort((a, b) => {
+                    if (!a.ts) return 1;
+                    if (!b.ts) return -1;
+                    return new Date(b.ts) - new Date(a.ts);
+                })
+                .slice(0, this.displayLimit);
         },
 
         updateFromOverview(timeseries) {
             if (!Array.isArray(timeseries)) return;
             this.totalPoints = timeseries.length;
+            // Sort by timestamp descending (newest first)
             this.tableData = timeseries
-                .sort((a, b) => b.ts - a.ts)
-                .slice(0, this.limit);
+                .sort((a, b) => {
+                    if (!a.ts) return 1;
+                    if (!b.ts) return -1;
+                    return new Date(b.ts) - new Date(a.ts);
+                })
+                .slice(0, this.displayLimit);
         },
 
         refresh() {
@@ -221,6 +230,7 @@ function spreadDataTable(initialSymbol = 'BTC', initialExchange = 'Binance', dis
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit',
+                second: '2-digit',
                 hour12: false
             });
         },

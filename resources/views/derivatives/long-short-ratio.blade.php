@@ -636,8 +636,17 @@
                             // Timeseries data
                             timeseries: timeseries,
                             exchangeData: exchangeData,
-                            topAccounts: (topAccounts && topAccounts.data) ? topAccounts.data : [],
-                            topPositions: (topPositions && topPositions.data) ? topPositions.data : [],
+                            // Sort by timestamp descending (newest first)
+                            topAccounts: ((topAccounts && topAccounts.data) ? topAccounts.data : []).sort((a, b) => {
+                                if (!a.ts) return 1;
+                                if (!b.ts) return -1;
+                                return new Date(b.ts) - new Date(a.ts);
+                            }),
+                            topPositions: ((topPositions && topPositions.data) ? topPositions.data : []).sort((a, b) => {
+                                if (!a.ts) return 1;
+                                if (!b.ts) return -1;
+                                return new Date(b.ts) - new Date(a.ts);
+                            }),
                         };
 
                         // Broadcast overview ready event

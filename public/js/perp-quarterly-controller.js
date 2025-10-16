@@ -363,7 +363,13 @@ function perpQuarterlySpreadController() {
                         spread_abs: parseFloat(r.spread_abs),
                         spread_bps: parseFloat(r.spread_bps),
                     }))
-                    .filter((r) => !Number.isNaN(r.spread_abs));
+                    .filter((r) => !Number.isNaN(r.spread_abs))
+                    // Sort by timestamp descending (newest first)
+                    .sort((a, b) => {
+                        if (!a.ts) return 1;
+                        if (!b.ts) return -1;
+                        return new Date(b.ts) - new Date(a.ts);
+                    });
 
                 this.overview = {
                     meta: {

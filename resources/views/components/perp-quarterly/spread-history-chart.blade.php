@@ -35,20 +35,20 @@
         </div>
         
         <!-- Data Table -->
-        <div x-show="!loading && chartData.length > 0" class="table-responsive">
-            <table class="table table-sm table-hover">
-                <thead>
+        <div x-show="!loading && chartData.length > 0" class="table-responsive" style="max-height: 800px; overflow-y: auto;">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="sticky-top bg-white">
                     <tr>
-                        <th>Time</th>
-                        <th>Exchange</th>
-                        <th>Perp Symbol</th>
-                        <th>Quarterly Symbol</th>
-                        <th>Spread (BPS)</th>
-                        <th>Spread (Abs)</th>
+                        <th class="text-secondary small">Time</th>
+                        <th class="text-secondary small">Exchange</th>
+                        <th class="text-secondary small">Perp Symbol</th>
+                        <th class="text-secondary small">Quarterly Symbol</th>
+                        <th class="text-secondary small text-end">Spread (BPS)</th>
+                        <th class="text-secondary small text-end">Spread (Abs)</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <template x-for="(row, idx) in chartData.slice(0, 20)" :key="idx">
+                    <template x-for="(row, idx) in chartData.slice(0, displayLimit)" :key="idx">
                         <tr>
                             <td class="small" x-text="formatTime(row.ts)">--</td>
                             <td class="small" x-text="row.exchange">--</td>
@@ -75,8 +75,8 @@
             <span class="badge bg-success bg-opacity-10 text-success">Contango (Perp > Quarterly)</span>
             <span class="badge bg-danger bg-opacity-10 text-danger ms-1">Backwardation (Quarterly > Perp)</span>
         </div>
-        <div x-show="dataPoints > 0">
-            <span x-text="dataPoints + ' data points'">-- data points</span>
+        <div x-show="chartData.length > 0">
+            Showing <span class="fw-semibold" x-text="Math.min(chartData.length, displayLimit)">0</span> of <span x-text="dataPoints">0</span> data points
         </div>
     </div>
 </div>
@@ -89,7 +89,8 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
         exchange: initialExchange,
         interval: '5m',
         perpSymbol: '', // Auto-generated if empty
-        limit: '2000', // Data limit
+        limit: '2000', // Data limit for API
+        displayLimit: 50, // Display limit for table
         loading: false,
         chart: null,
         chartId: 'spreadHistoryChart_' + Math.random().toString(36).substr(2, 9),
@@ -415,8 +416,15 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
 
                 const data = await response.json();
                 console.log('📡 Raw History API response:', data);
-                const chartData = data.data || [];
-                console.log('📡 Chart data length:', chartData.length);
+                const rawData = data.data || [];
+                console.log('📡 Chart data length:', rawData.length);
+                
+                // Sort by timestamp descending (newest first)
+                const chartData = rawData.sort((a, b) => {
+                    if (!a.ts) return 1;
+                    if (!b.ts) return -1;
+                    return new Date(b.ts) - new Date(a.ts);
+                });
                 
                 this.chartData = chartData;
                 this.dataPoints = chartData.length;
@@ -664,10 +672,13 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
         formatTime(timestamp) {
             if (!timestamp) return '--';
             const date = new Date(timestamp);
-            return date.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
                 minute: '2-digit',
-                second: '2-digit'
+                second: '2-digit',
+                hour12: false
             });
         },
 

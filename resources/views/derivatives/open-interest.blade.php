@@ -678,7 +678,13 @@
 
                         const response = await fetch(url);
                         const data = await response.json();
-                        this.exchangeData = data.data || [];
+                        
+                        // Sort by timestamp descending (newest first)
+                        this.exchangeData = (data.data || []).sort((a, b) => {
+                            if (!a.ts) return 1;  // Move items without ts to end
+                            if (!b.ts) return -1;
+                            return new Date(b.ts) - new Date(a.ts);
+                        });
                     } catch (error) {
                         console.error('❌ Error loading exchange data:', error);
                         this.exchangeData = [];
@@ -759,7 +765,13 @@
 
                         const response = await fetch(url);
                         const data = await response.json();
-                        this.historyData = data.data || [];
+                        
+                        // Sort by timestamp descending (newest first)
+                        this.historyData = (data.data || []).sort((a, b) => {
+                            if (!a.ts) return 1;  // Move items without ts to end
+                            if (!b.ts) return -1;
+                            return new Date(b.ts) - new Date(a.ts);
+                        });
                     } catch (error) {
                         console.error('Error loading history data:', error);
                         this.historyData = [];
