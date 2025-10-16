@@ -28,17 +28,57 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <select class="form-select" style="width: 140px;" x-model="selectedPeriod" @change="updatePeriod()">
+                    <!-- Period Filter -->
+                    <select class="form-select" style="width: 140px;" 
+                            x-model="selectedPeriod" 
+                            @change="handlePeriodChange()">
                         <option value="30">Last 30 Days</option>
                         <option value="60">Last 60 Days</option>
                         <option value="90">Last 90 Days</option>
                         <option value="180">Last 180 Days</option>
                     </select>
 
+                    <!-- Issuer Filter (Global) -->
+                    <select class="form-select" style="width: 150px;"
+                            x-model="selectedIssuer" 
+                            @change="handleIssuerChange()">
+                        <option value="all">All Issuers</option>
+                        <template x-for="issuer in issuerOptions.slice(1)" :key="issuer">
+                            <option :value="issuer" x-text="issuer"></option>
+                        </template>
+                    </select>
+
+                    <!-- Ticker Filter (Global) -->
+                    <select class="form-select" style="width: 150px;"
+                            x-model="selectedTicker" 
+                            @change="handleTickerChange()">
+                        <option value="all">All Tickers</option>
+                        <template x-for="ticker in tickerOptions.slice(1)" :key="ticker">
+                            <option :value="ticker" x-text="ticker"></option>
+                        </template>
+                    </select>
+
+                    <!-- Manual Refresh -->
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
-                        <span x-show="!loading">Refresh All</span>
+                        <i class="bi bi-arrow-clockwise"></i>
+                        <span x-show="!loading">Refresh</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Auto-Refresh Toggle -->
+                    <button class="btn" 
+                            :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'"
+                            @click="toggleAutoRefresh()"
+                            title="Toggle auto-refresh (5 seconds)">
+                        <i class="bi" :class="autoRefreshEnabled ? 'bi-arrow-repeat' : 'bi-pause'"></i>
+                        <span x-text="autoRefreshEnabled ? 'Auto (5s)' : 'Paused'"></span>
+                    </button>
+
+                    <!-- Last Updated -->
+                    <span class="text-secondary small" x-show="lastUpdated" x-cloak>
+                        <i class="bi bi-clock"></i>
+                        Last updated: <span x-text="lastUpdated"></span>
+                    </span>
                 </div>
             </div>
         </div>
@@ -202,7 +242,20 @@
                         <small class="text-secondary">Arus ETF harian dari institusi utama</small>
                     </div>
 
-                    <div class="table-responsive" style="height: 300px; overflow-y: auto;">
+                    <!-- Loading State -->
+                    <div x-show="loadingStates.flows" class="text-center py-4" x-cloak>
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+
+                    <!-- Error State -->
+                    <div x-show="errors.flows" class="alert alert-danger" role="alert" x-cloak>
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <span x-text="errors.flows"></span>
+                    </div>
+
+                    <div class="table-responsive" style="height: 300px; overflow-y: auto;" x-show="!loadingStates.flows && !errors.flows">
                         <table class="table table-sm table-hover mb-0">
                             <thead>
                                 <tr>
@@ -268,7 +321,21 @@
                         <h5 class="mb-0">Premium vs NAV (Basis Points)</h5>
                         <small class="text-secondary">ETF diperdagangkan di atas NAV mengindikasikan potensi overbought</small>
                     </div>
-                    <div class="flex-grow-1" style="height: 300px; max-height: 300px;">
+
+                    <!-- Loading State -->
+                    <div x-show="loadingStates.premium" class="text-center py-4" x-cloak>
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+
+                    <!-- Error State -->
+                    <div x-show="errors.premium" class="alert alert-danger" role="alert" x-cloak>
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <span x-text="errors.premium"></span>
+                    </div>
+
+                    <div class="flex-grow-1" style="height: 300px; max-height: 300px;" x-show="!loadingStates.premium && !errors.premium">
                         <canvas id="premiumDiscountChart"></canvas>
                     </div>
                     <div class="mt-3">
@@ -290,7 +357,20 @@
                         <small class="text-secondary">Aktivitas creation/redemption mingguan</small>
                     </div>
 
-                    <div class="flex-grow-1" style="height: 280px; overflow-y: auto; padding-right: 5px;">
+                    <!-- Loading State -->
+                    <div x-show="loadingStates.creations" class="text-center py-4" x-cloak>
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+
+                    <!-- Error State -->
+                    <div x-show="errors.creations" class="alert alert-danger" role="alert" x-cloak>
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <span x-text="errors.creations"></span>
+                    </div>
+
+                    <div class="flex-grow-1" style="height: 280px; overflow-y: auto; padding-right: 5px;" x-show="!loadingStates.creations && !errors.creations">
                         <template x-for="item in creationsRedemptions" :key="item.id">
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -528,7 +608,9 @@
 @section('scripts')
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="{{ asset('js/etf-institutional-controller.js') }}"></script>
+    <!-- ETF Data Service - MUST load before controller -->
+    <script src="{{ asset('js/etf/etf-data-service.js') }}" defer></script>
+    <script src="{{ asset('js/etf-institutional-controller.js') }}" defer></script>
 
     <style>
         .pulse-success {

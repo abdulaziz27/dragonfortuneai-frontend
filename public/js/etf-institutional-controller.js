@@ -22,11 +22,17 @@
 
 function etfInstitutionalController() {
     return {
+        // Dependencies (NEW - for modular architecture)
+        dataService: null,  // Instance of ETFDataService
+
         // Global state
         selectedAsset: "BTC", // Fixed to BTC since ETF data is Bitcoin-specific
         selectedPeriod: "30", // Time period filter (days)
+        selectedIssuer: "all", // NEW - Issuer filter (all, BlackRock, Grayscale, etc.)
+        selectedTicker: "all", // NEW - Ticker filter (all, IBIT, GBTC, etc.)
         loading: false,
         lastUpdated: null,
+        autoRefreshEnabled: true, // NEW - Auto-refresh toggle state
 
         // Data state
         etfFlows: [],
@@ -59,12 +65,35 @@ function etfInstitutionalController() {
         cmeOiChart: null,
         cotComparisonChart: null,
 
+        // Filter options (NEW - populated from data)
+        issuerOptions: ['all'],
+        tickerOptions: ['all'],
+
+        // Loading states per section (NEW)
+        loadingStates: {
+            flows: false,
+            premium: false,
+            creations: false,
+            cme: false,
+            cot: false
+        },
+
         // Error state
-        errors: {},
+        errors: {
+            flows: null,
+            premium: null,
+            creations: null,
+            cme: null,
+            cot: null
+        },
 
         // Auto-refresh timer
         autoRefreshTimer: null,
-        autoRefreshInterval: 300000, // 5 minutes
+        autoRefreshInterval: 5000, // NEW - Changed to 5 seconds (was 5 minutes)
+        
+        // Debounce timer for filter changes (NEW - prevent rapid filter changes)
+        filterDebounceTimer: null,
+        filterDebounceDelay: 300, // 300ms debounce
 
         // API endpoints
         API_ENDPOINTS: {
@@ -79,12 +108,17 @@ function etfInstitutionalController() {
 
         // Initialize dashboard
         init() {
+            // Initialize data service (NEW)
+            this.dataService = new ETFDataService();
+            console.log("✅ ETF Data Service initialized");
+
             // Initialize from URL parameters
             this.initFromURL();
 
             console.log("🚀 ETF & Institutional Dashboard initialized");
             console.log("📊 Asset:", this.selectedAsset);
             console.log("📅 Period:", this.selectedPeriod, "days");
+            console.log("🔄 Auto-refresh:", this.autoRefreshEnabled ? "enabled" : "disabled");
 
             // Setup event listeners
             this.setupEventListeners();
@@ -172,6 +206,132 @@ function etfInstitutionalController() {
             // ETF data is Bitcoin-specific, so no need to reload
         },
 
+        // NEW: Handle period filter change with debouncing
+        handlePeriodChange() {
+            console.log("🔄 Period filter changed to:", this.selectedPeriod, "days");
+
+            // Clear any pending filter changes
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+
+            // Clear cache to force fresh data
+            if (this.dataService) {
+                this.dataService.clearCache();
+            }
+
+            // Update URL
+            this.updateURL();
+
+            // Debounce the data reload
+            this.filterDebounceTimer = setTimeout(() => {
+                this.loadAllData().catch((e) => {
+                    console.warn("Period change data reload failed:", e);
+                });
+            }, this.filterDebounceDelay);
+        },
+
+        // NEW: Handle issuer filter change with debouncing
+        handleIssuerChange() {
+            console.log("🔄 Issuer filter changed to:", this.selectedIssuer);
+
+            // Clear any pending filter changes
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+
+            // Clear cache to force fresh data
+            if (this.dataService) {
+                this.dataService.clearCache();
+            }
+
+            // Debounce the data reload
+            this.filterDebounceTimer = setTimeout(() => {
+                this.loadAllData().catch((e) => {
+                    console.warn("Issuer change data reload failed:", e);
+                });
+            }, this.filterDebounceDelay);
+        },
+
+        // NEW: Handle ticker filter change with debouncing
+        handleTickerChange() {
+            console.log("🔄 Ticker filter changed to:", this.selectedTicker);
+
+            // Clear any pending filter changes
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+
+            // Clear cache to force fresh data
+            if (this.dataService) {
+                this.dataService.clearCache();
+            }
+
+            // Debounce the data reload
+            this.filterDebounceTimer = setTimeout(() => {
+                this.loadAllData().catch((e) => {
+                    console.warn("Ticker change data reload failed:", e);
+                });
+            }, this.filterDebounceDelay);
+        },
+
+        // NEW: Get filter parameters for API calls
+        getFilterParams() {
+            // Calculate date range from period
+            const dateRange = this.dataService ?
+                this.dataService.calculateDateRange(parseInt(this.selectedPeriod)) :
+                { start_date: null, end_date: null, limit: parseInt(this.selectedPeriod) };
+
+            // Build params object (omit 'all' values)
+            const params = {
+                ...dateRange,
+                issuer: this.selectedIssuer !== 'all' ? this.selectedIssuer : undefined,
+                ticker: this.selectedTicker !== 'all' ? this.selectedTicker : undefined
+            };
+
+            // Remove undefined values
+            Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
+
+            return params;
+        },
+
+        // NEW: Populate filter options from data
+        populateFilterOptions() {
+            if (!this.etfFlows || this.etfFlows.length === 0) {
+                return;
+            }
+
+            // Extract unique issuers
+            const issuers = new Set();
+            const tickers = new Set();
+
+            this.etfFlows.forEach(flow => {
+                if (flow.issuer) issuers.add(flow.issuer);
+                if (flow.ticker) tickers.add(flow.ticker);
+            });
+
+            // Update options (keep 'all' as first option)
+            this.issuerOptions = ['all', ...Array.from(issuers).sort()];
+            this.tickerOptions = ['all', ...Array.from(tickers).sort()];
+
+            // Validate current selections - reset to 'all' if selected value no longer exists
+            if (this.selectedIssuer !== 'all' && !this.issuerOptions.includes(this.selectedIssuer)) {
+                console.warn(`⚠️ Selected issuer '${this.selectedIssuer}' not in data, resetting to 'all'`);
+                this.selectedIssuer = 'all';
+            }
+            if (this.selectedTicker !== 'all' && !this.tickerOptions.includes(this.selectedTicker)) {
+                console.warn(`⚠️ Selected ticker '${this.selectedTicker}' not in data, resetting to 'all'`);
+                this.selectedTicker = 'all';
+            }
+
+            console.log("✅ Filter options populated:", {
+                issuers: this.issuerOptions.length - 1,
+                tickers: this.tickerOptions.length - 1,
+                selectedIssuer: this.selectedIssuer,
+                selectedTicker: this.selectedTicker
+            });
+        },
+
         // Load all ETF data in parallel
         async loadAllData() {
             // Prevent multiple simultaneous loads
@@ -218,7 +378,16 @@ function etfInstitutionalController() {
                 // Render charts with data
                 this.renderCharts();
 
-                this.lastUpdated = Date.now();
+                // Populate filter options from loaded data (NEW)
+                this.populateFilterOptions();
+
+                // Format last updated timestamp
+                this.lastUpdated = new Date().toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                });
                 console.log("✅ All ETF data loaded successfully");
 
             } catch (error) {
@@ -229,36 +398,87 @@ function etfInstitutionalController() {
             }
         },
 
-        // Fetch ETF flows data
+        // Fetch ETF flows data (UPDATED to use filters)
         async fetchETFFlows() {
-            return this.fetchAPI(this.API_ENDPOINTS.spotFlows, {
+            // Calculate actual limit: days * issuers (4) to get correct number of days
+            // API returns records per issuer, so 30 days = 30 * 4 = 120 records
+            const daysRequested = parseInt(this.selectedPeriod);
+            const issuersCount = 4; // BlackRock, Grayscale, Fidelity, ARK Invest
+            
+            const params = {
                 symbol: this.selectedAsset,
-                limit: parseInt(this.selectedPeriod) // Use selected period
-            });
+                limit: daysRequested * issuersCount
+            };
+
+            // Add filters if not 'all'
+            if (this.selectedIssuer && this.selectedIssuer !== 'all') {
+                params.issuer = this.selectedIssuer;
+            }
+            if (this.selectedTicker && this.selectedTicker !== 'all') {
+                params.ticker = this.selectedTicker;
+            }
+
+            return this.fetchAPI(this.API_ENDPOINTS.spotFlows, params);
         },
 
-        // Fetch ETF summary data
+        // Fetch ETF summary data (UPDATED to use filters + period)
         async fetchETFSummary() {
-            return this.fetchAPI(this.API_ENDPOINTS.spotSummary, {
+            const daysRequested = parseInt(this.selectedPeriod);
+            const issuersCount = 4;
+            
+            const params = {
                 symbol: this.selectedAsset,
-                limit: 180
-            });
+                limit: daysRequested * issuersCount
+            };
+
+            // Add filters if not 'all'
+            if (this.selectedIssuer && this.selectedIssuer !== 'all') {
+                params.issuer = this.selectedIssuer;
+            }
+            if (this.selectedTicker && this.selectedTicker !== 'all') {
+                params.ticker = this.selectedTicker;
+            }
+
+            return this.fetchAPI(this.API_ENDPOINTS.spotSummary, params);
         },
 
-        // Fetch premium/discount data
+        // Fetch premium/discount data (UPDATED to use ticker filter only)
         async fetchPremiumDiscount() {
-            return this.fetchAPI(this.API_ENDPOINTS.premiumDiscount, {
+            const daysRequested = parseInt(this.selectedPeriod);
+            const issuersCount = 4;
+            
+            const params = {
                 symbol: this.selectedAsset,
-                limit: parseInt(this.selectedPeriod) // Use selected period
-            });
+                limit: daysRequested * issuersCount
+            };
+
+            // Premium/discount only supports ticker filter
+            if (this.selectedTicker && this.selectedTicker !== 'all') {
+                params.ticker = this.selectedTicker;
+            }
+
+            return this.fetchAPI(this.API_ENDPOINTS.premiumDiscount, params);
         },
 
-        // Fetch creations/redemptions data
+        // Fetch creations/redemptions data (UPDATED to use filters + period)
         async fetchCreationsRedemptions() {
-            return this.fetchAPI(this.API_ENDPOINTS.creationsRedemptions, {
+            const daysRequested = parseInt(this.selectedPeriod);
+            const issuersCount = 4;
+            
+            const params = {
                 symbol: this.selectedAsset,
-                limit: 10 // Recent activity
-            });
+                limit: daysRequested * issuersCount
+            };
+
+            // Add filters if not 'all'
+            if (this.selectedIssuer && this.selectedIssuer !== 'all') {
+                params.issuer = this.selectedIssuer;
+            }
+            if (this.selectedTicker && this.selectedTicker !== 'all') {
+                params.ticker = this.selectedTicker;
+            }
+
+            return this.fetchAPI(this.API_ENDPOINTS.creationsRedemptions, params);
         },
 
         // Fetch CME open interest data
@@ -269,20 +489,161 @@ function etfInstitutionalController() {
             });
         },
 
-        // Fetch COT data
+        // Fetch COT data (FIXED: Use selected period)
         async fetchCOTData() {
             return this.fetchAPI(this.API_ENDPOINTS.cmeCOT, {
                 symbol: this.selectedAsset,
-                limit: 10 // Last 10 weeks
+                limit: parseInt(this.selectedPeriod) // FIXED: Use selected period instead of hardcoded 10
             });
         },
 
-        // Fetch CME summary data
+        // Fetch CME summary data (FIXED: Use selected period)
         async fetchCMESummary() {
             return this.fetchAPI(this.API_ENDPOINTS.cmeSummary, {
                 symbol: this.selectedAsset,
-                limit: 180
+                limit: parseInt(this.selectedPeriod) // FIXED: Use selected period instead of hardcoded 180
             });
+        },
+
+        // NEW: Load Flows Section with filters
+        async loadFlowsSection() {
+            this.loadingStates.flows = true;
+            this.errors.flows = null;
+
+            try {
+                const params = this.getFilterParams();
+                console.log("📊 Loading flows section with params:", params);
+
+                const response = await this.dataService.fetchSpotFlows(params);
+                this.processETFFlows(response);
+
+                // Update chart if exists
+                if (this.etfFlowChart) {
+                    this.renderETFFlowChart();
+                }
+
+                console.log("✅ Flows section loaded");
+            } catch (error) {
+                console.error("❌ Error loading flows section:", error);
+                this.errors.flows = "Failed to load ETF flows data";
+            } finally {
+                this.loadingStates.flows = false;
+            }
+        },
+
+        // NEW: Load Premium Section with filters
+        async loadPremiumSection() {
+            this.loadingStates.premium = true;
+            this.errors.premium = null;
+
+            try {
+                const params = this.getFilterParams();
+                // Premium endpoint only needs ticker, not issuer
+                delete params.issuer;
+
+                console.log("📊 Loading premium section with params:", params);
+
+                const response = await this.dataService.fetchPremiumDiscount(params);
+                this.processPremiumDiscount(response);
+
+                // Update chart if exists
+                if (this.premiumDiscountChart) {
+                    this.renderPremiumDiscountChart();
+                }
+
+                console.log("✅ Premium section loaded");
+            } catch (error) {
+                console.error("❌ Error loading premium section:", error);
+                this.errors.premium = "Failed to load premium/discount data";
+            } finally {
+                this.loadingStates.premium = false;
+            }
+        },
+
+        // NEW: Load Creations Section with filters
+        async loadCreationsSection() {
+            this.loadingStates.creations = true;
+            this.errors.creations = null;
+
+            try {
+                const params = this.getFilterParams();
+                console.log("📊 Loading creations section with params:", params);
+
+                const response = await this.dataService.fetchCreationsRedemptions(params);
+                this.processCreationsRedemptions(response);
+
+                console.log("✅ Creations section loaded");
+            } catch (error) {
+                console.error("❌ Error loading creations section:", error);
+                this.errors.creations = "Failed to load creations/redemptions data";
+            } finally {
+                this.loadingStates.creations = false;
+            }
+        },
+
+        // NEW: Load CME Section with filters
+        async loadCMESection() {
+            this.loadingStates.cme = true;
+            this.errors.cme = null;
+
+            try {
+                const params = this.getFilterParams();
+                // CME endpoint needs symbol, not issuer/ticker
+                delete params.issuer;
+                delete params.ticker;
+                params.symbol = 'BTC';
+
+                console.log("📊 Loading CME section with params:", params);
+
+                const response = await this.dataService.fetchCMEOI(params);
+                this.processCMEOpenInterest(response);
+
+                // Update chart if exists
+                if (this.cmeOiChart) {
+                    this.renderCMEOIChart();
+                }
+
+                console.log("✅ CME section loaded");
+            } catch (error) {
+                console.error("❌ Error loading CME section:", error);
+                this.errors.cme = "Failed to load CME open interest data";
+            } finally {
+                this.loadingStates.cme = false;
+            }
+        },
+
+        // NEW: Load COT Section with filters
+        async loadCOTSection() {
+            this.loadingStates.cot = true;
+            this.errors.cot = null;
+
+            try {
+                const params = this.getFilterParams();
+                // COT endpoint uses start_week/end_week instead of start_date/end_date
+                const cotParams = {
+                    symbol: 'BTC',
+                    start_week: params.start_date,
+                    end_week: params.end_date,
+                    limit: params.limit
+                };
+
+                console.log("📊 Loading COT section with params:", cotParams);
+
+                const response = await this.dataService.fetchCOT(cotParams);
+                this.processCOTData(response);
+
+                // Update chart if exists
+                if (this.cotComparisonChart) {
+                    this.renderCOTComparisonChart();
+                }
+
+                console.log("✅ COT section loaded");
+            } catch (error) {
+                console.error("❌ Error loading COT section:", error);
+                this.errors.cot = "Failed to load COT data";
+            } finally {
+                this.loadingStates.cot = false;
+            }
         },
 
         // Process ETF flows data
@@ -303,10 +664,10 @@ function etfInstitutionalController() {
                 if (this.etfFlows.length > 0) {
                     const latestDate = this.etfFlows[0].date;
                     const latestFlows = this.etfFlows.filter(f => f.date === latestDate);
-                    
+
                     // Sum all flows for the latest date and convert to millions
                     this.flowMeter.daily_flow = latestFlows.reduce((sum, flow) => sum + flow.flow_usd, 0) / 1000000;
-                    
+
                     console.log(`📊 Daily Flow Calculation:`, {
                         latestDate,
                         flowCount: latestFlows.length,
@@ -461,12 +822,38 @@ function etfInstitutionalController() {
             this.resetAutoRefreshTimer();
         },
 
-        // Setup auto-refresh timer
-        setupAutoRefresh() {
+        // NEW: Toggle auto-refresh on/off
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+
+            if (this.autoRefreshEnabled) {
+                console.log("✅ Auto-refresh enabled");
+                this.startAutoRefresh();
+            } else {
+                console.log("⏸️ Auto-refresh disabled");
+                this.stopAutoRefresh();
+            }
+        },
+
+        // NEW: Start auto-refresh
+        startAutoRefresh() {
+            // Clear any existing interval
+            this.stopAutoRefresh();
+
+            // Start new interval
             this.autoRefreshTimer = setInterval(() => {
-                if (!document.hidden) {
-                    console.log("🔄 Auto-refresh triggered");
-                    // Use setTimeout to prevent circular reference issues
+                if (this.autoRefreshEnabled && !document.hidden) {
+                    console.log("🔄 Auto-refresh triggered (5s interval)");
+
+                    // Update last updated timestamp
+                    this.lastUpdated = new Date().toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: true
+                    });
+
+                    // Reload data
                     setTimeout(() => {
                         this.loadAllData().catch((e) => {
                             console.warn("Auto-refresh failed:", e);
@@ -474,35 +861,51 @@ function etfInstitutionalController() {
                     }, 10);
                 }
             }, this.autoRefreshInterval);
+
+            console.log(`🔄 Auto-refresh started (${this.autoRefreshInterval / 1000}s interval)`);
+        },
+
+        // NEW: Stop auto-refresh
+        stopAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+                this.autoRefreshTimer = null;
+            }
+        },
+
+        // Setup auto-refresh timer (UPDATED to use new methods)
+        setupAutoRefresh() {
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            }
         },
 
         // Pause auto-refresh (when tab is hidden)
         pauseAutoRefresh() {
-            if (this.autoRefreshTimer) {
-                clearInterval(this.autoRefreshTimer);
-                this.autoRefreshTimer = null;
-                console.log("⏸️ Auto-refresh paused");
-            }
+            this.stopAutoRefresh();
+            console.log("⏸️ Auto-refresh paused (tab hidden)");
         },
 
         // Resume auto-refresh (when tab becomes visible)
         resumeAutoRefresh() {
-            if (!this.autoRefreshTimer) {
-                this.setupAutoRefresh();
+            if (this.autoRefreshEnabled && !this.autoRefreshTimer) {
+                this.startAutoRefresh();
                 // Immediately refresh data when tab becomes active
                 setTimeout(() => {
                     this.loadAllData().catch((e) => {
                         console.warn("Resume refresh failed:", e);
                     });
                 }, 10);
-                console.log("▶️ Auto-refresh resumed");
+                console.log("▶️ Auto-refresh resumed (tab visible)");
             }
         },
 
         // Reset auto-refresh timer
         resetAutoRefreshTimer() {
-            this.pauseAutoRefresh();
-            this.setupAutoRefresh();
+            if (this.autoRefreshEnabled) {
+                this.stopAutoRefresh();
+                this.startAutoRefresh();
+            }
         },
 
         // API Helper: Fetch with error handling
@@ -868,21 +1271,57 @@ function etfInstitutionalController() {
             }
         },
 
+        // Safely destroy all charts (NEW - prevent race conditions)
+        destroyAllCharts() {
+            const charts = [
+                { name: 'ETF Flow', instance: this.etfFlowChart, key: 'etfFlowChart' },
+                { name: 'Premium/Discount', instance: this.premiumDiscountChart, key: 'premiumDiscountChart' },
+                { name: 'CME OI', instance: this.cmeOiChart, key: 'cmeOiChart' },
+                { name: 'COT Comparison', instance: this.cotComparisonChart, key: 'cotComparisonChart' }
+            ];
+
+            charts.forEach(chart => {
+                if (chart.instance) {
+                    try {
+                        // Stop all animations first
+                        if (typeof chart.instance.stop === 'function') {
+                            chart.instance.stop();
+                        }
+                        // Destroy chart
+                        chart.instance.destroy();
+                        console.log(`🗑️ ${chart.name} chart destroyed`);
+                    } catch (e) {
+                        console.warn(`⚠️ Error destroying ${chart.name} chart:`, e);
+                    }
+                    // Clear reference
+                    this[chart.key] = null;
+                }
+            });
+        },
+
         // Render charts with data (data-driven pattern)
         renderCharts() {
             console.log("📊 Rendering ETF charts with data...");
 
-            // Render ETF flow chart
-            this.renderETFFlowChart();
+            // Destroy all existing charts first to prevent race conditions
+            this.destroyAllCharts();
 
-            // Render premium/discount chart
-            this.renderPremiumDiscountChart();
+            // Use requestAnimationFrame to ensure DOM is ready and animations are synced
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    // Render ETF flow chart
+                    this.renderETFFlowChart();
 
-            // Render CME open interest chart
-            this.renderCMEOpenInterestChart();
+                    // Render premium/discount chart
+                    this.renderPremiumDiscountChart();
 
-            // Render COT comparison chart
-            this.renderCOTComparisonChart();
+                    // Render CME open interest chart
+                    this.renderCMEOpenInterestChart();
+
+                    // Render COT comparison chart
+                    this.renderCOTComparisonChart();
+                });
+            });
         },
 
         // Render ETF flow chart with data (data-driven pattern)
@@ -893,9 +1332,15 @@ function etfInstitutionalController() {
                 return;
             }
 
-            // Destroy existing chart to prevent memory leaks
+            // Chart already destroyed by destroyAllCharts(), just verify
             if (this.etfFlowChart) {
-                this.etfFlowChart.destroy();
+                console.warn("⚠️ ETF flow chart still exists, forcing cleanup");
+                try {
+                    this.etfFlowChart.stop();
+                    this.etfFlowChart.destroy();
+                } catch (e) {
+                    console.warn("⚠️ Error in forced cleanup:", e);
+                }
                 this.etfFlowChart = null;
             }
 
@@ -922,6 +1367,9 @@ function etfInstitutionalController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0 // Disable animation to prevent race conditions
+                    },
                     layout: {
                         padding: {
                             top: 10,
@@ -986,6 +1434,7 @@ function etfInstitutionalController() {
                         },
                         y: {
                             display: true,
+                            beginAtZero: true,
                             title: {
                                 display: true,
                                 text: 'Flow (USD Millions)',
@@ -1036,9 +1485,15 @@ function etfInstitutionalController() {
                 return;
             }
 
-            // Destroy existing chart to prevent memory leaks
+            // Chart already destroyed by destroyAllCharts(), just verify
             if (this.premiumDiscountChart) {
-                this.premiumDiscountChart.destroy();
+                console.warn("⚠️ Premium/discount chart still exists, forcing cleanup");
+                try {
+                    this.premiumDiscountChart.stop();
+                    this.premiumDiscountChart.destroy();
+                } catch (e) {
+                    console.warn("⚠️ Error in forced cleanup:", e);
+                }
                 this.premiumDiscountChart = null;
             }
 
@@ -1066,6 +1521,9 @@ function etfInstitutionalController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0 // Disable animation to prevent race conditions
+                    },
                     layout: {
                         padding: {
                             top: 10,
@@ -1171,9 +1629,15 @@ function etfInstitutionalController() {
                 return;
             }
 
-            // Destroy existing chart to prevent memory leaks
+            // Chart already destroyed by destroyAllCharts(), just verify
             if (this.cmeOiChart) {
-                this.cmeOiChart.destroy();
+                console.warn("⚠️ CME OI chart still exists, forcing cleanup");
+                try {
+                    this.cmeOiChart.stop();
+                    this.cmeOiChart.destroy();
+                } catch (e) {
+                    console.warn("⚠️ Error in forced cleanup:", e);
+                }
                 this.cmeOiChart = null;
             }
 
@@ -1200,6 +1664,9 @@ function etfInstitutionalController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0 // Disable animation to prevent race conditions
+                    },
                     layout: {
                         padding: {
                             top: 10,
@@ -1285,9 +1752,15 @@ function etfInstitutionalController() {
                 return;
             }
 
-            // Destroy existing chart to prevent memory leaks
+            // Chart already destroyed by destroyAllCharts(), just verify
             if (this.cotComparisonChart) {
-                this.cotComparisonChart.destroy();
+                console.warn("⚠️ COT comparison chart still exists, forcing cleanup");
+                try {
+                    this.cotComparisonChart.stop();
+                    this.cotComparisonChart.destroy();
+                } catch (e) {
+                    console.warn("⚠️ Error in forced cleanup:", e);
+                }
                 this.cotComparisonChart = null;
             }
 
@@ -1314,6 +1787,9 @@ function etfInstitutionalController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0 // Disable animation to prevent race conditions
+                    },
                     layout: {
                         padding: {
                             top: 10,
@@ -2042,11 +2518,11 @@ function etfInstitutionalController() {
         // Format date to simple format (e.g., "Thu, 25 Sep 2025")
         formatSimpleDate(dateString) {
             if (!dateString) return "--";
-            
+
             try {
                 const date = new Date(dateString);
                 if (isNaN(date.getTime())) return "--";
-                
+
                 return date.toLocaleDateString('en-US', {
                     weekday: 'short',
                     day: 'numeric',
@@ -2090,14 +2566,14 @@ function etfInstitutionalController() {
         getFlowAngle() {
             const flow = this.flowMeter.daily_flow || 0;
             const maxFlow = 500; // ±500M range
-            
+
             // Clamp flow to the range
             const clampedFlow = Math.max(-maxFlow, Math.min(maxFlow, flow));
-            
+
             // Map -500M to +500M to 0° to 180° (semicircle)
             // -500M = 0°, 0M = 90°, +500M = 180°
             const angle = ((clampedFlow + maxFlow) / (2 * maxFlow)) * 180;
-            
+
             return angle;
         },
 
