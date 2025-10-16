@@ -71,10 +71,29 @@
                     </select>
 
                     <button class="btn btn-primary" @click="refreshAllData()" :disabled="globalLoading">
-                        <span x-show="!globalLoading">Refresh All</span>
+                        <span x-show="!globalLoading">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </span>
                         <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
                     </button>
+                    
+                    <!-- Auto-refresh toggle -->
+                    <button 
+                        class="btn" 
+                        :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'"
+                        @click="toggleAutoRefresh()"
+                        title="Toggle auto-refresh every 5 seconds">
+                        <i class="fas" :class="autoRefreshEnabled ? 'fa-pause' : 'fa-play'"></i>
+                        <span x-text="autoRefreshEnabled ? 'Auto (5s)' : 'Auto Off'"></span>
+                    </button>
                 </div>
+            </div>
+            
+            <!-- Last refresh indicator -->
+            <div x-show="lastRefreshTime" class="mt-2">
+                <small class="text-secondary">
+                    <i class="fas fa-clock"></i> Last updated: <span x-text="lastRefreshTime ? lastRefreshTime.toLocaleTimeString() : 'Never'"></span>
+                </small>
             </div>
         </div>
 
@@ -92,7 +111,7 @@
                         </div>
                     </div>
                     <div class="small text-secondary">
-                        Inflation: <span class="fw-semibold" x-text="analytics?.market_sentiment?.inflation_pressure || 'N/A'">--</span>
+                        Inflation Pressure: <span class="fw-semibold" x-text="analytics?.market_sentiment?.inflation_pressure || 'N/A'">--</span>
                     </div>
                     <div class="small text-secondary">
                         DXY Change: <span class="fw-semibold" x-text="formatPercentage(analytics?.market_sentiment?.details?.dxy_change)">--</span>
@@ -111,7 +130,7 @@
                         </div>
                     </div>
                     <div class="small text-secondary">
-                        Liquidity: <span class="fw-semibold" x-text="analytics?.monetary_policy?.liquidity_conditions || 'N/A'">--</span>
+                        Liquidity Condition: <span class="fw-semibold" x-text="analytics?.monetary_policy?.liquidity_conditions || 'N/A'">--</span>
                     </div>
                     <div class="small text-secondary">
                         Fed Funds: <span class="fw-semibold" x-text="formatNumber(analytics?.monetary_policy?.details?.fed_funds_rate) + '%'">--</span>
@@ -371,7 +390,7 @@
 
         <!-- Economic Events Section -->
         <div class="row g-3">
-            <div class="col-lg-8">
+            <div class="col-12">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0">Economic Events (CPI, NFP, Core CPI)</h5>
@@ -384,71 +403,55 @@
                             </select>
                         </div>
                     </div>
-                    <div style="height: 350px; overflow-y: auto;">
-                        <template x-for="(event, index) in (events?.data || [])" :key="`event-${index}-${event?.event_type || 'unknown'}-${event?.ts || Date.now()}`">
-                            <div class="p-2 mb-2 rounded border" :class="getEventTypeClass(event?.event_type)">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <div class="fw-semibold small" x-text="event?.event_type || 'N/A'">--</div>
-                                        <div class="small text-secondary" x-text="formatDate(event?.release_date)">--</div>
-                                    </div>
-                                    <div class="text-end">
-                                        <div class="fw-semibold" x-text="formatNumber(event?.actual_value)">--</div>
-                                        <div class="small text-secondary">Actual</div>
-                                    </div>
-                                </div>
-                                <div class="mt-1 d-flex justify-content-between">
-                                    <div class="small">
-                                        <span class="text-secondary">Forecast:</span> 
-                                        <span x-text="formatNumber(event?.forecast_value) || 'N/A'">--</span>
-                                    </div>
-                                    <div class="small">
-                                        <span class="text-secondary">Previous:</span> 
-                                        <span x-text="formatNumber(event?.previous_value) || 'N/A'">--</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-                        
-                        <!-- Empty state -->
-                        <div x-show="!events?.data || events?.data?.length === 0" class="text-center py-4">
-                            <div class="small text-secondary">
-                                <i class="fas fa-calendar-alt mb-2"></i><br>
-                                No economic events data available
-                            </div>
-                        </div>
+                    <!-- Events Table -->
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-hover">
+                            <thead class="sticky-top" style="background: var(--bs-body-bg); z-index: 1;">
+                                <tr>
+                                    <th>Event Type</th>
+                                    <th>Release Date</th>
+                                    <th class="text-end">Actual</th>
+                                    <th class="text-end">Forecast</th>
+                                    <th class="text-end">Previous</th>
+                                    <th>Series ID</th>
+                                    <th>Source</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(event, index) in (events?.data || [])" :key="`event-${index}-${event?.event_type || 'unknown'}-${event?.ts || Date.now()}`">
+                                    <tr>
+                                        <td>
+                                            <span class="badge" :class="getEventTypeBadge(event?.event_type)" x-text="event?.event_type || 'N/A'">--</span>
+                                        </td>
+                                        <td class="small" x-text="formatDate(event?.release_date)">--</td>
+                                        <td class="text-end fw-bold" x-text="formatNumber(event?.actual_value)">--</td>
+                                        <td class="text-end" x-text="event?.forecast_value !== null ? formatNumber(event?.forecast_value) : 'N/A'">--</td>
+                                        <td class="text-end" x-text="event?.previous_value !== null ? formatNumber(event?.previous_value) : 'N/A'">--</td>
+                                        <td class="small text-secondary" x-text="event?.series_id || 'N/A'">--</td>
+                                        <td class="small text-secondary" x-text="event?.source || 'N/A'">--</td>
+                                    </tr>
+                                </template>
+                                
+                                <!-- Empty state -->
+                                <tr x-show="!events?.data || events?.data?.length === 0">
+                                    <td colspan="7" class="text-center py-4">
+                                        <div class="small text-secondary">
+                                            <i class="fas fa-calendar-alt mb-2"></i><br>
+                                            No economic events data available
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                </div>
-            </div>
-            <div class="col-lg-4">
-                <div class="df-panel p-3 h-100">
-                    <h5 class="mb-3">Events Summary</h5>
-                    <div x-show="eventsSummary?.data">
-                        <div class="mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small text-secondary">Total Events</span>
-                                <span class="fw-semibold" x-text="eventsSummary?.data?.total_events || 0">--</span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small text-secondary">Events with Forecast</span>
-                                <span class="fw-semibold" x-text="eventsSummary?.data?.events_with_forecast || 0">--</span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small text-secondary">Avg Surprise %</span>
-                                <span class="fw-semibold" x-text="formatPercentage(eventsSummary?.data?.avg_surprise_pct)">--</span>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small text-secondary">Latest Release</span>
-                                <span class="fw-semibold small" x-text="formatDate(eventsSummary?.data?.latest_release_date)">--</span>
-                            </div>
-                        </div>
-                        <div class="p-2 rounded" style="background: rgba(59, 130, 246, 0.1);">
-                            <div class="fw-semibold small mb-1">Event Impact Guide</div>
-                            <div class="small text-secondary">
-                                <div><strong>CPI > Expected:</strong> Fed hawkish → Crypto bearish</div>
-                                <div><strong>NFP Strong (>200K):</strong> Fed hawkish → Risk-off</div>
-                                <div><strong>Core CPI Rising:</strong> Persistent inflation → Rate hikes</div>
-                            </div>
+                    
+                    <!-- Event Impact Guide (moved from Events Summary) -->
+                    <div class="mt-3 p-3 rounded" style="background: rgba(59, 130, 246, 0.1);">
+                        <div class="fw-semibold mb-2">📊 Event Impact Guide</div>
+                        <div class="small text-secondary">
+                            <div class="mb-1"><strong>CPI > Expected:</strong> Fed hawkish → Crypto bearish</div>
+                            <div class="mb-1"><strong>NFP Strong (>200K):</strong> Fed hawkish → Risk-off</div>
+                            <div><strong>Core CPI Rising:</strong> Persistent inflation → Rate hikes</div>
                         </div>
                     </div>
                 </div>
@@ -596,60 +599,6 @@
             </div>
         </div>
 
-        <!-- Trading Insights -->
-        <div class="row g-3">
-            <div class="col-12">
-                <div class="df-panel p-3">
-                    <h5 class="mb-3">Trading Insights & Market Analysis</h5>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="p-3 rounded" style="background: rgba(59, 130, 246, 0.1);">
-                                <h6 class="fw-bold mb-2">Current Market Sentiment</h6>
-                                <div class="small text-secondary">
-                                    <div class="mb-2">
-                                        <strong>Risk Appetite:</strong> 
-                                        <span class="badge ms-1" :class="getSentimentBadge(analytics?.market_sentiment?.risk_appetite)">
-                                            <span x-text="analytics?.market_sentiment?.risk_appetite || 'N/A'">--</span>
-                                        </span>
-                                    </div>
-                                    <div class="mb-2">
-                                        <strong>Dollar Strength:</strong> 
-                                        <span x-show="analytics?.market_sentiment?.dollar_strengthening" class="badge text-bg-danger">USD Strong</span>
-                                        <span x-show="!analytics?.market_sentiment?.dollar_strengthening" class="badge text-bg-success">USD Weak</span>
-                                    </div>
-                                    <div class="mb-2">
-                                        <strong>Inflation Pressure:</strong> 
-                                        <span x-text="analytics?.market_sentiment?.inflation_pressure || 'N/A'">--</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="p-3 rounded" style="background: rgba(34, 197, 94, 0.1);">
-                                <h6 class="fw-bold mb-2">Monetary Policy Outlook</h6>
-                                <div class="small text-secondary">
-                                    <div class="mb-2">
-                                        <strong>Fed Stance:</strong> 
-                                        <span class="badge ms-1" :class="getFedStanceBadge(analytics?.monetary_policy?.fed_stance)">
-                                            <span x-text="analytics?.monetary_policy?.fed_stance || 'N/A'">--</span>
-                                        </span>
-                                    </div>
-                                    <div class="mb-2">
-                                        <strong>Liquidity Conditions:</strong> 
-                                        <span x-text="analytics?.monetary_policy?.liquidity_conditions || 'N/A'">--</span>
-                                    </div>
-                                    <div class="mb-2">
-                                        <strong>Yield Curve:</strong> 
-                                        <span x-text="analytics?.monetary_policy?.yield_curve || 'N/A'">--</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Simple Loading Indicator -->
         <div x-show="globalLoading" class="text-center py-3">
             <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
@@ -674,6 +623,10 @@
                 globalDaysBack: 90,
                 globalCadence: '',
                 
+                // Calculated date range (NEW)
+                startDate: null,
+                endDate: null,
+                
                 // Selected filters
                 selectedRawMetric: 'DXY',
                 selectedEventType: '',
@@ -692,6 +645,12 @@
                 
                 // Chart ID for DOM storage
                 chartId: 'rawDataChart',
+                
+                // Auto-refresh
+                autoRefreshInterval: null,
+                autoRefreshEnabled: true,
+                autoRefreshSeconds: 5,
+                lastRefreshTime: null,
 
                 // Chart storage methods (DOM-based to avoid Alpine reactivity)
                 getChart() {
@@ -704,12 +663,32 @@
                     if (canvas) canvas._chartInstance = chartInstance;
                 },
 
+                // Calculate date range from daysBack
+                // This will be used for BOTH start_date/end_date AND days_back parameters
+                // Example: If globalDaysBack = 30
+                //   - start_date = today - 30 days (e.g., "2024-09-15")
+                //   - end_date = today (e.g., "2024-10-15")
+                //   - days_back = 30
+                calculateDateRange() {
+                    const today = new Date();
+                    const startDate = new Date(today);
+                    startDate.setDate(today.getDate() - this.globalDaysBack);
+                    
+                    this.endDate = today.toISOString().split('T')[0];
+                    this.startDate = startDate.toISOString().split('T')[0];
+                    
+                    console.log(`📅 Date range calculated: ${this.startDate} to ${this.endDate} (${this.globalDaysBack} days)`);
+                },
+
                 // Initialize dashboard
                 async init() {
                     console.log("🚀 Macro Overlay (Raw) Dashboard initialized");
                     
                     // Initialize controller
                     this.controller = new MacroOverlayRawController();
+                    
+                    // Calculate initial date range
+                    this.calculateDateRange();
                     
                     // Load initial data first
                     await this.loadInitialData();
@@ -719,7 +698,55 @@
                         this.initCharts();
                     });
                     
+                    // Start auto-refresh
+                    this.startAutoRefresh();
+                    
                     console.log("✅ Macro Overlay (Raw) dashboard ready");
+                },
+
+                // Start auto-refresh timer
+                startAutoRefresh() {
+                    if (!this.autoRefreshEnabled) return;
+                    
+                    console.log(`🔄 Auto-refresh enabled: every ${this.autoRefreshSeconds} seconds`);
+                    
+                    this.autoRefreshInterval = setInterval(async () => {
+                        if (this.autoRefreshEnabled && !this.globalLoading) {
+                            console.log('🔄 Auto-refreshing data...');
+                            this.lastRefreshTime = new Date();
+                            
+                            // Recalculate date range to get latest data
+                            this.calculateDateRange();
+                            
+                            // Refresh all data
+                            await this.loadInitialData();
+                            
+                            // Refresh raw data if metric is selected
+                            if (this.selectedRawMetric) {
+                                await this.loadRawData();
+                            }
+                        }
+                    }, this.autoRefreshSeconds * 1000);
+                },
+
+                // Stop auto-refresh
+                stopAutoRefresh() {
+                    if (this.autoRefreshInterval) {
+                        clearInterval(this.autoRefreshInterval);
+                        this.autoRefreshInterval = null;
+                        console.log('⏸️ Auto-refresh stopped');
+                    }
+                },
+
+                // Toggle auto-refresh
+                toggleAutoRefresh() {
+                    this.autoRefreshEnabled = !this.autoRefreshEnabled;
+                    
+                    if (this.autoRefreshEnabled) {
+                        this.startAutoRefresh();
+                    } else {
+                        this.stopAutoRefresh();
+                    }
                 },
 
                 // Load all initial data
@@ -728,9 +755,12 @@
                     
                     try {
                         console.log("📊 Loading initial macro data...");
+                        console.log(`🔍 Parameters: start_date=${this.startDate}, end_date=${this.endDate}, days_back=${this.globalDaysBack}`);
                         
-                        // Load all data in parallel
+                        // Load all data in parallel with date range parameters
                         const results = await this.controller.fetchAllData({
+                            start_date: this.startDate,
+                            end_date: this.endDate,
                             days_back: this.globalDaysBack,
                             metric: this.globalMetric || null
                         });
@@ -742,7 +772,21 @@
                         this.events = results.events;
                         this.eventsSummary = results.eventsSummary;
                         
+                        // Sort events by release_date descending (newest first)
+                        if (this.events?.data && Array.isArray(this.events.data)) {
+                            this.events.data.sort((a, b) => {
+                                return new Date(b.release_date) - new Date(a.release_date);
+                            });
+                            console.log(`✅ Events loaded and sorted: ${this.events.data.length} events`);
+                            if (this.events.data.length > 0) {
+                                console.log(`📅 First event (newest): ${this.events.data[0]?.event_type} - ${this.events.data[0]?.release_date}`);
+                                console.log(`📅 Last event (oldest): ${this.events.data[this.events.data.length - 1]?.event_type} - ${this.events.data[this.events.data.length - 1]?.release_date}`);
+                            }
+                        }
+                        
                         console.log("✅ Initial data loaded successfully");
+                        console.log(`📈 Analytics date range: ${this.analytics?.summary?.date_range?.earliest} to ${this.analytics?.summary?.date_range?.latest}`);
+                        console.log(`📅 Events count: ${this.events?.data?.length || 0}, Events summary: ${this.eventsSummary?.data?.total_events || 0}`);
                         
                     } catch (error) {
                         console.error("❌ Error loading initial data:", error);
@@ -770,10 +814,13 @@
                     
                     try {
                         console.log(`📈 Loading raw data for ${this.selectedRawMetric}`);
+                        console.log(`🔍 Date range: ${this.startDate} to ${this.endDate}`);
                         
-                        // Fetch raw data for selected metric
+                        // Fetch raw data for selected metric with date range
                         const rawData = await this.controller.fetchRawData({ 
                             metric: this.selectedRawMetric,
+                            start_date: this.startDate,
+                            end_date: this.endDate,
                             limit: 2000 
                         });
                         
@@ -790,6 +837,14 @@
                             data: { count: 0, avg_value: null, max_value: null, min_value: null, trend: 'neutral' }
                         };
                         
+                        // Sort data by date descending (newest first) for display
+                        if (this.rawData.data && Array.isArray(this.rawData.data)) {
+                            this.rawData.data.sort((a, b) => {
+                                return new Date(b.date) - new Date(a.date);
+                            });
+                            console.log(`✅ Raw data sorted: ${this.rawData.data.length} records, newest: ${this.rawData.data[0]?.date}`);
+                        }
+                        
                         // Update chart
                         this.updateRawDataChart();
                         
@@ -805,20 +860,35 @@
                 async loadEvents() {
                     try {
                         console.log(`📅 Loading events for ${this.selectedEventType || 'all types'}`);
+                        console.log(`🔍 Date range: ${this.startDate} to ${this.endDate}`);
+                        
+                        // Calculate months_back from globalDaysBack
+                        const monthsBack = Math.ceil(this.globalDaysBack / 30);
+                        console.log(`🔍 Months back: ${monthsBack}`);
                         
                         const [events, eventsSummary] = await Promise.all([
                             this.controller.fetchEvents({ 
                                 event_type: this.selectedEventType || null,
+                                start_date: this.startDate,
+                                end_date: this.endDate,
                                 limit: 100 
                             }),
                             this.controller.fetchEventsSummary({ 
                                 event_type: this.selectedEventType || null,
-                                months_back: 6 
+                                months_back: monthsBack 
                             })
                         ]);
                         
                         this.events = events;
                         this.eventsSummary = eventsSummary;
+                        
+                        // Sort events by release_date descending (newest first)
+                        if (this.events.data && Array.isArray(this.events.data)) {
+                            this.events.data.sort((a, b) => {
+                                return new Date(b.release_date) - new Date(a.release_date);
+                            });
+                            console.log(`✅ Events sorted: ${this.events.data.length} events, newest: ${this.events.data[0]?.release_date}`);
+                        }
                         
                     } catch (error) {
                         console.error("❌ Error loading events:", error);
@@ -827,12 +897,35 @@
 
                 // Update global filters
                 async updateGlobalFilters() {
+                    console.log(`🔄 Updating filters: ${this.globalDaysBack} days, metric: ${this.globalMetric || 'all'}`);
+                    
+                    // Recalculate date range based on new globalDaysBack
+                    this.calculateDateRange();
+                    
+                    // Reload all data with new filters
+                    // Note: loadInitialData() already loads events, so no need to call loadEvents() separately
                     await this.loadInitialData();
+                    
+                    // Reload raw data if metric is selected
+                    if (this.selectedRawMetric) {
+                        await this.loadRawData();
+                    }
                 },
 
                 // Refresh all data
                 async refreshAllData() {
+                    console.log('🔄 Refreshing all data...');
+                    
+                    // Recalculate date range
+                    this.calculateDateRange();
+                    
+                    // Reload all data (including events)
                     await this.loadInitialData();
+                    
+                    // Reload raw data if metric is selected
+                    if (this.selectedRawMetric) {
+                        await this.loadRawData();
+                    }
                 },
 
                 // Initialize charts
@@ -1062,14 +1155,29 @@
                     }
                 },
 
+                getEventTypeBadge(eventType) {
+                    switch (eventType) {
+                        case 'CPI': return 'text-bg-danger';
+                        case 'CPI_CORE': return 'text-bg-warning';
+                        case 'NFP': return 'text-bg-success';
+                        default: return 'text-bg-secondary';
+                    }
+                },
+
 
                 // Cleanup when component is destroyed
                 destroy() {
+                    // Stop auto-refresh
+                    this.stopAutoRefresh();
+                    
+                    // Destroy chart
                     const chart = this.getChart();
                     if (chart) {
                         chart.destroy();
                         this.setChart(null);
                     }
+                    
+                    console.log('🧹 Macro Overlay dashboard cleaned up');
                 }
             };
         }

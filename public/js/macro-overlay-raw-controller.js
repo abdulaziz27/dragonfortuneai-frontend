@@ -245,19 +245,59 @@ class MacroOverlayRawController {
 
     /**
      * Fetch all data sources in parallel with fallbacks
+     * Supports both start_date/end_date and days_back parameters
      */
     async fetchAllData(customFilters = {}) {
         try {
             console.log('🚀 Fetching all macro overlay data...');
+            console.log('📅 Filters:', {
+                start_date: customFilters.start_date,
+                end_date: customFilters.end_date,
+                days_back: customFilters.days_back,
+                metric: customFilters.metric
+            });
+            
+            // Calculate months_back from days_back for events-summary
+            const monthsBack = customFilters.days_back ? Math.ceil(customFilters.days_back / 30) : 6;
             
             const promises = [
-                this.fetchRawData(customFilters),
-                this.fetchSummary(customFilters),
-                this.fetchAnalytics(customFilters),
-                this.fetchEnhancedAnalytics(customFilters),
+                // Raw data - uses start_date & end_date
+                this.fetchRawData({
+                    metric: customFilters.metric,
+                    start_date: customFilters.start_date,
+                    end_date: customFilters.end_date,
+                    limit: 2000
+                }),
+                // Summary - uses days_back
+                this.fetchSummary({
+                    metric: customFilters.metric,
+                    days_back: customFilters.days_back || 90
+                }),
+                // Analytics - uses start_date & end_date
+                this.fetchAnalytics({
+                    metric: customFilters.metric,
+                    start_date: customFilters.start_date,
+                    end_date: customFilters.end_date,
+                    limit: 2000
+                }),
+                // Enhanced Analytics - uses days_back
+                this.fetchEnhancedAnalytics({
+                    days_back: customFilters.days_back || 90
+                }),
+                // Available Metrics - no parameters
                 this.fetchAvailableMetrics(),
-                this.fetchEvents(customFilters),
-                this.fetchEventsSummary(customFilters)
+                // Events - uses start_date & end_date (NOT affected by metric filter)
+                this.fetchEvents({
+                    event_type: null, // Events are independent of metric selection
+                    start_date: customFilters.start_date,
+                    end_date: customFilters.end_date,
+                    limit: 100
+                }),
+                // Events Summary - uses months_back (NOT affected by metric filter)
+                this.fetchEventsSummary({
+                    event_type: null, // Events are independent of metric selection
+                    months_back: monthsBack
+                })
             ];
 
             const results = await Promise.allSettled(promises);
@@ -334,6 +374,7 @@ class MacroOverlayRawController {
 
     /**
      * Format data for charts
+     * Charts need data sorted ascending (oldest to newest) for proper timeline visualization
      */
     formatForChart(data, xField = 'date', yField = 'value') {
         if (!data?.data || !Array.isArray(data.data) || data.data.length === 0) {
@@ -341,13 +382,18 @@ class MacroOverlayRawController {
         }
         
         try {
+            // Sort data ascending (oldest first) for timeline chart
+            const sortedData = [...data.data].sort((a, b) => {
+                return new Date(a[xField]) - new Date(b[xField]);
+            });
+            
             return {
-                labels: data.data.map(item => {
+                labels: sortedData.map(item => {
                     if (!item[xField]) return 'N/A';
                     const date = new Date(item[xField]);
                     return isNaN(date.getTime()) ? 'N/A' : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 }),
-                values: data.data.map(item => {
+                values: sortedData.map(item => {
                     const value = parseFloat(item[yField]);
                     return isNaN(value) ? 0 : value;
                 })

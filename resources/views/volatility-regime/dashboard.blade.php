@@ -1,25 +1,14 @@
 @extends('layouts.app')
 
 @section('scripts')
+    <!-- Chart.js and dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     
-    <!-- Load the volatility regime controller -->
-    <script src="{{ asset('js/volatility-regime-controller.js') }}"></script>
-
-    <script>
-        // Simple initialization without conflicts
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('📊 DOM loaded, volatility controller should be available');
-            
-            // Check if controller function exists
-            if (typeof volatilityRegimeController === 'function') {
-                console.log('✅ volatilityRegimeController function is available');
-            } else {
-                console.error('❌ volatilityRegimeController function not found');
-            }
-        });
-    </script>
+    <!-- Load modular architecture: Service → Renderer → Controller -->
+    <script src="{{ asset('js/volatility/volatility-data-service.js') }}"></script>
+    <script src="{{ asset('js/volatility/volatility-chart-renderer.js') }}"></script>
+    <script src="{{ asset('js/volatility/volatility-regime-controller.js') }}"></script>
 @endsection
 
 @section('content')
@@ -69,10 +58,35 @@
                         </select>
                     </div>
 
+                    <!-- Period Filter (Cadence-Aware) -->
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="small text-secondary mb-0">Period:</label>
+                        <select class="form-select form-select-sm" style="width: 100px;" x-model="selectedPeriod" @change="handlePeriodChange()">
+                            <template x-for="option in currentPeriodOptions" :key="option.value">
+                                <option :value="option.value" x-text="option.label"></option>
+                            </template>
+                        </select>
+                    </div>
+
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
-                        <span x-show="!loading">Refresh All</span>
+                        <span x-show="!loading">🔄</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Auto-Refresh Toggle -->
+                    <button 
+                        class="btn btn-sm"
+                        :class="autoRefreshEnabled ? 'btn-success' : 'btn-secondary'"
+                        @click="toggleAutoRefresh()"
+                        :disabled="loading">
+                        <span x-show="autoRefreshEnabled">⏸ Auto (5s)</span>
+                        <span x-show="!autoRefreshEnabled">▶ Auto Off</span>
+                    </button>
+
+                    <!-- Last Updated Indicator -->
+                    <div class="text-secondary small" x-show="lastUpdated" style="min-width: 150px;">
+                        <span x-text="'Last updated: ' + lastUpdated"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -275,102 +289,69 @@
             </div>
         </div>
 
-        <!-- Regime Transition Probability + Volume Profile -->
+        <!-- Price Action Candlestick Chart -->
         <div class="row g-3">
-            <!-- Regime Transition Probability -->
-            <div class="col-lg-6">
-                <div class="df-panel p-3 h-100">
+            <div class="col-12">
+                <div class="df-panel p-3">
                     <div class="mb-3">
-                        <h5 class="mb-0">Regime Transition Probability</h5>
-                        <small class="text-secondary">Forecast probabilitas perubahan regime berikutnya</small>
-                    </div>
-
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="small fw-semibold">Current: <span x-text="currentRegime.name"></span></span>
-                            <span class="badge text-bg-info">Next 6-12h</span>
-                        </div>
-
-                        <template x-for="transition in regimeTransitions" :key="transition.id">
-                            <div class="mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="small" x-text="'→ ' + formatTransitionLabel(transition.to)">--</span>
-                                    <span class="small" :class="getTransitionProbabilityClass(transition.probability)" x-text="transition.probability + '%'">--</span>
-                                </div>
-                                <div class="progress" style="height: 10px;">
-                                    <div class="progress-bar"
-                                         :class="getTransitionBarClass(transition.probability)"
-                                         :style="'width: ' + transition.probability + '%'"
-                                         :title="'Confidence: ' + (transition.confidence * 100).toFixed(1) + '%'"></div>
-                                </div>
-                                <div class="small text-muted mt-1" x-show="transition.timeframe" x-text="'Timeframe: ' + transition.timeframe">--</div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-1">Price Action (Candlestick)</h5>
+                                <small class="text-secondary">
+                                    <span x-text="selectedPair"></span> • 
+                                    <span x-text="getCadenceDisplayName(selectedCadence)"></span> • 
+                                    <span x-text="selectedPeriod"></span> • 
+                                    <span x-text="ohlcData.length + ' candles'"></span>
+                                </small>
                             </div>
-                        </template>
-                        
-                        <!-- No transitions message -->
-                        <div x-show="regimeTransitions.length === 0" class="text-center py-3">
-                            <div class="text-muted">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="mb-2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <path d="M12 6v6l4 2"/>
-                                </svg>
-                                <div class="small">Loading transition probabilities...</div>
-                            </div>
-                        </div>
-                        
-                        <!-- High probability alert -->
-                        <div x-show="isRegimeChangelikely()" class="alert alert-warning py-2 mt-3">
-                            <div class="d-flex align-items-center">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2">
-                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                                    <line x1="12" y1="9" x2="12" y2="13"/>
-                                    <line x1="12" y1="17" x2="12.01" y2="17"/>
-                                </svg>
-                                <div class="small">
-                                    <strong>Regime Change Alert:</strong> High probability of transition detected. Monitor positions closely.
-                                </div>
-                            </div>
+                            <div x-show="loadingStates.ohlc" class="spinner-border spinner-border-sm text-primary"></div>
+                            <div x-show="errors.ohlc" class="text-danger small" x-text="errors.ohlc"></div>
                         </div>
                     </div>
+                    
+                    <!-- Candlestick Chart -->
+                    <div style="min-height: 400px;">
+                        <canvas id="candlestickChart"></canvas>
+                    </div>
+                    
+                    <!-- Volume Chart -->
+                    <div style="min-height: 100px;" class="mt-2">
+                        <canvas id="volumeChart"></canvas>
+                    </div>
 
-                    <div class="p-2 rounded" style="background: rgba(139, 92, 246, 0.1);">
+                    <div class="mt-3 p-2 rounded" style="background: rgba(59, 130, 246, 0.1);">
                         <div class="small text-secondary">
-                            <strong>Forecast Model:</strong> Based on HV/RV crossover, volume patterns, and historical regime duration. Update setiap 5 menit.
+                            <strong>Candlestick Insight:</strong> Green candles = bullish (close > open), Red candles = bearish (close < open). Volume bars show trading activity intensity.
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Volume Profile by Price Level -->
-            <div class="col-lg-6">
-                <div class="df-panel p-3 h-100">
+
+
+        <!-- Volatility Trend Chart (HV + RV) -->
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="df-panel p-3">
                     <div class="mb-3">
-                        <h5 class="mb-0">Volume Profile - Last 24h</h5>
-                        <small class="text-secondary">Distribusi volume per level harga</small>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-1">Volatility Analysis</h5>
+                                <small class="text-secondary">Analyze volatility trends and patterns last 30 days</small>
+                            </div>
+                            <div x-show="loadingStates.trends" class="spinner-border spinner-border-sm text-primary"></div>
+                            <div x-show="errors.trends" class="text-danger small" x-text="errors.trends"></div>
+                        </div>
                     </div>
-                    <div style="min-height: 280px;">
-                        <canvas id="volumeProfileChart"></canvas>
+                    
+                    <div style="min-height: 320px;">
+                        <canvas id="volatilityTrendChart"></canvas>
                     </div>
-                    <div class="mt-2">
-                        <div class="row g-2 small">
-                            <div class="col-4">
-                                <div class="p-2 rounded text-center" style="background: rgba(59, 130, 246, 0.1);">
-                                    <div class="text-secondary">POC</div>
-                                    <div class="fw-bold text-primary" x-text="volumeProfile.poc ? '$' + volumeProfile.poc.toLocaleString() : '--'">--</div>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="p-2 rounded text-center" style="background: rgba(34, 197, 94, 0.1);">
-                                    <div class="text-secondary">VAH</div>
-                                    <div class="fw-bold text-success" x-text="volumeProfile.vah ? '$' + volumeProfile.vah.toLocaleString() : '--'">--</div>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="p-2 rounded text-center" style="background: rgba(239, 68, 68, 0.1);">
-                                    <div class="text-secondary">VAL</div>
-                                    <div class="fw-bold text-danger" x-text="volumeProfile.val ? '$' + volumeProfile.val.toLocaleString() : '--'">--</div>
-                                </div>
-                            </div>
+                    
+                    <div class="mt-3 p-2 rounded" style="background: rgba(59, 130, 246, 0.1);">
+                        <div class="small text-secondary">
+                            <strong>Volatility Insight:</strong> Track volatility patterns to identify market regime changes and adjust trading strategies accordingly.
                         </div>
                     </div>
                 </div>
@@ -431,7 +412,7 @@
         </div>
 
         <!-- Volatility Trend Chart -->
-        <div class="row g-3">
+        <!-- <div class="row g-3">
             <div class="col-12">
                 <div class="df-panel p-3">
                     <div class="mb-3">
@@ -448,12 +429,13 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </div> -->
 
-        <!-- Intraday Volatility Heatmap + Bollinger Squeeze -->
-        <div class="row g-3">
-            <!-- Intraday Volatility Heatmap -->
-            <div class="col-lg-8">
+
+
+        <!-- Intraday Volatility Heatmap -->
+        <div class="row g-3 mt-3">
+            <div class="col-12">
                 <div class="df-panel p-3 h-100">
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center">
@@ -461,172 +443,235 @@
                                 <h5 class="mb-0">Intraday Volatility Heatmap</h5>
                                 <small class="text-secondary">Identifikasi jam-jam dengan volatilitas tertinggi (UTC)</small>
                             </div>
-                            <span class="badge text-bg-info">24h Pattern</span>
+                            <div x-show="loadingStates.heatmap" class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
                         </div>
                     </div>
-                    <div style="min-height: 280px;">
-                        <canvas id="volatilityHeatmapChart"></canvas>
+
+                    <div style="min-height: 320px;">
+                        <canvas id="intradayHeatmapChart"></canvas>
                     </div>
-                    <div class="mt-2 p-2 rounded" style="background: rgba(139, 92, 246, 0.1);">
+
+                    <div class="mt-3 p-2 rounded" style="background: rgba(139, 92, 246, 0.1);">
                         <div class="small text-secondary">
-                            <strong>Trading Hours Insight:</strong> Volatilitas biasanya spike saat overlap session (London-NY: 12-16 UTC). Asian session (00-08 UTC) cenderung lebih tenang.
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Bollinger Bands Squeeze Indicator -->
-            <div class="col-lg-4">
-                <div class="df-panel p-4 h-100 d-flex flex-column">
-                    <div class="mb-3">
-                        <h5 class="mb-1">Bollinger Squeeze</h5>
-                        <small class="text-secondary">Volatility breakout indicator</small>
-                    </div>
-
-                    <div class="text-center mb-3 flex-grow-1 d-flex align-items-center justify-content-center">
-                        <div>
-                            <div class="mb-3">
-                                <div class="position-relative d-inline-block" style="width: 120px; height: 120px;">
-                                    <svg viewBox="0 0 120 120" class="w-100 h-100">
-                                        <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" stroke-width="10"/>
-                                        <circle cx="60" cy="60" r="50" fill="none"
-                                                :stroke="squeezeData.status === 'squeeze' ? '#ef4444' : squeezeData.status === 'expansion' ? '#22c55e' : '#f59e0b'"
-                                                stroke-width="10"
-                                                :stroke-dasharray="314"
-                                                :stroke-dashoffset="314 - (314 * squeezeData.intensity / 100)"
-                                                transform="rotate(-90 60 60)"/>
-                                    </svg>
-                                    <div class="position-absolute top-50 start-50 translate-middle text-center">
-                                        <div class="h4 mb-0 fw-bold" x-text="squeezeData.intensity + '%'">--</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="badge fs-6 mb-2"
-                                 :class="squeezeData.status === 'squeeze' ? 'text-bg-danger' : squeezeData.status === 'expansion' ? 'text-bg-success' : 'text-bg-warning'"
-                                 x-text="squeezeData.label">--</div>
-                            <div class="small text-secondary" x-text="squeezeData.message">--</div>
+                            <strong>Trading Insight:</strong> Volatilitas cenderung tinggi saat overlap sesi trading (Asia-Europe: 07:00-09:00 UTC, Europe-US: 12:00-16:00 UTC). Gunakan informasi ini untuk timing entry/exit yang optimal.
                         </div>
                     </div>
 
-                    <div class="mt-auto">
-                        <div class="row g-2 small">
-                            <div class="col-6">
-                                <div class="p-2 rounded text-center" style="background: rgba(239, 68, 68, 0.1);">
-                                    <div class="text-secondary">BB Width</div>
-                                    <div class="fw-bold text-danger" x-text="squeezeData.bbWidth + '%'">--</div>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="p-2 rounded text-center" style="background: rgba(34, 197, 94, 0.1);">
-                                    <div class="text-secondary">Duration</div>
-                                    <div class="fw-bold text-success" x-text="squeezeData.duration + 'h'">--</div>
-                                </div>
-                            </div>
-                        </div>
+                    <div x-show="errors.heatmap" class="alert alert-warning mt-3 mb-0" role="alert">
+                        <small x-text="errors.heatmap"></small>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Multi-Timeframe Volatility + Exchange Divergence -->
+        <!-- New Sections Row -->
         <div class="row g-3">
-            <!-- Multi-Timeframe Volatility Analysis -->
-            <div class="col-lg-6">
-                <div class="df-panel p-3 h-100">
-                    <div class="mb-3">
-                        <h5 class="mb-0">Multi-Timeframe Volatility</h5>
-                        <small class="text-secondary">Analisis volatilitas across different timeframes</small>
-                    </div>
-
-                    <div class="mb-3">
-                        <template x-for="tf in timeframeVolatility" :key="tf.timeframe">
-                            <div class="mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div class="d-flex align-items-center">
-                                        <span class="badge text-bg-secondary me-2" x-text="tf.timeframe">--</span>
-                                        <span class="small fw-semibold" x-text="tf.current + '%'">--</span>
-                                    </div>
-                                    <div class="d-flex align-items-center">
-                                        <span class="small text-muted me-2">Avg: <span x-text="tf.average + '%'">--</span></span>
-                                        <span class="badge" 
-                                              :class="tf.current > tf.average ? 'text-bg-danger' : 'text-bg-success'"
-                                              x-text="tf.current > tf.average ? 'High' : 'Low'">--</span>
-                                    </div>
-                                </div>
-                                <div class="progress" style="height: 8px;">
-                                    <div class="progress-bar"
-                                         :class="tf.current > tf.average ? 'bg-danger' : 'bg-success'"
-                                         :style="'width: ' + Math.min(tf.current, 100) + '%'"></div>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-
-                    <div class="p-2 rounded" style="background: rgba(59, 130, 246, 0.1);">
-                        <div class="small text-secondary">
-                            <strong>Timeframe Analysis:</strong> Shorter timeframes show immediate volatility spikes, longer timeframes indicate structural changes in market regime.
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Exchange Price Divergence Monitor -->
+            <!-- Volume Profile - Last 24h -->
             <div class="col-lg-6">
                 <div class="df-panel p-3 h-100">
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <h5 class="mb-0">Exchange Divergence Monitor</h5>
-                                <small class="text-secondary">Cross-exchange arbitrage opportunities</small>
+                                <h5 class="mb-1">Volume Profile - Last 24h</h5>
+                                <small class="text-secondary">Price levels with highest trading volume</small>
                             </div>
-                            <span class="badge" 
-                                  :class="divergenceData.opportunity ? 'text-bg-success' : 'text-bg-secondary'"
-                                  x-text="divergenceData.opportunity ? 'Opportunity' : 'Normal'">--</span>
+                            <div x-show="loadingStates.volumeProfile" class="spinner-border spinner-border-sm text-primary"></div>
                         </div>
                     </div>
-
-                    <div class="row g-3 mb-3">
-                        <div class="col-4">
-                            <div class="p-2 rounded text-center" style="background: rgba(245, 158, 11, 0.1);">
-                                <div class="text-secondary small">Max Spread</div>
-                                <div class="fw-bold text-warning" x-text="divergenceData.maxSpread + '%'">--</div>
-                            </div>
-                        </div>
+                    
+                    <div style="min-height: 320px;">
+                        <canvas id="volumeProfileChart"></canvas>
+                    </div>
+                    
+                    <div class="row g-2 mt-2">
                         <div class="col-4">
                             <div class="p-2 rounded text-center" style="background: rgba(59, 130, 246, 0.1);">
-                                <div class="text-secondary small">Avg Spread</div>
-                                <div class="fw-bold text-primary" x-text="divergenceData.avgSpread + '%'">--</div>
+                                <div class="text-secondary small">POC</div>
+                                <div class="fw-bold text-primary" x-text="'$' + volumeProfile.poc.toLocaleString()">--</div>
                             </div>
                         </div>
                         <div class="col-4">
                             <div class="p-2 rounded text-center" style="background: rgba(34, 197, 94, 0.1);">
-                                <div class="text-secondary small">Opportunities</div>
-                                <div class="fw-bold text-success" x-text="divergenceData.opportunities">--</div>
+                                <div class="text-secondary small">VAH</div>
+                                <div class="fw-bold text-success" x-text="'$' + volumeProfile.vah.toLocaleString()">--</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-2 rounded text-center" style="background: rgba(34, 197, 94, 0.1);">
+                                <div class="text-secondary small">VAL</div>
+                                <div class="fw-bold text-success" x-text="'$' + volumeProfile.val.toLocaleString()">--</div>
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="mt-3 p-2 rounded" style="background: rgba(59, 130, 246, 0.1);">
+                        <div class="small text-secondary">
+                            <strong>Volume Insight:</strong> POC (Point of Control) shows price with highest volume. VAH/VAL define 70% value area. Price tends to return to high-volume zones.
+                        </div>
+                    </div>
+                    
+                    <div x-show="errors.volumeProfile" class="alert alert-warning mt-3 mb-0">
+                        <small x-text="errors.volumeProfile"></small>
+                    </div>
+                </div>
+            </div>
 
-                    <div class="mb-3" style="max-height: 200px; overflow-y: auto;">
-                        <template x-for="pair in divergenceData.pairs" :key="pair.symbol">
-                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                <div>
-                                    <div class="fw-semibold small" x-text="pair.symbol">--</div>
-                                    <div class="text-muted small" x-text="pair.exchanges">--</div>
+            <!-- Regime Transition Probability -->
+            <div class="col-lg-6">
+                <div class="df-panel p-3 h-100">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-1">Regime Transition Probability</h5>
+                                <small class="text-secondary">Forecast probabilitas perubahan regime berikutnya</small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-info text-white" x-show="regimeTransitionData.nextTimeframe" x-text="'Next ' + regimeTransitionData.nextTimeframe"></span>
+                                <div x-show="loadingStates.regimeTransition" class="spinner-border spinner-border-sm text-primary"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Current Regime Display -->
+                    <div class="mb-3 p-2 rounded" style="background: rgba(59, 130, 246, 0.1);">
+                        <div class="small text-secondary mb-1">Current:</div>
+                        <div class="fw-bold" x-text="regimeTransitionData.currentLabel || 'Normal Volatility'"></div>
+                    </div>
+                    
+                    <!-- Transition Probabilities with Timeframes -->
+                    <div class="mb-3">
+                        <template x-for="transition in regimeTransitions" :key="transition.to + transition.timeframe">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <div class="flex-grow-1">
+                                        <div class="fw-semibold">→ <span x-text="transition.to"></span></div>
+                                        <div class="small text-muted" x-text="'Timeframe: ' + transition.timeframe"></div>
+                                    </div>
+                                    <div class="text-end ms-2">
+                                        <span class="fw-bold" x-text="transition.probability.toFixed(0) + '%'"></span>
+                                    </div>
                                 </div>
-                                <div class="text-end">
-                                    <div class="fw-bold" 
-                                         :class="pair.spread > 0.5 ? 'text-success' : 'text-muted'"
-                                         x-text="pair.spread + '%'">--</div>
-                                    <div class="small text-muted" x-text="pair.volume">--</div>
+                                <div class="progress" style="height: 12px;">
+                                    <div class="progress-bar" 
+                                         :class="'bg-' + transition.color"
+                                         :style="'width: ' + transition.probability + '%'"></div>
                                 </div>
                             </div>
                         </template>
                     </div>
-
-                    <div class="p-2 rounded" style="background: rgba(34, 197, 94, 0.1);">
+                    
+                    <!-- Insight Box -->
+                    <div class="mt-3 p-2 rounded" style="background: rgba(139, 92, 246, 0.1);">
                         <div class="small text-secondary">
-                            <strong>Arbitrage Alert:</strong> Spreads > 0.5% may indicate profitable opportunities. Consider transaction costs and execution speed.
+                            <strong>Forecast Model:</strong> Based on HV/RV crossover, volume patterns, and historical regime duration. Update setiap <span x-text="getCadenceDisplayName(selectedCadence)"></span>.
                         </div>
+                    </div>
+                    
+                    <div x-show="errors.regimeTransition" class="alert alert-warning mt-3 mb-0">
+                        <small x-text="errors.regimeTransition"></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Volatility Comparison (Multi-Asset) -->
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="df-panel p-3">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-1">Volatility Comparison</h5>
+                                <small class="text-secondary">Compare volatility across multiple assets</small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge" :class="volatilityRanking.opportunity ? 'text-bg-success' : 'text-bg-secondary'">
+                                    <span x-show="volatilityRanking.opportunity">🎯 Opportunity Detected</span>
+                                    <span x-show="!volatilityRanking.opportunity">Normal</span>
+                                </span>
+                                <div x-show="loadingStates.volatilityRanking" class="spinner-border spinner-border-sm text-primary"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Asset</th>
+                                    <th>Volatility</th>
+                                    <th>24h Change</th>
+                                    <th>Current Price</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(asset, index) in volatilityRanking.ranking" :key="asset.symbol">
+                                    <tr>
+                                        <td>
+                                            <span class="badge" :class="index === 0 ? 'text-bg-danger' : (index === volatilityRanking.ranking.length - 1 ? 'text-bg-success' : 'text-bg-secondary')"
+                                                  x-text="'#' + (index + 1)"></span>
+                                        </td>
+                                        <td class="fw-semibold" x-text="asset.symbol"></td>
+                                        <td>
+                                            <span class="fw-bold" x-text="asset.volatility.toFixed(2) + '%'"></span>
+                                        </td>
+                                        <td>
+                                            <span :class="asset.change_24h >= 0 ? 'text-success' : 'text-danger'"
+                                                  x-text="(asset.change_24h >= 0 ? '+' : '') + (asset.change_24h * 100).toFixed(2) + '%'"></span>
+                                        </td>
+                                        <td x-text="'$' + asset.current_price.toLocaleString()"></td>
+                                        <td>
+                                            <span class="badge badge-sm" 
+                                                  :class="asset.volatility > volatilityRanking.statistics.mean ? 'text-bg-danger' : 'text-bg-success'">
+                                                <span x-show="asset.volatility > volatilityRanking.statistics.mean">High Vol</span>
+                                                <span x-show="asset.volatility <= volatilityRanking.statistics.mean">Low Vol</span>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="row g-2 mt-2">
+                        <div class="col-md-3">
+                            <div class="p-2 rounded text-center" style="background: rgba(239, 68, 68, 0.1);">
+                                <div class="text-secondary small">Max Spread</div>
+                                <div class="fw-bold text-danger" x-text="volatilityRanking.maxSpread.toFixed(2) + '%'">--</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-2 rounded text-center" style="background: rgba(245, 158, 11, 0.1);">
+                                <div class="text-secondary small">Avg Spread</div>
+                                <div class="fw-bold text-warning" x-text="volatilityRanking.avgSpread.toFixed(2) + '%'">--</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-2 rounded text-center" style="background: rgba(34, 197, 94, 0.1);">
+                                <div class="text-secondary small">High Vol Assets</div>
+                                <div class="fw-bold text-success" x-text="volatilityRanking.opportunities">--</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-2 rounded text-center" style="background: rgba(59, 130, 246, 0.1);">
+                                <div class="text-secondary small">Mean Volatility</div>
+                                <div class="fw-bold text-primary" x-text="volatilityRanking.statistics.mean?.toFixed(2) + '%'">--</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3 p-2 rounded" style="background: rgba(59, 130, 246, 0.1);">
+                        <div class="small text-secondary">
+                            <strong>Comparison Insight:</strong> High spread (>20%) indicates divergence opportunities. Assets above mean + 1σ are flagged as high volatility. Use for relative value trading and pair selection.
+                        </div>
+                    </div>
+                    
+                    <div x-show="errors.volatilityRanking" class="alert alert-warning mt-3 mb-0">
+                        <small x-text="errors.volatilityRanking"></small>
                     </div>
                 </div>
             </div>
