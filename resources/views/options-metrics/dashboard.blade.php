@@ -17,16 +17,27 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <select class="form-select" style="width: 120px;" x-model="selectedAsset">
+                    <!-- Enhanced Asset Filter -->
+                    <select class="form-select" style="width: 120px;" x-model="selectedAsset" @change="handleAssetChange()">
                         <option value="BTC">BTC</option>
                         <option value="ETH">ETH</option>
                     </select>
 
-                    <select class="form-select" style="width: 140px;" x-model="selectedExchange">
+                    <!-- Enhanced Exchange Filter -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedExchange" @change="handleExchangeChange()">
                         <option value="Deribit">Deribit</option>
-                        <option value="OKX">OKX</option>
                     </select>
 
+                    <!-- NEW: Tenor Filter -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedTenor" @change="handleTenorChange()">
+                        <option value="all">All Tenors</option>
+                        <option value="7D">7 Days</option>
+                        <option value="14D">14 Days</option>
+                        <option value="30D">30 Days</option>
+                        <option value="90D">90 Days</option>
+                    </select>
+
+                    <!-- Existing Timeframe (kept for UI consistency) -->
                     <select class="form-select" style="width: 120px;" x-model="selectedTimeframe">
                         <option value="5m">5m</option>
                         <option value="15m">15m</option>
@@ -35,12 +46,30 @@
                         <option value="1d">1d</option>
                     </select>
 
-                    <button class="btn btn-primary" @click="applyProfile(); refreshAll();">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2">
-                            <path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.6M21 3v6h-6"/>
-                        </svg>
-                        Refresh
+                    <!-- Enhanced Manual Refresh -->
+                    <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
+                        <span x-show="!loading">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-2">
+                                <path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.6M21 3v6h-6"/>
+                            </svg>
+                            Refresh
+                        </span>
+                        <span x-show="loading">
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            Loading...
+                        </span>
                     </button>
+
+                    <!-- NEW: Auto-Refresh Toggle -->
+                    <button class="btn" 
+                            :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'"
+                            @click="toggleAutoRefresh()">
+                        <span x-show="autoRefreshEnabled">⏸ Auto (10s)</span>
+                        <span x-show="!autoRefreshEnabled">▶ Auto Off</span>
+                    </button>
+
+                    <!-- NEW: Last Updated Timestamp -->
+                    <span class="text-muted small" x-show="lastUpdated" x-text="'Last: ' + lastUpdated"></span>
                 </div>
             </div>
         </div>
@@ -51,7 +80,7 @@
                 <div class="df-panel p-4 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <div class="text-uppercase small fw-semibold text-secondary">ATM IV (30D)</div>
+                            <div class="text-uppercase small fw-semibold text-secondary">ATM IV (Composite)</div>
                             <div class="h2 mb-1" x-text="formatPercent(metrics.atmIv)"></div>
                         </div>
                         <div class="badge rounded-pill"
@@ -66,12 +95,9 @@
                 <div class="df-panel p-4 h-100 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <div class="text-uppercase small fw-semibold text-secondary">25D Risk Reversal</div>
+                            <div class="text-uppercase small fw-semibold text-secondary" x-text="`25D Risk Reversal (${metrics.skewTenor || '14D'})`"></div>
                             <div class="h2 mb-1" x-text="formatDelta(metrics.skew, '%')"></div>
                         </div>
-                        <div class="badge rounded-pill"
-                             :class="metrics.skewChange <= 0 ? 'text-bg-warning' : 'text-bg-success'"
-                             x-text="formatDelta(metrics.skewChange, 'bps')"></div>
                     </div>
                     <div class="small text-secondary mt-3" x-text="metrics.skewNarrative"></div>
                 </div>
@@ -84,9 +110,6 @@
                             <div class="text-uppercase small fw-semibold text-secondary">Total OI</div>
                             <div class="h2 mb-1" x-text="formatCompact(metrics.totalOi)"></div>
                         </div>
-                        <div class="badge rounded-pill"
-                             :class="metrics.oiChange >= 0 ? 'text-bg-info' : 'text-bg-secondary'"
-                             x-text="formatDelta(metrics.oiChange, '%')"></div>
                     </div>
                     <div class="small text-secondary mt-3" x-text="metrics.oiNarrative"></div>
                 </div>
@@ -115,7 +138,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                         <div>
                             <h5 class="mb-1">IV Smile & Surface</h5>
-                            <small class="text-secondary">Implied volatility structure across strikes and tenors (ts, exchange, tenor, strike, iv) - 5-15m intervals</small>
+                            <small class="text-secondary">Implied volatility structure across strikes and tenors</small>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
                             <template x-for="tenor in smileTenors" :key="tenor">
@@ -126,6 +149,28 @@
                     </div>
                     <div class="flex-grow-1 position-relative" style="z-index: 1201; min-height: 400px;">
                         <canvas id="ivSmileChart"></canvas>
+                    </div>
+                    
+                    <!-- Insight Section - IV Smile -->
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <h6 class="text-primary mb-2">💡 Panduan Membaca IV Smile</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <strong>Kurva Normal:</strong> IV tinggi di ujung (OTM), rendah di tengah (ATM)<br>
+                                    <strong>Volatility Smile:</strong> Menunjukkan ekspektasi pergerakan ekstrem<br>
+                                    <strong>Tenor Berbeda:</strong> Warna berbeda = jangka waktu berbeda
+                                </small>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <strong>Interpretasi:</strong><br>
+                                    • Kurva curam = Pasar khawatir volatility tinggi<br>
+                                    • Kurva datar = Pasar tenang, volatility stabil<br>
+                                    • Asimetri = Bias arah (bullish/bearish)
+                                </small>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -138,7 +183,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
                             <h5 class="mb-1">25D Skew</h5>
-                            <small class="text-secondary">Risk reversal 25 delta across time series (ts, exchange, tenor, rr25) - 5-15m intervals</small>
+                            <small class="text-secondary">Risk reversal 25 delta across time series</small>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
                             <span class="badge text-bg-warning" x-text="`${selectedTimeframe} intervals`"></span>
@@ -147,6 +192,28 @@
                     </div>
                     <div class="flex-grow-1 position-relative" style="z-index: 1201; min-height: 350px;">
                         <canvas id="skewChart"></canvas>
+                    </div>
+                    
+                    <!-- Insight Section - 25D Skew -->
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <h6 class="text-success mb-2">📈 Panduan Membaca 25D Skew</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <strong>Risk Reversal:</strong> Selisih IV antara call dan put 25 delta<br>
+                                    <strong>Positif (+):</strong> Call lebih mahal = Sentimen bullish<br>
+                                    <strong>Negatif (-):</strong> Put lebih mahal = Sentimen bearish
+                                </small>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <strong>Trading Signal:</strong><br>
+                                    • Skew naik = Demand call meningkat (bullish)<br>
+                                    • Skew turun = Demand put meningkat (bearish)<br>
+                                    • Skew ekstrem = Reversal signal potensial
+                                </small>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -159,7 +226,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
                             <h5 class="mb-1">OI & Volume by Strike/Expiry</h5>
-                            <small class="text-secondary">Open interest and volume distribution across strikes and expiries (ts, exchange, expiry, strike, call_oi, put_oi, call_vol, put_vol) - 15-60m intervals</small>
+                            <small class="text-secondary">Open interest and volume distribution across strikes and expiries</small>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
                             <span class="badge text-bg-success" x-text="`${selectedTimeframe} intervals`"></span>
@@ -168,6 +235,28 @@
                     </div>
                     <div class="flex-grow-1 position-relative" style="z-index: 1201; min-height: 400px;">
                         <canvas id="oiVolumeChart"></canvas>
+                    </div>
+                    
+                    <!-- Insight Section - OI & Volume -->
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <h6 class="text-info mb-2">📊 Panduan Membaca OI & Volume</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <strong>Open Interest (OI):</strong> Total kontrak yang belum ditutup<br>
+                                    <strong>Call OI Tinggi:</strong> Banyak posisi bullish terbuka<br>
+                                    <strong>Put OI Tinggi:</strong> Banyak posisi bearish terbuka
+                                </small>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <strong>Strike Analysis:</strong><br>
+                                    • OI tinggi = Level support/resistance kuat<br>
+                                    • Volume tinggi = Aktivitas trading aktif<br>
+                                    • Rasio Call/Put = Sentimen pasar dominan
+                                </small>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -180,16 +269,38 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
                             <h5 class="mb-1">GEX / Dealer Greeks</h5>
-                            <small class="text-secondary">Gamma exposure and dealer positioning across price levels (ts, price_level, gamma_exposure) - 15-60m intervals (if vendor available)</small>
+                            <small class="text-secondary">Gamma exposure and dealer positioning across price levels</small>
                         </div>
                         <div class="d-flex gap-2">
-                            <span class="badge rounded-pill text-bg-danger" x-text="formatGamma(gammaSummary.netGamma)"></span>
-                            <span class="badge rounded-pill text-bg-secondary" x-text="`Pivot ${formatPrice(gammaSummary.pivot)}`"></span>
+                            <!-- <span class="badge rounded-pill text-bg-danger" x-text="formatGamma(gammaSummary.netGamma)"></span> -->
+                            <!-- <span class="badge rounded-pill text-bg-secondary" x-text="`Pivot ${formatPrice(gammaSummary.pivot)}`"></span> -->
                             <span class="badge text-bg-warning" x-text="`${selectedTimeframe} intervals`"></span>
                         </div>
                     </div>
                     <div class="flex-grow-1 position-relative" style="z-index: 1201; min-height: 400px;">
                         <canvas id="gammaChart"></canvas>
+                    </div>
+                    
+                    <!-- Insight Section - GEX / Dealer Greeks -->
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <h6 class="text-danger mb-2">⚡ Panduan Membaca GEX (Gamma Exposure)</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <strong>Gamma Exposure:</strong> Posisi dealer di setiap level harga<br>
+                                    <strong>Positif (Hijau):</strong> Dealer long gamma = Support level<br>
+                                    <strong>Negatif (Merah):</strong> Dealer short gamma = Resistance level
+                                </small>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <strong>Trading Implications:</strong><br>
+                                    • Gamma tinggi = Harga cenderung stabil di level ini<br>
+                                    • Gamma rendah = Harga mudah bergerak melewati level<br>
+                                    • Net gamma negatif = Pasar lebih volatile
+                                </small>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -198,6 +309,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <script src="/js/options-metrics-controller.js"></script>
+    <!-- NEW: Enhanced Options Services -->
+    <script src="/js/options/options-data-service.js"></script>
+    <script src="/js/options/options-chart-renderer.js"></script>
     <script>
         // Wait for OptionsMetricsController to be available
         function waitForOptionsMetricsController() {
@@ -215,12 +329,29 @@
                 // API Controller instance
                 apiController: null,
                 
-                // UI State
+                // NEW: Enhanced data services
+                dataService: null,
+                chartRenderer: null,
+                
+                // UI State (EXISTING - preserved)
                 selectedAsset: 'BTC',
                 selectedExchange: 'Deribit',
                 selectedTimeframe: '15m',
                 loading: false,
                 error: null,
+
+                // NEW: Filter state
+                selectedTenor: 'all',
+                
+                // NEW: Auto-refresh state
+                autoRefreshEnabled: true,
+                autoRefreshInterval: null,
+                autoRefreshTimer: 10000, // 10 seconds
+                lastUpdated: '',
+                
+                // NEW: Debouncing
+                filterDebounceTimer: null,
+                filterDebounceDelay: 300,
 
                 // Chart instances
                 smileChart: null,
@@ -279,14 +410,16 @@
                 },
 
                 async init() {
-                    console.log('🚀 Initializing Options Metrics Dashboard...');
+                    console.log('🚀 Initializing Enhanced Options Metrics Dashboard...');
                     
-                    // Wait for OptionsMetricsController to be available
+                    // Wait for all controllers to be available
                     await waitForOptionsMetricsController();
                     console.log('✅ OptionsMetricsController is now available');
                     
-                    // Initialize API controller
+                    // Initialize services
                     this.apiController = new OptionsMetricsController();
+                    this.dataService = new OptionsDataService();
+                    this.chartRenderer = new OptionsChartRenderer();
                     
                     // Generate chart labels
                     this.generateIntradayLabels();
@@ -294,13 +427,14 @@
                     // Load initial data
                     await this.loadDashboardData();
                     
-                    // Setup watchers
-                    this.$watch('selectedAsset', () => this.loadDashboardData());
-                    this.$watch('selectedExchange', () => this.loadDashboardData());
-                    this.$watch('selectedTimeframe', () => {
-                        this.generateIntradayLabels();
-                        this.loadDashboardData();
-                    });
+                    // Setup enhanced watchers (REMOVED old watchers, replaced with filter handlers)
+                    // Old watchers removed to prevent conflicts with new filter system
+                    
+                    // Start auto-refresh
+                    this.startAutoRefresh();
+                    
+                    // Setup visibility change handler
+                    this.setupVisibilityHandler();
                     
                     // Wait for Chart.js and render charts
                     this.waitForChart(() => this.renderAllCharts());
@@ -318,21 +452,39 @@
                 },
 
                 async loadDashboardData() {
-                    if (!this.apiController) return;
+                    if (this.loading) return; // Prevent concurrent loads
                     
                     this.loading = true;
                     this.error = null;
                     
                     try {
-                        console.log(`📊 Loading data for ${this.selectedAsset} on ${this.selectedExchange}...`);
+                        console.log(`📊 Loading data for ${this.selectedAsset} on ${this.selectedExchange}, tenor: ${this.selectedTenor}...`);
                         
-                        // Fetch all dashboard data
-                        const data = await this.apiController.fetchDashboardData(this.selectedExchange, this.selectedAsset);
+                        // NEW: Use enhanced data service with filters
+                        const filters = {
+                            exchange: this.selectedExchange,
+                            underlying: this.selectedAsset,
+                            tenor: this.selectedTenor
+                        };
+                        
+                        const data = await this.dataService.fetchAllData(filters);
                         
                         if (data) {
                             this.updateMetricsFromAPI(data);
                             this.updateChartDataFromAPI(data);
-                            console.log('✅ Dashboard data loaded successfully');
+                            
+                            // NEW: Render charts using chart renderer
+                            this.chartRenderer.renderAllCharts(data);
+                            
+                            // NEW: Update timestamp
+                            this.lastUpdated = new Date().toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: true
+                            });
+                            
+                            console.log('✅ Enhanced dashboard data loaded successfully');
                         } else {
                             this.error = 'Failed to load data from API';
                             console.error('❌ No data received from API');
@@ -389,24 +541,27 @@
                     if (data.skewSummary && data.skewSummary.data && data.skewSummary.data.length > 0) {
                         const latest = data.skewSummary.data[0];
                         this.metrics.skew = latest.rr25?.avg || 0;
+                        this.metrics.skewTenor = latest.tenor || '14D'; // Store tenor for dynamic label
                         this.metrics.skewChange = 0; // Calculate from timeseries if available
-                        this.metrics.skewNarrative = `25D Risk Reversal: ${this.formatDelta(latest.rr25?.avg || 0, '%')}`;
+                        this.metrics.skewNarrative = `25D Risk Reversal (${latest.tenor}): ${this.formatDelta(latest.rr25?.avg || 0, '%')}`;
                     }
                     
                     // Update OI metrics
                     if (data.oiSummary && data.oiSummary.data && data.oiSummary.data.headline) {
                         const oi = data.oiSummary.data.headline;
                         this.metrics.totalOi = oi.total_oi;
+                        this.metrics.oiPcr = oi.pcr || 0; // Store PCR for additional info
                         this.metrics.oiChange = 0; // Calculate from timeseries if available
-                        this.metrics.oiNarrative = `Total OI: ${this.formatCompact(oi.total_oi)}`;
+                        this.metrics.oiNarrative = `Total OI: ${this.formatCompact(oi.total_oi)} • PCR: ${(oi.pcr || 0).toFixed(2)}`;
                     }
                     
                     // Update Gamma metrics
                     if (data.dealerGreeksSummary && data.dealerGreeksSummary.data && data.dealerGreeksSummary.data.summary) {
                         const gamma = data.dealerGreeksSummary.data.summary;
                         this.metrics.netGamma = gamma.gamma_net || 0;
+                        this.metrics.gammaAbs = gamma.gamma_abs || 0; // Store absolute gamma
                         this.metrics.gammaTag = (gamma.gamma_net || 0) >= 0 ? 'Long Gamma' : 'Short Gamma';
-                        this.metrics.gammaNarrative = `Net Gamma: ${this.formatGamma(gamma.gamma_net || 0)}`;
+                        this.metrics.gammaNarrative = `Net Gamma: ${this.formatGamma(gamma.gamma_net || 0)} • Abs: ${this.formatGamma(gamma.gamma_abs || 0)}`;
                     }
                 },
 
@@ -445,48 +600,14 @@
                     }
                 },
 
-                async refreshAll() {
-                    console.log('🔄 Refreshing all data...');
-                    this.destroyCharts();
-                    await this.loadDashboardData();
-                    this.waitForChart(() => this.renderAllCharts());
-                },
+                // OLD refreshAll method - REMOVED to prevent conflicts
+                // Now using the enhanced refreshAll method below
 
-                waitForChart(callback) {
-                    if (typeof Chart !== 'undefined') {
-                        callback();
-                    } else {
-                        setTimeout(() => this.waitForChart(callback), 80);
-                    }
-                },
+                // OLD CHART METHODS REMOVED - Using enhanced OptionsChartRenderer instead
+                // This prevents double chart rendering and race conditions
 
-                destroyCharts() {
-                    if (this.smileChart) {
-                        this.smileChart.destroy();
-                        this.smileChart = null;
-                    }
-                    if (this.skewChart) {
-                        this.skewChart.destroy();
-                        this.skewChart = null;
-                    }
-                    if (this.oiVolumeChart) {
-                        this.oiVolumeChart.destroy();
-                        this.oiVolumeChart = null;
-                    }
-                    if (this.gammaChart) {
-                        this.gammaChart.destroy();
-                        this.gammaChart = null;
-                    }
-                },
-
-                renderAllCharts() {
-                    this.renderSmileChart();
-                    this.renderSkewChart();
-                    this.renderOiVolumeChart();
-                    this.renderGammaChart();
-                },
-
-                renderSmileChart() {
+                // OLD renderSmileChart() method removed - using OptionsChartRenderer instead
+                oldRenderSmileChart() {
                     const ctx = document.getElementById('ivSmileChart');
                     console.log('🎯 renderSmileChart called');
                     console.log('🎯 ctx:', ctx);
@@ -800,7 +921,7 @@
                 // Utility functions
                 formatPercent(value) {
                     if (value === null || value === undefined) return 'N/A';
-                    return `${parseFloat(value).toFixed(1)}%`;
+                    return `${(parseFloat(value) * 100).toFixed(1)}%`;
                 },
 
                 formatDelta(value, suffix = '') {
@@ -828,7 +949,8 @@
                 formatGamma(value) {
                     if (value === null || value === undefined) return 'N/A';
                     const sign = value > 0 ? '+' : '';
-                    return `${sign}${value}k gamma`;
+                    const rounded = Math.round(value);
+                    return `${sign}${rounded}k`;
                 },
 
                 formatPriceLevel(value) {
@@ -842,6 +964,92 @@
                 formatCompact(value) {
                     if (value === null || value === undefined) return 'N/A';
                     return this.compactFormatter.format(value);
+                },
+
+                // NEW: Filter handlers with debouncing
+                async handleAssetChange() {
+                    console.log(`🔄 Asset changed to: ${this.selectedAsset}`);
+                    clearTimeout(this.filterDebounceTimer);
+                    
+                    this.filterDebounceTimer = setTimeout(async () => {
+                        this.dataService.clearCache();
+                        await this.loadDashboardData();
+                    }, this.filterDebounceDelay);
+                },
+
+                async handleExchangeChange() {
+                    console.log(`🔄 Exchange changed to: ${this.selectedExchange}`);
+                    clearTimeout(this.filterDebounceTimer);
+                    
+                    this.filterDebounceTimer = setTimeout(async () => {
+                        this.dataService.clearCache();
+                        await this.loadDashboardData();
+                    }, this.filterDebounceDelay);
+                },
+
+                async handleTenorChange() {
+                    console.log(`🔄 Tenor changed to: ${this.selectedTenor}`);
+                    clearTimeout(this.filterDebounceTimer);
+                    
+                    this.filterDebounceTimer = setTimeout(async () => {
+                        this.dataService.clearCache();
+                        await this.loadDashboardData();
+                    }, this.filterDebounceDelay);
+                },
+
+                // NEW: Auto-refresh functionality
+                startAutoRefresh() {
+                    this.stopAutoRefresh(); // Stop existing timer first
+                    
+                    this.autoRefreshInterval = setInterval(() => {
+                        if (this.autoRefreshEnabled && !this.loading && !document.hidden) {
+                            console.log('🔄 Auto-refresh triggered');
+                            this.loadDashboardData();
+                        }
+                    }, this.autoRefreshTimer);
+                    
+                    console.log('✅ Auto-refresh started (5s interval)');
+                },
+
+                stopAutoRefresh() {
+                    if (this.autoRefreshInterval) {
+                        clearInterval(this.autoRefreshInterval);
+                        this.autoRefreshInterval = null;
+                        console.log('⏹️ Auto-refresh stopped');
+                    }
+                },
+
+                toggleAutoRefresh() {
+                    this.autoRefreshEnabled = !this.autoRefreshEnabled;
+                    
+                    if (this.autoRefreshEnabled) {
+                        this.startAutoRefresh();
+                        console.log('▶️ Auto-refresh enabled');
+                    } else {
+                        this.stopAutoRefresh();
+                        console.log('⏸️ Auto-refresh disabled');
+                    }
+                },
+
+                // NEW: Visibility change handler
+                setupVisibilityHandler() {
+                    document.addEventListener('visibilitychange', () => {
+                        if (document.hidden) {
+                            console.log('👁️ Tab hidden, pausing auto-refresh');
+                        } else {
+                            console.log('👁️ Tab visible, resuming auto-refresh');
+                            if (this.autoRefreshEnabled) {
+                                this.startAutoRefresh();
+                            }
+                        }
+                    });
+                },
+
+                // NEW: Manual refresh
+                async refreshAll() {
+                    console.log('🔄 Manual refresh triggered');
+                    this.dataService.clearCache();
+                    await this.loadDashboardData();
                 }
             };
         }
