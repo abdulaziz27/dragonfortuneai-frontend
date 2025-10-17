@@ -26,85 +26,86 @@
                     <p class="mb-0 text-secondary">
                         Monitor Bitcoin on-chain data: MVRV, supply distribution, exchange flows, miner activity & whale movements
                     </p>
+                    <!-- NEW: Last Updated Timestamp -->
+                    <div class="small text-muted mt-1" x-show="lastUpdated">
+                        <i class="fas fa-clock"></i> Last updated: <span x-text="lastUpdated"></span>
+                    </div>
                 </div>
 
                 <!-- Global Controls -->
-                <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <!-- Asset Filter (for flows) -->
-                    <select class="form-select" style="width: 140px;" x-model="selectedAsset" @change="refreshAll()">
-                        <option value="ALL">All Assets</option>
-                        <option value="BTC">BTC</option>
-                        <option value="USDT">USDT</option>
-                    </select>
-
-                    <!-- Exchange Filter -->
-                    <select class="form-select" style="width: 140px;" x-model="selectedExchange" @change="refreshAll()">
-                        <option value="ALL">All Exchanges</option>
-                        <option value="binance">Binance</option>
-                        <option value="coinbase">Coinbase</option>
-                        <option value="okx">OKX</option>
-                    </select>
-
-                    <!-- Date Range -->
-                    <select class="form-select" style="width: 120px;" x-model="selectedDateRange" @change="refreshAll()">
-                        <option value="30d">30 Days</option>
-                        <option value="90d">90 Days</option>
-                        <option value="180d">180 Days</option>
-                        <option value="365d">1 Year</option>
-                    </select>
+                <div class="d-flex gap-3 align-items-center flex-wrap">
+                    <!-- Period Filter -->
+                    <div class="d-flex flex-column">
+                        <small class="text-muted mb-1">📅 Period</small>
+                        <select class="form-select" style="width: 130px;" x-model="selectedPeriod" @change="handlePeriodChange($event)">
+                            <option value="30">30 Days</option>
+                            <option value="60">60 Days</option>
+                            <option value="90">90 Days</option>
+                            <option value="180">180 Days</option>
+                            <option value="365">1 Year</option>
+                        </select>
+                    </div>
 
                     <!-- Refresh Button -->
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
                         <span x-show="!loading">🔄 Refresh All</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Auto-refresh Toggle -->
+                    <button class="btn" 
+                            :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'" 
+                            @click="toggleAutoRefresh()"
+                            style="min-width: 140px;">
+                        <span x-text="autoRefreshEnabled ? '🔄 Auto: ON' : '⏸️ Auto: OFF'"></span>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Quick Stats Row -->
-        <div class="row g-3">
+        <!-- Essential Metrics Row -->
+        <div class="row g-4 justify-content-center">
             <div class="col-lg-3 col-md-6">
-                <div class="df-panel p-3 h-100">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="df-panel p-4 h-100">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
                         <span class="text-muted small">MVRV Z-Score</span>
                         <span class="badge bg-info bg-opacity-10 text-info">Valuation</span>
                     </div>
-                    <div class="h3 mb-1 fw-bold" :class="getMVRVZScoreClass()" x-text="formatValue(metrics.mvrvZScore, 2)"></div>
+                    <div class="h2 mb-2 fw-bold" :class="getMVRVZScoreClass()" x-text="formatValue(metrics.mvrvZScore, 2)"></div>
                     <div class="small text-muted" x-text="metrics.mvrvZScoreStatus"></div>
                 </div>
             </div>
 
             <div class="col-lg-3 col-md-6">
-                <div class="df-panel p-3 h-100">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="df-panel p-4 h-100">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
                         <span class="text-muted small">Exchange Netflow (24h)</span>
                         <span class="badge bg-warning bg-opacity-10 text-warning">Flow</span>
                     </div>
-                    <div class="h3 mb-1 fw-bold" :class="getNetflowClass(metrics.btcNetflow)" x-text="formatValue(metrics.btcNetflow, 0, 'BTC')"></div>
+                    <div class="h2 mb-2 fw-bold" :class="getNetflowClass(metrics.btcNetflow)" x-text="formatValue(metrics.btcNetflow, 0, 'BTC')"></div>
                     <div class="small text-muted" x-text="metrics.btcNetflowStatus"></div>
                 </div>
             </div>
 
             <div class="col-lg-3 col-md-6">
-                <div class="df-panel p-3 h-100">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="df-panel p-4 h-100">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
                         <span class="text-muted small">Puell Multiple</span>
-                        <span class="badge bg-danger bg-opacity-10 text-danger">Miners</span>
+                        <span class="badge bg-danger bg-opacity-10 text-danger">Mining</span>
                     </div>
-                    <div class="h3 mb-1 fw-bold" :class="getPuellMultipleClass()" x-text="formatValue(metrics.puellMultiple, 2)"></div>
+                    <div class="h2 mb-2 fw-bold" :class="getPuellMultipleClass()" x-text="formatValue(metrics.puellMultiple, 2)"></div>
                     <div class="small text-muted" x-text="metrics.puellMultipleStatus"></div>
                 </div>
             </div>
 
             <div class="col-lg-3 col-md-6">
-                <div class="df-panel p-3 h-100">
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="text-muted small">LTH/STH Ratio</span>
-                        <span class="badge bg-success bg-opacity-10 text-success">Supply</span>
+                <div class="df-panel p-4 h-100">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="text-muted small">BTC Price</span>
+                        <span class="badge bg-success bg-opacity-10 text-success">Price</span>
                     </div>
-                    <div class="h3 mb-1 fw-bold" :class="getLthSthRatioClass()" x-text="formatValue(metrics.lthSthRatio, 2)"></div>
-                    <div class="small text-muted" x-text="metrics.lthSthRatioStatus"></div>
+                    <div class="h2 mb-2 fw-bold text-success" x-text="'$' + getLatestBTCPrice()"></div>
+                    <div class="small text-muted">Current Price</div>
                 </div>
             </div>
         </div>
@@ -519,8 +520,8 @@
                     </div>
                     <div class="mt-2 d-flex justify-content-around text-center" x-show="cryptoquant.minerReserve.length > 0">
                         <div>
-                            <small class="text-muted">Latest Reserve</small>
-                            <div class="fw-bold" x-text="(cryptoquant.minerReserve[0]?.value || 0).toLocaleString() + ' BTC'"></div>
+                            <small class="text-muted">Latest MPI</small>
+                            <div class="fw-bold" x-text="(cryptoquant.minerReserve[0]?.mpi || 0).toFixed(4)"></div>
                         </div>
                         <div>
                             <small class="text-muted">Date</small>
@@ -548,7 +549,7 @@
                     <div class="mt-2 d-flex justify-content-around text-center" x-show="cryptoquant.ethGas.length > 0">
                         <div>
                             <small class="text-muted">Latest Gas Price</small>
-                            <div class="fw-bold" x-text="(cryptoquant.ethGas[0]?.gas_price || 0).toFixed(2) + ' Gwei'"></div>
+                            <div class="fw-bold" x-text="(cryptoquant.ethGas[0]?.gas_price_mean || 0).toFixed(2) + ' Gwei'"></div>
                         </div>
                         <div>
                             <small class="text-muted">Timestamp</small>
@@ -571,8 +572,8 @@
                     </div>
                     <div class="mt-2 d-flex justify-content-around text-center" x-show="cryptoquant.ethStaking.length > 0">
                         <div>
-                            <small class="text-muted">Total Staked</small>
-                            <div class="fw-bold" x-text="(cryptoquant.ethStaking[0]?.staking_total / 1e6 || 0).toFixed(2) + 'M ETH'"></div>
+                            <small class="text-muted">Staking Inflow</small>
+                            <div class="fw-bold" x-text="(cryptoquant.ethStaking[0]?.staking_inflow_total / 1000 || 0).toFixed(1) + 'K ETH'"></div>
                         </div>
                         <div>
                             <small class="text-muted">Date</small>

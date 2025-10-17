@@ -54,6 +54,22 @@ function onchainMetricsController() {
         selectedExchange: "ALL",
         selectedDateRange: "365d",
 
+        // NEW: Enhanced Filter State for Auto-Refresh Feature
+        selectedPeriod: "30",        // 30/60/90/180 days
+        selectedSymbol: "BTC",       // BTC/ETH/ALL
+        selectedMetricType: "all",   // all/MVRV/Flow/Supply/Mining
+        selectedDataSource: "all",   // all/Native/CryptoQuant
+
+        // NEW: Filter Debouncing
+        filterDebounceTimer: null,
+        filterDebounceDelay: 300,    // 300ms debounce delay
+
+        // NEW: Auto-refresh State
+        autoRefreshEnabled: true,
+        autoRefreshTimer: null,
+        autoRefreshInterval: 5000,   // 5 seconds
+        lastUpdated: null,
+
         // Quick stats
         metrics: {
             mvrvZScore: null,
@@ -86,7 +102,7 @@ function onchainMetricsController() {
         // Data storage
         exchangeSummary: [],
         whaleSummary: [],
-        
+
         // CryptoQuant data
         cryptoquant: {
             mpi: [],
@@ -125,20 +141,268 @@ function onchainMetricsController() {
             console.log("⛓️ On-Chain Metrics Dashboard initialized");
             console.log("🌐 API Base URL:", this.apiBaseUrl);
 
+            // Setup visibility API for auto-refresh optimization
+            this.setupVisibilityAPI();
+
+            // Start auto-refresh
+            this.startAutoRefresh();
+
             // Load all data
             this.refreshAll();
         },
 
         /**
-         * Destroy all charts
+         * Setup visibility API for auto-refresh optimization
          */
-        destroyAllCharts() {
-            Object.keys(this.charts).forEach((key) => {
-                if (this.charts[key]) {
-                    this.charts[key].destroy();
-                    this.charts[key] = null;
+        setupVisibilityAPI() {
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log(`👁️ Tab hidden - pausing auto-refresh`);
+                    this.pauseAutoRefresh();
+                } else {
+                    console.log(`👁️ Tab visible - resuming auto-refresh`);
+                    this.resumeAutoRefresh();
                 }
             });
+        },
+
+        /**
+         * Destroy all charts with enhanced error handling
+         */
+        destroyAllCharts() {
+            console.log("🧹 Destroying all charts...");
+
+            Object.keys(this.charts).forEach((key) => {
+                if (this.charts[key]) {
+                    try {
+                        // Stop any ongoing animations
+                        if (typeof this.charts[key].stop === 'function') {
+                            this.charts[key].stop();
+                        }
+
+                        // Destroy the chart instance
+                        this.charts[key].destroy();
+                        console.log(`✅ Chart ${key} destroyed successfully`);
+                    } catch (error) {
+                        console.warn(`⚠️ Error destroying chart ${key}:`, error);
+                    } finally {
+                        // Always set to null regardless of destroy success
+                        this.charts[key] = null;
+                    }
+                }
+            });
+
+            console.log("🧹 All charts destruction completed");
+        },
+
+        /**
+         * Render all charts with stable requestAnimationFrame pattern
+         */
+        renderCharts() {
+            console.log("🎨 Starting stable chart rendering...");
+
+            // Double requestAnimationFrame for stable rendering
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    console.log("🎨 Executing chart rendering in stable frame");
+                    this.refreshAll();
+                });
+            });
+        },
+
+        // ==================== NEW: Filter Change Handlers ====================
+
+        /**
+         * Handle period filter change with debouncing
+         */
+        handlePeriodChange(event) {
+            const newPeriod = event?.target?.value || event;
+            console.log(`🔄 Period filter changed to: ${newPeriod}`);
+
+            this.selectedPeriod = newPeriod;
+            this.debouncedLoadAllData();
+        },
+
+        /**
+         * Handle symbol filter change with debouncing
+         */
+        handleSymbolChange(event) {
+            const newSymbol = event?.target?.value || event;
+            console.log(`🔄 Symbol filter changed to: ${newSymbol}`);
+
+            this.selectedSymbol = newSymbol;
+            this.debouncedLoadAllData();
+        },
+
+        /**
+         * Handle metric type filter change with debouncing
+         */
+        handleMetricTypeChange(event) {
+            const newMetricType = event?.target?.value || event;
+            console.log(`🔄 Metric type filter changed to: ${newMetricType}`);
+
+            this.selectedMetricType = newMetricType;
+            this.debouncedLoadAllData();
+        },
+
+        /**
+         * Handle data source filter change with debouncing
+         */
+        handleDataSourceChange(event) {
+            const newDataSource = event?.target?.value || event;
+            console.log(`🔄 Data source filter changed to: ${newDataSource}`);
+
+            this.selectedDataSource = newDataSource;
+            this.debouncedLoadAllData();
+        },
+
+        /**
+         * Debounced data loading to prevent excessive API calls
+         */
+        debouncedLoadAllData() {
+            // Clear existing timer
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+
+            // Set new timer
+            this.filterDebounceTimer = setTimeout(() => {
+                console.log(`🔄 Debounced filter change - loading all data...`);
+                this.refreshAll();
+            }, this.filterDebounceDelay);
+        },
+
+        // ==================== NEW: Auto-Refresh System ====================
+
+        /**
+         * Start auto-refresh timer
+         */
+        startAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+            }
+
+            console.log(`🔄 Starting auto-refresh with ${this.autoRefreshInterval}ms interval`);
+
+            this.autoRefreshTimer = setInterval(() => {
+                if (this.autoRefreshEnabled && !document.hidden) {
+                    console.log(`🔄 Auto-refresh triggered`);
+                    this.refreshAll();
+                    this.updateLastUpdatedTimestamp();
+                }
+            }, this.autoRefreshInterval);
+        },
+
+        /**
+         * Pause auto-refresh
+         */
+        pauseAutoRefresh() {
+            console.log(`⏸️ Auto-refresh paused`);
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+                this.autoRefreshTimer = null;
+            }
+        },
+
+        /**
+         * Resume auto-refresh
+         */
+        resumeAutoRefresh() {
+            if (this.autoRefreshEnabled) {
+                console.log(`▶️ Auto-refresh resumed`);
+                this.startAutoRefresh();
+            }
+        },
+
+        /**
+         * Toggle auto-refresh on/off
+         */
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+            console.log(`🔄 Auto-refresh toggled: ${this.autoRefreshEnabled ? 'ON' : 'OFF'}`);
+
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            } else {
+                this.pauseAutoRefresh();
+            }
+        },
+
+        /**
+         * Update last updated timestamp
+         */
+        updateLastUpdatedTimestamp() {
+            this.lastUpdated = new Date().toLocaleTimeString('en-US', {
+                hour12: true,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            console.log(`🕒 Last updated: ${this.lastUpdated}`);
+        },
+
+        // ==================== NEW: Helper Methods for Missing Metrics ====================
+
+        /**
+         * Get latest ETH Gas Price
+         */
+        getLatestGasPrice() {
+            if (this.cryptoquant.ethGas && this.cryptoquant.ethGas.length > 0) {
+                return this.cryptoquant.ethGas[0].gas_price_mean.toFixed(2);
+            }
+            return "--";
+        },
+
+        /**
+         * Get latest ETH Staking Inflow
+         */
+        getLatestStakingInflow() {
+            if (this.cryptoquant.ethStaking && this.cryptoquant.ethStaking.length > 0) {
+                return this.formatNumber(this.cryptoquant.ethStaking[0].staking_inflow_total);
+            }
+            return "--";
+        },
+
+        /**
+         * Get latest MPI value
+         */
+        getLatestMPI() {
+            if (this.cryptoquant.mpi && this.cryptoquant.mpi.length > 0) {
+                return this.cryptoquant.mpi[0].mpi.toFixed(4);
+            }
+            return "--";
+        },
+
+        /**
+         * Get latest BTC Price
+         */
+        getLatestBTCPrice() {
+            if (this.cryptoquant.priceOHLCV && this.cryptoquant.priceOHLCV.length > 0) {
+                return this.formatNumber(this.cryptoquant.priceOHLCV[0].close);
+            }
+            return "--";
+        },
+
+        /**
+         * Get gas price styling class
+         */
+        getGasPriceClass() {
+            const gasPrice = parseFloat(this.getLatestGasPrice());
+            if (gasPrice > 50) return "text-danger";   // High gas
+            if (gasPrice > 20) return "text-warning";  // Medium gas
+            if (gasPrice > 0) return "text-success";   // Low gas
+            return "text-muted";
+        },
+
+        /**
+         * Get MPI styling class
+         */
+        getMPIClass() {
+            const mpi = parseFloat(this.getLatestMPI());
+            if (mpi > 0.5) return "text-danger";    // High selling pressure
+            if (mpi > 0) return "text-warning";     // Medium pressure
+            if (mpi > -0.5) return "text-info";     // Low pressure
+            return "text-success";                  // Very low pressure
         },
 
         /**
@@ -169,6 +433,7 @@ function onchainMetricsController() {
                 ]);
 
                 console.log("✅ All data loaded successfully");
+                this.updateLastUpdatedTimestamp();
             } catch (error) {
                 console.error("❌ Error refreshing data:", error);
             } finally {
@@ -201,6 +466,66 @@ function onchainMetricsController() {
          */
         getExchangeFilter() {
             return this.selectedExchange === "ALL" ? "" : this.selectedExchange;
+        },
+
+        // ==================== NEW: Filter Parameter Mapping System ====================
+
+        /**
+         * Get filter parameters for API calls
+         */
+        getFilterParams() {
+            const params = {};
+
+            // Period filter - maps to limit parameter
+            if (this.selectedPeriod) {
+                params.limit = parseInt(this.selectedPeriod);
+            }
+
+            // Symbol filter - maps to asset parameter for supported endpoints
+            if (this.selectedSymbol && this.selectedSymbol !== "ALL") {
+                params.asset = this.selectedSymbol;
+                params.symbol = this.selectedSymbol; // For CryptoQuant endpoints
+            }
+
+            // Existing filters (maintain backward compatibility)
+            const assetFilter = this.getAssetFilter();
+            if (assetFilter) {
+                params.asset = assetFilter;
+            }
+
+            const exchangeFilter = this.getExchangeFilter();
+            if (exchangeFilter) {
+                params.exchange = exchangeFilter;
+            }
+
+            // Legacy date range support
+            if (this.selectedDateRange) {
+                const legacyLimit = this.getLimit();
+                if (!params.limit) {
+                    params.limit = legacyLimit;
+                }
+            }
+
+            return params;
+        },
+
+        /**
+         * Build URL with filter parameters
+         */
+        buildApiUrl(endpoint, additionalParams = {}) {
+            const baseParams = this.getFilterParams();
+            const allParams = { ...baseParams, ...additionalParams };
+
+            const params = new URLSearchParams();
+            Object.entries(allParams).forEach(([key, value]) => {
+                if (value !== null && value !== undefined && value !== "") {
+                    params.append(key, value);
+                }
+            });
+
+            const url = `${this.apiBaseUrl}${endpoint}?${params}`;
+            console.log(`🔗 API URL: ${url}`);
+            return url;
         },
 
         /**
@@ -315,17 +640,11 @@ function onchainMetricsController() {
             this.loadingStates.mvrv = true;
 
             try {
-                const params = new URLSearchParams({
-                    limit: this.getLimit(),
-                });
+                // Use new filter parameter system
+                const url = this.buildApiUrl("/api/onchain/valuation/mvrv");
+                console.log(`📊 Loading MVRV data with filters: ${url}`);
 
-                console.log(
-                    `📊 Loading MVRV data: ${this.apiBaseUrl}/api/onchain/valuation/mvrv?${params}`
-                );
-
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/valuation/mvrv?${params}`
-                );
+                const response = await fetch(url);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -374,27 +693,18 @@ function onchainMetricsController() {
             this.loadingStates.flows = true;
 
             try {
-                const params = new URLSearchParams({
-                    limit: this.getLimit(),
-                });
-
-                const assetFilter = this.getAssetFilter();
-                if (assetFilter) {
-                    params.append("asset", assetFilter);
-                }
+                // Use new filter parameter system with additional legacy filters
+                const additionalParams = {};
 
                 const exchangeFilter = this.getExchangeFilter();
                 if (exchangeFilter) {
-                    params.append("exchange", exchangeFilter);
+                    additionalParams.exchange = exchangeFilter;
                 }
 
-                console.log(
-                    `📊 Loading Exchange Flows: ${this.apiBaseUrl}/api/onchain/flow/exchange-netflow?${params}`
-                );
+                const url = this.buildApiUrl("/api/onchain/flow/exchange-netflow", additionalParams);
+                console.log(`📊 Loading Exchange Flows with filters: ${url}`);
 
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/flow/exchange-netflow?${params}`
-                );
+                const response = await fetch(url);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -438,23 +748,18 @@ function onchainMetricsController() {
          */
         async loadExchangeSummary() {
             try {
-                const params = new URLSearchParams({
-                    limit: this.getLimit(),
-                });
-
-                const assetFilter = this.getAssetFilter();
-                if (assetFilter) {
-                    params.append("asset", assetFilter);
-                }
+                // Use new filter parameter system with additional legacy filters
+                const additionalParams = {};
 
                 const exchangeFilter = this.getExchangeFilter();
                 if (exchangeFilter) {
-                    params.append("exchange", exchangeFilter);
+                    additionalParams.exchange = exchangeFilter;
                 }
 
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/exchange/summary?${params}`
-                );
+                const url = this.buildApiUrl("/api/onchain/exchange/summary", additionalParams);
+                console.log(`📊 Loading Exchange Summary with filters: ${url}`);
+
+                const response = await fetch(url);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -481,17 +786,11 @@ function onchainMetricsController() {
             this.loadingStates.supply = true;
 
             try {
-                const params = new URLSearchParams({
-                    limit: this.getLimit(),
-                });
+                // Use new filter parameter system
+                const url = this.buildApiUrl("/api/onchain/supply/lth-sth");
+                console.log(`📊 Loading Supply Distribution with filters: ${url}`);
 
-                console.log(
-                    `📊 Loading Supply Distribution: ${this.apiBaseUrl}/api/onchain/supply/lth-sth?${params}`
-                );
-
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/supply/lth-sth?${params}`
-                );
+                const response = await fetch(url);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -536,17 +835,11 @@ function onchainMetricsController() {
             this.loadingStates.hodl = true;
 
             try {
-                const params = new URLSearchParams({
-                    limit: this.getLimit(),
-                });
+                // Use new filter parameter system
+                const url = this.buildApiUrl("/api/onchain/supply/hodl-waves");
+                console.log(`📊 Loading HODL Waves with filters: ${url}`);
 
-                console.log(
-                    `📊 Loading HODL Waves: ${this.apiBaseUrl}/api/onchain/supply/hodl-waves?${params}`
-                );
-
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/supply/hodl-waves?${params}`
-                );
+                const response = await fetch(url);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -575,18 +868,15 @@ function onchainMetricsController() {
             this.loadingStates.chainHealth = true;
 
             try {
-                const params = new URLSearchParams({
-                    limit: this.getLimit(),
-                    metric: this.chainHealthMetric,
-                });
+                // Use new filter parameter system with additional metric parameter
+                const additionalParams = {
+                    metric: this.chainHealthMetric
+                };
 
-                console.log(
-                    `📊 Loading Chain Health: ${this.apiBaseUrl}/api/onchain/chain-health/reserve-risk?${params}`
-                );
+                const url = this.buildApiUrl("/api/onchain/chain-health/reserve-risk", additionalParams);
+                console.log(`📊 Loading Chain Health with filters: ${url}`);
 
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/chain-health/reserve-risk?${params}`
-                );
+                const response = await fetch(url);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -615,17 +905,11 @@ function onchainMetricsController() {
             this.loadingStates.miners = true;
 
             try {
-                const params = new URLSearchParams({
-                    limit: this.getLimit(),
-                });
+                // Use new filter parameter system
+                const url = this.buildApiUrl("/api/onchain/mining/miner-netflow");
+                console.log(`📊 Loading Miner Metrics with filters: ${url}`);
 
-                console.log(
-                    `📊 Loading Miner Metrics: ${this.apiBaseUrl}/api/onchain/mining/miner-netflow?${params}`
-                );
-
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/mining/miner-netflow?${params}`
-                );
+                const response = await fetch(url);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -676,21 +960,17 @@ function onchainMetricsController() {
             this.loadingStates.whales = true;
 
             try {
-                const params = new URLSearchParams({
-                    limit: this.getLimit(),
-                });
+                // Use new filter parameter system with additional cohort parameter
+                const additionalParams = {};
 
                 if (this.whaleCohort) {
-                    params.append("cohort", this.whaleCohort);
+                    additionalParams.cohort = this.whaleCohort;
                 }
 
-                console.log(
-                    `📊 Loading Whale Holdings: ${this.apiBaseUrl}/api/onchain/whale/holdings?${params}`
-                );
+                const url = this.buildApiUrl("/api/onchain/whale/holdings", additionalParams);
+                console.log(`📊 Loading Whale Holdings with filters: ${url}`);
 
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/whale/holdings?${params}`
-                );
+                const response = await fetch(url);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -754,17 +1034,11 @@ function onchainMetricsController() {
             this.loadingStates.realizedCap = true;
 
             try {
-                const params = new URLSearchParams({
-                    limit: this.getLimit(),
-                });
+                // Use new filter parameter system
+                const url = this.buildApiUrl("/api/onchain/valuation/realized-cap");
+                console.log(`📊 Loading Realized Cap with filters: ${url}`);
 
-                console.log(
-                    `📊 Loading Realized Cap: ${this.apiBaseUrl}/api/onchain/valuation/realized-cap?${params}`
-                );
-
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/valuation/realized-cap?${params}`
-                );
+                const response = await fetch(url);
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -841,6 +1115,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     interaction: {
                         mode: "index",
                         intersect: false,
@@ -861,7 +1138,7 @@ function onchainMetricsController() {
                                         label +=
                                             context.dataset.yAxisID === "y1"
                                                 ? "$" +
-                                                  context.parsed.y.toLocaleString()
+                                                context.parsed.y.toLocaleString()
                                                 : context.parsed.y.toFixed(2);
                                     }
                                     return label;
@@ -942,8 +1219,8 @@ function onchainMetricsController() {
             const labels =
                 Object.keys(byExchange).length > 0
                     ? byExchange[Object.keys(byExchange)[0]].map(
-                          (d, index) => index
-                      )
+                        (d, index) => index
+                    )
                     : [];
 
             // Create datasets
@@ -975,6 +1252,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     interaction: {
                         mode: "index",
                         intersect: false,
@@ -1074,6 +1354,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     interaction: {
                         mode: "index",
                         intersect: false,
@@ -1159,8 +1442,8 @@ function onchainMetricsController() {
             const labels =
                 Object.keys(byCohort).length > 0
                     ? byCohort[Object.keys(byCohort)[0]].map(
-                          (d, index) => index
-                      )
+                        (d, index) => index
+                    )
                     : [];
 
             // Define cohort colors
@@ -1197,6 +1480,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     interaction: {
                         mode: "index",
                         intersect: false,
@@ -1288,6 +1574,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     interaction: {
                         mode: "index",
                         intersect: false,
@@ -1369,6 +1658,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     interaction: {
                         mode: "index",
                         intersect: false,
@@ -1457,8 +1749,8 @@ function onchainMetricsController() {
             const labels =
                 Object.keys(byCohort).length > 0
                     ? byCohort[Object.keys(byCohort)[0]].map(
-                          (d, index) => index
-                      )
+                        (d, index) => index
+                    )
                     : [];
 
             // Define cohort colors
@@ -1492,6 +1784,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     interaction: {
                         mode: "index",
                         intersect: false,
@@ -1601,6 +1896,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     interaction: {
                         mode: "index",
                         intersect: false,
@@ -1801,17 +2099,30 @@ function onchainMetricsController() {
         async loadCryptoQuantMPI() {
             this.loadingStates.cqMPI = true;
             try {
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/cq/miners-position-index?limit=30`
-                );
+                // Use new filter parameter system
+                const url = this.buildApiUrl("/api/onchain/cq/miners-position-index");
+                console.log(`📊 Loading CQ MPI with filters: ${url}`);
+
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const result = await response.json();
+                console.log(`📊 CQ MPI response:`, result);
+
                 if (result.data && result.data.length > 0) {
                     this.cryptoquant.mpi = result.data;
                     this.renderCQMPIChart();
                     console.log("✅ CQ MPI loaded:", result.data.length);
+                } else {
+                    console.warn("⚠️ No CQ MPI data available");
+                    this.cryptoquant.mpi = [];
                 }
             } catch (error) {
                 console.error("❌ Error loading CQ MPI:", error);
+                this.cryptoquant.mpi = [];
             } finally {
                 this.loadingStates.cqMPI = false;
             }
@@ -1823,17 +2134,30 @@ function onchainMetricsController() {
         async loadCryptoQuantMinerReserve() {
             this.loadingStates.cqMinerReserve = true;
             try {
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/cq/miner-reserve?limit=30`
-                );
+                // Use new filter parameter system
+                const url = this.buildApiUrl("/api/onchain/cq/miner-reserve");
+                console.log(`📊 Loading CQ Miner Reserve with filters: ${url}`);
+
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const result = await response.json();
+                console.log(`📊 CQ Miner Reserve response:`, result);
+
                 if (result.data && result.data.length > 0) {
                     this.cryptoquant.minerReserve = result.data;
                     this.renderCQMinerReserveChart();
                     console.log("✅ CQ Miner Reserve loaded:", result.data.length);
+                } else {
+                    console.warn("⚠️ No CQ Miner Reserve data available");
+                    this.cryptoquant.minerReserve = [];
                 }
             } catch (error) {
                 console.error("❌ Error loading CQ Miner Reserve:", error);
+                this.cryptoquant.minerReserve = [];
             } finally {
                 this.loadingStates.cqMinerReserve = false;
             }
@@ -1845,17 +2169,30 @@ function onchainMetricsController() {
         async loadCryptoQuantETHGas() {
             this.loadingStates.cqETHGas = true;
             try {
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/cq/eth-gas-price?limit=30`
-                );
+                // Use new filter parameter system
+                const url = this.buildApiUrl("/api/onchain/cq/eth-gas-price");
+                console.log(`📊 Loading CQ ETH Gas with filters: ${url}`);
+
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const result = await response.json();
+                console.log(`📊 CQ ETH Gas response:`, result);
+
                 if (result.data && result.data.length > 0) {
                     this.cryptoquant.ethGas = result.data;
                     this.renderCQETHGasChart();
                     console.log("✅ CQ ETH Gas loaded:", result.data.length);
+                } else {
+                    console.warn("⚠️ No CQ ETH Gas data available");
+                    this.cryptoquant.ethGas = [];
                 }
             } catch (error) {
                 console.error("❌ Error loading CQ ETH Gas:", error);
+                this.cryptoquant.ethGas = [];
             } finally {
                 this.loadingStates.cqETHGas = false;
             }
@@ -1867,17 +2204,30 @@ function onchainMetricsController() {
         async loadCryptoQuantETHStaking() {
             this.loadingStates.cqETHStaking = true;
             try {
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/cq/eth-staking-total?limit=30`
-                );
+                // Use new filter parameter system
+                const url = this.buildApiUrl("/api/onchain/cq/eth-staking-total");
+                console.log(`📊 Loading CQ ETH Staking with filters: ${url}`);
+
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const result = await response.json();
+                console.log(`📊 CQ ETH Staking response:`, result);
+
                 if (result.data && result.data.length > 0) {
                     this.cryptoquant.ethStaking = result.data;
                     this.renderCQETHStakingChart();
                     console.log("✅ CQ ETH Staking loaded:", result.data.length);
+                } else {
+                    console.warn("⚠️ No CQ ETH Staking data available");
+                    this.cryptoquant.ethStaking = [];
                 }
             } catch (error) {
                 console.error("❌ Error loading CQ ETH Staking:", error);
+                this.cryptoquant.ethStaking = [];
             } finally {
                 this.loadingStates.cqETHStaking = false;
             }
@@ -1889,17 +2239,30 @@ function onchainMetricsController() {
         async loadCryptoQuantPrice() {
             this.loadingStates.cqPrice = true;
             try {
-                const response = await fetch(
-                    `${this.apiBaseUrl}/api/onchain/cq/price-ohlcv?limit=30`
-                );
+                // Use new filter parameter system
+                const url = this.buildApiUrl("/api/onchain/cq/price-ohlcv");
+                console.log(`📊 Loading CQ Price OHLCV with filters: ${url}`);
+
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const result = await response.json();
+                console.log(`📊 CQ Price OHLCV response:`, result);
+
                 if (result.data && result.data.length > 0) {
                     this.cryptoquant.priceOHLCV = result.data;
                     this.renderCQPriceChart();
                     console.log("✅ CQ Price OHLCV loaded:", result.data.length);
+                } else {
+                    console.warn("⚠️ No CQ Price OHLCV data available");
+                    this.cryptoquant.priceOHLCV = [];
                 }
             } catch (error) {
                 console.error("❌ Error loading CQ Price OHLCV:", error);
+                this.cryptoquant.priceOHLCV = [];
             } finally {
                 this.loadingStates.cqPrice = false;
             }
@@ -1931,6 +2294,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
@@ -1961,7 +2327,7 @@ function onchainMetricsController() {
                     datasets: [
                         {
                             label: "Miner Reserve (BTC)",
-                            data: this.cryptoquant.minerReserve.map((d) => d.value).reverse(),
+                            data: this.cryptoquant.minerReserve.map((d) => d.mpi).reverse(),
                             borderColor: "rgb(75, 192, 192)",
                             backgroundColor: "rgba(75, 192, 192, 0.1)",
                             fill: true,
@@ -1972,6 +2338,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
@@ -2002,7 +2371,7 @@ function onchainMetricsController() {
                     datasets: [
                         {
                             label: "ETH Gas Price (Gwei)",
-                            data: this.cryptoquant.ethGas.map((d) => d.gas_price).reverse(),
+                            data: this.cryptoquant.ethGas.map((d) => d.gas_price_mean).reverse(),
                             borderColor: "rgb(153, 102, 255)",
                             backgroundColor: "rgba(153, 102, 255, 0.1)",
                             fill: true,
@@ -2013,6 +2382,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
@@ -2043,7 +2415,7 @@ function onchainMetricsController() {
                     datasets: [
                         {
                             label: "ETH Staking Total",
-                            data: this.cryptoquant.ethStaking.map((d) => d.staking_total).reverse(),
+                            data: this.cryptoquant.ethStaking.map((d) => d.staking_inflow_total).reverse(),
                             borderColor: "rgb(54, 162, 235)",
                             backgroundColor: "rgba(54, 162, 235, 0.1)",
                             fill: true,
@@ -2054,6 +2426,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
@@ -2095,6 +2470,9 @@ function onchainMetricsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
