@@ -5,13 +5,7 @@
             <small class="text-secondary">OHLCV data for major assets, ERC20 tokens, and stablecoins</small>
         </div>
         <div class="d-flex gap-2">
-            <!-- Chart Type Toggle -->
-            <select class="form-select form-select-sm" style="width: 120px;" x-model="chartType" @change="updatePriceChart()">
-                <option value="line">Line Chart</option>
-                <option value="candlestick">Candlestick</option>
-            </select>
             <span x-show="loadingStates.price" class="spinner-border spinner-border-sm text-primary"></span>
-            <button class="btn btn-sm btn-outline-primary" @click="refreshPriceData()">Refresh</button>
         </div>
     </div>
     
