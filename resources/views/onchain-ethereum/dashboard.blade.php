@@ -28,24 +28,35 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <!-- Time Window -->
-                    <select class="form-select" style="width: 120px;" x-model="selectedWindow" @change="refreshAll()">
-                        <option value="day">Daily</option>
-                        <option value="hour">Hourly</option>
-                    </select>
-
-                    <!-- Data Limit -->
-                    <select class="form-select" style="width: 120px;" x-model="selectedLimit" @change="refreshAll()">
+                    <!-- Data Limit - Enhanced with more options including 1000 and 2000 -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedLimit" @change="handleLimitChange()">
+                        <option value="30">30 Records</option>
                         <option value="50">50 Records</option>
                         <option value="100">100 Records</option>
                         <option value="200">200 Records</option>
+                        <option value="365">365 Records</option>
+                        <option value="500">500 Records</option>
+                        <option value="1000">1000 Records</option>
+                        <option value="2000">2000 Records</option>
                     </select>
 
-                    <!-- Refresh Button -->
+                    <!-- Auto-refresh Toggle - Fixed styling and positioning -->
+                    <button class="btn" @click="toggleAutoRefresh()" 
+                            :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'">
+                        <span x-text="autoRefreshEnabled ? '🔄 Auto-refresh: ON' : '⏸️ Auto-refresh: OFF'"></span>
+                    </button>
+
+                    <!-- Manual Refresh Button - Moved before auto-refresh -->
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
                         <span x-show="!loading">🔄 Refresh All</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Last Updated -->
+                    <div class="d-flex align-items-center gap-1 text-muted small" x-show="lastUpdated">
+                        <span>Last updated:</span>
+                        <span x-text="lastUpdated" class="fw-bold"></span>
+                    </div>
                     
                     <!-- Debug Button (temporary) -->
                     <!-- <button class="btn btn-warning btn-sm" @click="console.log('Test functions:', typeof formatPercentage, typeof getMomentumClass)">

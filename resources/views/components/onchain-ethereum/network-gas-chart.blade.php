@@ -6,7 +6,6 @@
         </div>
         <div class="d-flex gap-2">
             <span x-show="loadingStates.gas" class="spinner-border spinner-border-sm text-primary"></span>
-            <button class="btn btn-sm btn-outline-primary" @click="refreshGasData()">Refresh</button>
         </div>
     </div>
     

@@ -10,8 +10,20 @@ function onchainEthereumController() {
     return {
         // Global state
         loading: false,
-        selectedWindow: 'day',
         selectedLimit: 200,
+        
+        // ENHANCED: More record options (keeping existing selectedLimit pattern)
+        // selectedLimit already exists, we'll just add more options in UI
+        
+        // NEW: Auto-refresh State
+        autoRefreshEnabled: true,
+        autoRefreshTimer: null,
+        autoRefreshInterval: 5000,   // 5 seconds
+        lastUpdated: null,
+        
+        // NEW: Debouncing
+        filterDebounceTimer: null,
+        filterDebounceDelay: 300,
         
         // Component-specific state
         gasData: [],
@@ -41,30 +53,32 @@ function onchainEthereumController() {
             
             this.loadAllData();
             
-            // Auto refresh every 60 seconds
-            setInterval(() => this.refreshAll(), 60000);
+            // NEW: Start auto-refresh system
+            this.startAutoRefresh();
+            
+            // NEW: Add visibility API integration
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log('👁️ Tab hidden, pausing auto-refresh');
+                    this.pauseAutoRefresh();
+                } else {
+                    console.log('👁️ Tab visible, resuming auto-refresh');
+                    this.resumeAutoRefresh();
+                }
+            });
         },
         
         // Load shared state
         loadSharedState() {
             if (window.OnChainSharedState) {
                 const sharedFilters = window.OnChainSharedState.getAllFilters();
-                this.selectedWindow = sharedFilters.selectedWindow;
-                this.selectedLimit = sharedFilters.selectedLimit;
+                this.selectedLimit = sharedFilters.selectedLimit || 200;
             }
         },
         
         // Subscribe to shared state changes
         subscribeToSharedState() {
             if (window.OnChainSharedState) {
-                // Subscribe to window changes
-                window.OnChainSharedState.subscribe('selectedWindow', (value) => {
-                    if (this.selectedWindow !== value) {
-                        this.selectedWindow = value;
-                        this.refreshAll();
-                    }
-                });
-                
                 // Subscribe to limit changes
                 window.OnChainSharedState.subscribe('selectedLimit', (value) => {
                     if (this.selectedLimit !== value) {
@@ -78,7 +92,6 @@ function onchainEthereumController() {
         // Update shared state when local state changes
         updateSharedState() {
             if (window.OnChainSharedState) {
-                window.OnChainSharedState.setFilter('selectedWindow', this.selectedWindow);
                 window.OnChainSharedState.setFilter('selectedLimit', this.selectedLimit);
             }
         },
@@ -96,15 +109,19 @@ function onchainEthereumController() {
             
             if (!this.gasData.length) return;
             
-            const labels = this.gasData.map(item => {
+            // FIXED: Sort data chronologically (oldest to newest)
+            const sortedData = this.sortDataChronologically(this.gasData);
+            console.log('📊 Gas chart data sorted:', sortedData.length, 'records');
+            
+            const labels = sortedData.map(item => {
                 const date = new Date(item.timestamp);
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             });
-            const gasPrices = this.gasData.map(item => item.gas_price_mean);
-            const gasUsedPercent = this.gasData.map(item => 
+            const gasPrices = sortedData.map(item => item.gas_price_mean);
+            const gasUsedPercent = sortedData.map(item => 
                 (item.gas_used_mean / item.gas_limit_mean) * 100
             );
-            const gasLimits = this.gasData.map(item => item.gas_limit_mean);
+            const gasLimits = sortedData.map(item => item.gas_limit_mean);
             
             const ctx = canvas.getContext('2d');
             this.gasChart = new Chart(ctx, {
@@ -141,6 +158,9 @@ function onchainEthereumController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     interaction: {
                         mode: 'index',
                         intersect: false,
@@ -219,11 +239,15 @@ function onchainEthereumController() {
             
             if (!this.stakingData.length) return;
             
-            const labels = this.stakingData.map(item => {
+            // FIXED: Sort data chronologically (oldest to newest)
+            const sortedData = this.sortDataChronologically(this.stakingData);
+            console.log('📊 Staking chart data sorted:', sortedData.length, 'records');
+            
+            const labels = sortedData.map(item => {
                 const date = new Date(item.timestamp);
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             });
-            const stakingInflows = this.stakingData.map(item => item.staking_inflow_total);
+            const stakingInflows = sortedData.map(item => item.staking_inflow_total);
             
             const ctx = canvas.getContext('2d');
             this.stakingChart = new Chart(ctx, {
@@ -244,6 +268,9 @@ function onchainEthereumController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     interaction: {
                         mode: 'index',
                         intersect: false,
@@ -291,6 +318,9 @@ function onchainEthereumController() {
                     this.loadGasData(),
                     this.loadStakingData()
                 ]);
+                
+                // NEW: Update timestamp on successful load
+                this.updateLastUpdated();
             } catch (error) {
                 console.error('❌ Error loading Ethereum data:', error);
             } finally {
@@ -304,8 +334,8 @@ function onchainEthereumController() {
             try {
                 const operation = async () => {
                     const [gasResponse, summaryResponse] = await Promise.all([
-                        this.fetchAPI(`/api/onchain/eth/network-gas?window=${this.selectedWindow}&limit=${this.selectedLimit}`),
-                        this.fetchAPI(`/api/onchain/eth/network-gas/summary?window=${this.selectedWindow}&limit=${this.selectedLimit}`)
+                        this.fetchAPI(`/api/onchain/eth/network-gas?window=day&limit=${this.selectedLimit}`),
+                        this.fetchAPI(`/api/onchain/eth/network-gas/summary?window=day&limit=${this.selectedLimit}`)
                     ]);
                     return { gasResponse, summaryResponse };
                 };
@@ -345,8 +375,8 @@ function onchainEthereumController() {
             try {
                 const operation = async () => {
                     const [stakingResponse, summaryResponse] = await Promise.all([
-                        this.fetchAPI(`/api/onchain/eth/staking-deposits?window=${this.selectedWindow}&limit=${this.selectedLimit}`),
-                        this.fetchAPI(`/api/onchain/eth/staking-deposits/summary?window=${this.selectedWindow}&limit=${this.selectedLimit}`)
+                        this.fetchAPI(`/api/onchain/eth/staking-deposits?window=day&limit=${this.selectedLimit}`),
+                        this.fetchAPI(`/api/onchain/eth/staking-deposits/summary?window=day&limit=${this.selectedLimit}`)
                     ]);
                     return { stakingResponse, summaryResponse };
                 };
@@ -394,6 +424,129 @@ function onchainEthereumController() {
         // Refresh staking data only
         async refreshStakingData() {
             await this.loadStakingData();
+        },
+        
+        // ENHANCED: Debounced refresh for better performance
+        handleLimitChange() {
+            console.log('🔄 Limit filter changed to:', this.selectedLimit);
+            
+            // Clear existing timer
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+            
+            // Set new timer with debouncing
+            this.filterDebounceTimer = setTimeout(() => {
+                console.log('⏰ Debounced limit change executing...');
+                this.loadAllData();
+            }, this.filterDebounceDelay);
+        },
+        
+        // NEW: Centralized chart destruction to prevent race conditions
+        destroyAllCharts() {
+            console.log('🧹 Destroying all charts...');
+            
+            // Destroy gas chart
+            if (this.gasChart) {
+                try {
+                    if (typeof this.gasChart.stop === 'function') {
+                        this.gasChart.stop();
+                    }
+                    this.gasChart.destroy();
+                } catch (e) {
+                    console.warn('⚠️ Error destroying gas chart:', e);
+                }
+                this.gasChart = null;
+            }
+            
+            // Destroy staking chart
+            if (this.stakingChart) {
+                try {
+                    if (typeof this.stakingChart.stop === 'function') {
+                        this.stakingChart.stop();
+                    }
+                    this.stakingChart.destroy();
+                } catch (e) {
+                    console.warn('⚠️ Error destroying staking chart:', e);
+                }
+                this.stakingChart = null;
+            }
+        },
+        
+        // NEW: Sort data chronologically (oldest to newest) to fix chart ordering
+        sortDataChronologically(data) {
+            if (!Array.isArray(data)) return data;
+            
+            return data.sort((a, b) => {
+                const dateA = new Date(a.timestamp);
+                const dateB = new Date(b.timestamp);
+                return dateA - dateB; // Ascending order (oldest first)
+            });
+        },
+        
+        // NEW: Enhanced chart rendering with RAF and proper data ordering
+        renderCharts() {
+            console.log('🎨 Rendering charts with RAF...');
+            
+            // Use double requestAnimationFrame for stable rendering
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    this.renderGasChart();
+                    this.renderStakingChart();
+                });
+            });
+        },
+        
+        // NEW: Auto-refresh system methods
+        startAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+            }
+            
+            console.log('🔄 Starting auto-refresh with', this.autoRefreshInterval, 'ms interval');
+            this.autoRefreshTimer = setInterval(() => {
+                if (this.autoRefreshEnabled && !document.hidden) {
+                    console.log('⏰ Auto-refresh triggered');
+                    this.loadAllData();
+                }
+            }, this.autoRefreshInterval);
+        },
+        
+        pauseAutoRefresh() {
+            console.log('⏸️ Pausing auto-refresh');
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+                this.autoRefreshTimer = null;
+            }
+        },
+        
+        resumeAutoRefresh() {
+            if (this.autoRefreshEnabled) {
+                console.log('▶️ Resuming auto-refresh');
+                this.startAutoRefresh();
+            }
+        },
+        
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+            console.log('🔄 Auto-refresh toggled:', this.autoRefreshEnabled ? 'ON' : 'OFF');
+            
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            } else {
+                this.pauseAutoRefresh();
+            }
+        },
+        
+        // NEW: Update timestamp on successful data load
+        updateLastUpdated() {
+            this.lastUpdated = new Date().toLocaleTimeString('en-US', {
+                hour12: true,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            console.log('🕒 Last updated:', this.lastUpdated);
         },
         
         // Fetch API helper with caching
