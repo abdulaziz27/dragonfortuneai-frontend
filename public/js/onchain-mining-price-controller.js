@@ -7,12 +7,19 @@ function onchainMiningPriceController() {
     return {
         // Global state
         loading: false,
-        selectedAsset: 'BTC',
-        selectedToken: '',
-        selectedStablecoin: '',
-        selectedWindow: 'day',
+        selectedAsset: 'BTC', // Fixed to BTC only
         selectedLimit: 200,
         chartType: 'line',
+        
+        // NEW: Auto-refresh State
+        autoRefreshEnabled: true,
+        autoRefreshTimer: null,
+        autoRefreshInterval: 5000,   // 5 seconds
+        lastUpdated: null,
+        
+        // NEW: Debouncing
+        filterDebounceTimer: null,
+        filterDebounceDelay: 300,
 
         // Component-specific state
         mpiData: [],
@@ -45,38 +52,34 @@ function onchainMiningPriceController() {
             
             this.loadAllData();
 
-            // Auto refresh every 60 seconds
-            setInterval(() => this.refreshAll(), 60000);
+            // NEW: Start auto-refresh system
+            this.startAutoRefresh();
+            
+            // NEW: Add visibility API integration
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log('👁️ Tab hidden, pausing auto-refresh');
+                    this.pauseAutoRefresh();
+                } else {
+                    console.log('👁️ Tab visible, resuming auto-refresh');
+                    this.resumeAutoRefresh();
+                }
+            });
         },
         
         // Load shared state
         loadSharedState() {
             if (window.OnChainSharedState) {
                 const sharedFilters = window.OnChainSharedState.getAllFilters();
-                this.selectedAsset = sharedFilters.selectedAsset;
-                this.selectedWindow = sharedFilters.selectedWindow;
-                this.selectedLimit = sharedFilters.selectedLimit;
+                this.selectedAsset = 'BTC'; // Force BTC only
+                this.selectedLimit = sharedFilters.selectedLimit || 200;
             }
         },
         
         // Subscribe to shared state changes
         subscribeToSharedState() {
             if (window.OnChainSharedState) {
-                // Subscribe to asset changes
-                window.OnChainSharedState.subscribe('selectedAsset', (value) => {
-                    if (this.selectedAsset !== value) {
-                        this.selectedAsset = value;
-                        this.refreshAll();
-                    }
-                });
-                
-                // Subscribe to window changes
-                window.OnChainSharedState.subscribe('selectedWindow', (value) => {
-                    if (this.selectedWindow !== value) {
-                        this.selectedWindow = value;
-                        this.refreshAll();
-                    }
-                });
+                // Asset is fixed to BTC only, no subscription needed
                 
                 // Subscribe to limit changes
                 window.OnChainSharedState.subscribe('selectedLimit', (value) => {
@@ -91,8 +94,7 @@ function onchainMiningPriceController() {
         // Update shared state when local state changes
         updateSharedState() {
             if (window.OnChainSharedState) {
-                window.OnChainSharedState.setFilter('selectedAsset', this.selectedAsset);
-                window.OnChainSharedState.setFilter('selectedWindow', this.selectedWindow);
+                // Asset is fixed to BTC, only update limit
                 window.OnChainSharedState.setFilter('selectedLimit', this.selectedLimit);
             }
         },
@@ -110,11 +112,15 @@ function onchainMiningPriceController() {
 
             if (!this.mpiData.length) return;
 
-            const labels = this.mpiData.map(item => {
+            // FIXED: Sort data chronologically (oldest to newest)
+            const sortedData = this.sortDataChronologically(this.mpiData);
+            console.log('📊 MPI chart data sorted:', sortedData.length, 'records');
+
+            const labels = sortedData.map(item => {
                 const date = new Date(item.timestamp);
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             });
-            const mpiValues = this.mpiData.map(item => item.mpi);
+            const mpiValues = sortedData.map(item => item.mpi);
 
             const ctx = canvas.getContext('2d');
             this.mpiChart = new Chart(ctx, {
@@ -135,6 +141,9 @@ function onchainMiningPriceController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     interaction: {
                         mode: 'index',
                         intersect: false,
@@ -184,12 +193,16 @@ function onchainMiningPriceController() {
 
             if (!this.priceData.length) return;
 
-            const labels = this.priceData.map(item => {
+            // FIXED: Sort data chronologically (oldest to newest)
+            const sortedData = this.sortDataChronologically(this.priceData);
+            console.log('📊 Price chart data sorted:', sortedData.length, 'records');
+
+            const labels = sortedData.map(item => {
                 const date = new Date(item.timestamp);
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             });
-            const closePrices = this.priceData.map(item => item.close);
-            const volumes = this.priceData.map(item => item.volume);
+            const closePrices = sortedData.map(item => item.close);
+            const volumes = sortedData.map(item => item.volume);
 
             const ctx = canvas.getContext('2d');
             this.priceChart = new Chart(ctx, {
@@ -219,6 +232,9 @@ function onchainMiningPriceController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // CRITICAL: Prevents race conditions
+                    },
                     interaction: {
                         mode: 'index',
                         intersect: false,
@@ -285,6 +301,9 @@ function onchainMiningPriceController() {
                     this.loadPriceData()
                 ]);
                 this.calculateCorrelation();
+                
+                // NEW: Update timestamp on successful load
+                this.updateLastUpdated();
             } catch (error) {
                 console.error('❌ Error loading mining & price data:', error);
             } finally {
@@ -298,7 +317,7 @@ function onchainMiningPriceController() {
             try {
                 const params = new URLSearchParams({
                     asset: this.selectedAsset,
-                    window: this.selectedWindow,
+                    window: 'day',  // Hardcoded to day only
                     limit: this.selectedLimit.toString()
                 });
 
@@ -326,22 +345,13 @@ function onchainMiningPriceController() {
         async loadPriceData() {
             this.loadingStates.price = true;
             try {
-                let endpoint = '';
-                let params = new URLSearchParams({
-                    window: this.selectedWindow,
-                    limit: this.selectedLimit.toString()
+                // Simplified: Only use OHLCV endpoint for BTC/ETH
+                const endpoint = '/api/onchain/price/ohlcv';
+                const params = new URLSearchParams({
+                    window: 'day',  // Hardcoded to day only
+                    limit: this.selectedLimit.toString(),
+                    asset: this.selectedAsset
                 });
-
-                if (this.selectedStablecoin) {
-                    endpoint = '/api/onchain/price/stablecoin';
-                    params.append('token', this.selectedStablecoin);
-                } else if (this.selectedToken) {
-                    endpoint = '/api/onchain/price/erc20';
-                    params.append('token', this.selectedToken);
-                } else {
-                    endpoint = '/api/onchain/price/ohlcv';
-                    params.append('asset', this.selectedAsset);
-                }
 
                 const response = await this.fetchAPI(`${endpoint}?${params}`);
 
@@ -390,9 +400,85 @@ function onchainMiningPriceController() {
             await this.loadMPIData();
         },
 
-        // Refresh price data only
-        async refreshPriceData() {
-            await this.loadPriceData();
+
+        
+        // ENHANCED: Debounced refresh for better performance
+        handleLimitChange() {
+            console.log('🔄 Filter changed');
+            
+            // Clear existing timer
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+            
+            // Set new timer with debouncing
+            this.filterDebounceTimer = setTimeout(() => {
+                console.log('⏰ Debounced filter change executing...');
+                this.loadAllData();
+            }, this.filterDebounceDelay);
+        },
+        
+        // NEW: Auto-refresh system methods
+        startAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+            }
+            
+            console.log('🔄 Starting auto-refresh with', this.autoRefreshInterval, 'ms interval');
+            this.autoRefreshTimer = setInterval(() => {
+                if (this.autoRefreshEnabled && !document.hidden) {
+                    console.log('⏰ Auto-refresh triggered');
+                    this.loadAllData();
+                }
+            }, this.autoRefreshInterval);
+        },
+        
+        pauseAutoRefresh() {
+            console.log('⏸️ Pausing auto-refresh');
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+                this.autoRefreshTimer = null;
+            }
+        },
+        
+        resumeAutoRefresh() {
+            if (this.autoRefreshEnabled) {
+                console.log('▶️ Resuming auto-refresh');
+                this.startAutoRefresh();
+            }
+        },
+        
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+            console.log('🔄 Auto-refresh toggled:', this.autoRefreshEnabled ? 'ON' : 'OFF');
+            
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            } else {
+                this.pauseAutoRefresh();
+            }
+        },
+        
+        // NEW: Update timestamp on successful data load
+        updateLastUpdated() {
+            this.lastUpdated = new Date().toLocaleTimeString('en-US', {
+                hour12: true,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            console.log('🕒 Last updated:', this.lastUpdated);
+        },
+        
+        // NEW: Sort data chronologically (oldest to newest) to fix chart ordering
+        sortDataChronologically(data) {
+            if (!Array.isArray(data)) return data;
+            
+            return data.sort((a, b) => {
+                const dateA = new Date(a.timestamp);
+                const dateB = new Date(b.timestamp);
+                return dateA - dateB; // Ascending order (oldest first)
+            });
         },
 
         // Fetch API helper

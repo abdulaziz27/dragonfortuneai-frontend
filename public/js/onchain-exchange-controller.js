@@ -7,10 +7,18 @@ function onchainExchangeController() {
     return {
         // Global state
         loading: false,
-        selectedAsset: 'BTC',
-        selectedExchange: '',
-        selectedWindow: 'day',
+        selectedAsset: 'BTC', // Fixed to BTC only
         selectedLimit: 200,
+        
+        // NEW: Auto-refresh State
+        autoRefreshEnabled: true,
+        autoRefreshTimer: null,
+        autoRefreshInterval: 5000,   // 5 seconds
+        lastUpdated: null,
+        
+        // NEW: Debouncing
+        filterDebounceTimer: null,
+        filterDebounceDelay: 300,
 
         // Component-specific state
         reservesData: [],
@@ -41,52 +49,39 @@ function onchainExchangeController() {
             
             this.loadAllData();
 
-            // Auto refresh every 60 seconds
-            setInterval(() => this.refreshAll(), 60000);
+            // NEW: Start auto-refresh system
+            this.startAutoRefresh();
+            
+            // NEW: Add visibility API integration
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log('👁️ Tab hidden, pausing auto-refresh');
+                    this.pauseAutoRefresh();
+                } else {
+                    console.log('👁️ Tab visible, resuming auto-refresh');
+                    this.resumeAutoRefresh();
+                }
+            });
         },
         
         // Load shared state
         loadSharedState() {
             if (window.OnChainSharedState) {
                 const sharedFilters = window.OnChainSharedState.getAllFilters();
-                this.selectedAsset = sharedFilters.selectedAsset;
-                this.selectedWindow = sharedFilters.selectedWindow;
-                this.selectedLimit = sharedFilters.selectedLimit;
-                this.selectedExchange = sharedFilters.selectedExchange;
+                this.selectedAsset = 'BTC'; // Force BTC only
+                this.selectedLimit = sharedFilters.selectedLimit || 200;
             }
         },
         
         // Subscribe to shared state changes
         subscribeToSharedState() {
             if (window.OnChainSharedState) {
-                // Subscribe to asset changes
-                window.OnChainSharedState.subscribe('selectedAsset', (value) => {
-                    if (this.selectedAsset !== value) {
-                        this.selectedAsset = value;
-                        this.refreshAll();
-                    }
-                });
-                
-                // Subscribe to window changes
-                window.OnChainSharedState.subscribe('selectedWindow', (value) => {
-                    if (this.selectedWindow !== value) {
-                        this.selectedWindow = value;
-                        this.refreshAll();
-                    }
-                });
+                // Asset is fixed to BTC only, no subscription needed
                 
                 // Subscribe to limit changes
                 window.OnChainSharedState.subscribe('selectedLimit', (value) => {
                     if (this.selectedLimit !== value) {
                         this.selectedLimit = value;
-                        this.refreshAll();
-                    }
-                });
-                
-                // Subscribe to exchange changes
-                window.OnChainSharedState.subscribe('selectedExchange', (value) => {
-                    if (this.selectedExchange !== value) {
-                        this.selectedExchange = value;
                         this.refreshAll();
                     }
                 });
@@ -96,10 +91,8 @@ function onchainExchangeController() {
         // Update shared state when local state changes
         updateSharedState() {
             if (window.OnChainSharedState) {
-                window.OnChainSharedState.setFilter('selectedAsset', this.selectedAsset);
-                window.OnChainSharedState.setFilter('selectedWindow', this.selectedWindow);
+                // Asset is fixed to BTC, only update limit
                 window.OnChainSharedState.setFilter('selectedLimit', this.selectedLimit);
-                window.OnChainSharedState.setFilter('selectedExchange', this.selectedExchange);
             }
         },
 
@@ -123,12 +116,16 @@ function onchainExchangeController() {
                 return;
             }
             
-            const labels = this.reservesData.map(item => {
+            // FIXED: Sort data chronologically (oldest to newest)
+            const sortedData = this.sortDataChronologically(this.reservesData);
+            console.log('📊 Reserves chart data sorted:', sortedData.length, 'records');
+            
+            const labels = sortedData.map(item => {
                 const date = new Date(item.timestamp);
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             });
-            const reserves = this.reservesData.map(item => item.reserve);
-            const usdValues = this.reservesData.map(item => item.reserve_usd);
+            const reserves = sortedData.map(item => item.reserve);
+            const usdValues = sortedData.map(item => item.reserve_usd);
             
             const ctx = canvas.getContext('2d');
             this.reservesChart = new Chart(ctx, {
@@ -157,6 +154,9 @@ function onchainExchangeController() {
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        animation: {
+                            duration: 0  // CRITICAL: Prevents race conditions
+                        },
                         interaction: {
                             mode: 'index',
                             intersect: false,
@@ -236,11 +236,15 @@ function onchainExchangeController() {
                 return;
             }
             
-            const labels = this.indicatorsData.map(item => {
+            // FIXED: Sort data chronologically (oldest to newest)
+            const sortedData = this.sortDataChronologically(this.indicatorsData);
+            console.log('📊 Indicators chart data sorted:', sortedData.length, 'records');
+            
+            const labels = sortedData.map(item => {
                 const date = new Date(item.timestamp);
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             });
-            const leverageRatios = this.indicatorsData.map(item => item.estimated_leverage_ratio);
+            const leverageRatios = sortedData.map(item => item.estimated_leverage_ratio);
             
             const ctx = canvas.getContext('2d');
             this.indicatorsChart = new Chart(ctx, {
@@ -261,6 +265,9 @@ function onchainExchangeController() {
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        animation: {
+                            duration: 0  // CRITICAL: Prevents race conditions
+                        },
                         interaction: {
                             mode: 'index',
                             intersect: false,
@@ -309,6 +316,9 @@ function onchainExchangeController() {
                     this.loadReservesData(),
                     this.loadIndicatorsData()
                 ]);
+                
+                // NEW: Update timestamp on successful load
+                this.updateLastUpdated();
             } catch (error) {
                 console.error('❌ Error loading exchange data:', error);
             } finally {
@@ -322,19 +332,14 @@ function onchainExchangeController() {
             try {
                 const params = new URLSearchParams({
                     asset: this.selectedAsset,
-                    window: this.selectedWindow,
+                    window: 'day',  // Hardcoded to day only
                     limit: this.selectedLimit.toString()
                 });
 
-                if (this.selectedExchange) {
-                    params.append('exchange', this.selectedExchange);
-                }
-
                 console.log('🔍 Loading reserves with params:', {
                     asset: this.selectedAsset,
-                    window: this.selectedWindow,
-                    limit: this.selectedLimit,
-                    exchange: this.selectedExchange
+                    window: 'day',
+                    limit: this.selectedLimit
                 });
 
                 const [reservesResponse, summaryResponse] = await Promise.all([
@@ -371,19 +376,14 @@ function onchainExchangeController() {
                 // Use XRP as default for market indicators as per API documentation
                 const params = new URLSearchParams({
                     asset: 'XRP', // API default for market indicators
-                    window: this.selectedWindow,
+                    window: 'day',  // Hardcoded to day only
                     limit: this.selectedLimit.toString()
                 });
 
-                if (this.selectedExchange) {
-                    params.append('exchange', this.selectedExchange);
-                }
-
                 console.log('🔍 Loading indicators with params:', {
                     asset: 'XRP',
-                    window: this.selectedWindow,
-                    limit: this.selectedLimit,
-                    exchange: this.selectedExchange
+                    window: 'day',
+                    limit: this.selectedLimit
                 });
 
                 const response = await this.fetchAPI(`/api/onchain/market/indicators?${params}`);
@@ -428,6 +428,85 @@ function onchainExchangeController() {
         // Refresh indicators data only
         async refreshIndicatorsData() {
             await this.loadIndicatorsData();
+        },
+        
+        // ENHANCED: Debounced refresh for better performance
+        handleLimitChange() {
+            console.log('🔄 Filter changed');
+            
+            // Clear existing timer
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+            
+            // Set new timer with debouncing
+            this.filterDebounceTimer = setTimeout(() => {
+                console.log('⏰ Debounced filter change executing...');
+                this.loadAllData();
+            }, this.filterDebounceDelay);
+        },
+        
+        // NEW: Auto-refresh system methods
+        startAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+            }
+            
+            console.log('🔄 Starting auto-refresh with', this.autoRefreshInterval, 'ms interval');
+            this.autoRefreshTimer = setInterval(() => {
+                if (this.autoRefreshEnabled && !document.hidden) {
+                    console.log('⏰ Auto-refresh triggered');
+                    this.loadAllData();
+                }
+            }, this.autoRefreshInterval);
+        },
+        
+        pauseAutoRefresh() {
+            console.log('⏸️ Pausing auto-refresh');
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+                this.autoRefreshTimer = null;
+            }
+        },
+        
+        resumeAutoRefresh() {
+            if (this.autoRefreshEnabled) {
+                console.log('▶️ Resuming auto-refresh');
+                this.startAutoRefresh();
+            }
+        },
+        
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+            console.log('🔄 Auto-refresh toggled:', this.autoRefreshEnabled ? 'ON' : 'OFF');
+            
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            } else {
+                this.pauseAutoRefresh();
+            }
+        },
+        
+        // NEW: Update timestamp on successful data load
+        updateLastUpdated() {
+            this.lastUpdated = new Date().toLocaleTimeString('en-US', {
+                hour12: true,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            console.log('🕒 Last updated:', this.lastUpdated);
+        },
+        
+        // NEW: Sort data chronologically (oldest to newest) to fix chart ordering
+        sortDataChronologically(data) {
+            if (!Array.isArray(data)) return data;
+            
+            return data.sort((a, b) => {
+                const dateA = new Date(a.timestamp);
+                const dateB = new Date(b.timestamp);
+                return dateA - dateB; // Ascending order (oldest first)
+            });
         },
 
         // Fetch API helper

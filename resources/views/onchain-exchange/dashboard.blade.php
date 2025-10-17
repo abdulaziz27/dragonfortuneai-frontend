@@ -28,42 +28,41 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <!-- Asset Filter -->
-                    <select class="form-select" style="width: 120px;" x-model="selectedAsset" @change="refreshAll()">
+                    <!-- Asset Filter - Focused on Major Assets Only -->
+                    <select class="form-select" style="width: 120px;" x-model="selectedAsset" @change="handleLimitChange()">
                         <option value="BTC">Bitcoin</option>
-                        <option value="ETH">Ethereum</option>
-                        <option value="USDT">Tether</option>
-                        <option value="USDC">USD Coin</option>
                     </select>
 
-                    <!-- Exchange Filter -->
-                    <select class="form-select" style="width: 140px;" x-model="selectedExchange" @change="refreshAll()">
-                        <option value="">All Exchanges</option>
-                        <option value="binance">Binance</option>
-                        <option value="coinbase">Coinbase</option>
-                        <option value="okx">OKX</option>
-                        <option value="kraken">Kraken</option>
-                        <option value="bitfinex">Bitfinex</option>
-                    </select>
-
-                    <!-- Time Window -->
-                    <select class="form-select" style="width: 120px;" x-model="selectedWindow" @change="refreshAll()">
-                        <option value="day">Daily</option>
-                        <option value="hour">Hourly</option>
-                    </select>
-
-                    <!-- Data Limit -->
-                    <select class="form-select" style="width: 120px;" x-model="selectedLimit" @change="refreshAll()">
+                    <!-- Data Limit - Enhanced with more options -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedLimit" @change="handleLimitChange()">
+                        <option value="30">30 Records</option>
+                        <option value="50">50 Records</option>
                         <option value="90">90 Records</option>
                         <option value="180">180 Records</option>
                         <option value="200">200 Records</option>
+                        <option value="365">365 Records</option>
+                        <option value="500">500 Records</option>
+                        <option value="1000">1000 Records</option>
+                        <option value="2000">2000 Records</option>
                     </select>
 
-                    <!-- Refresh Button -->
+                    <!-- Manual Refresh Button - Moved before auto-refresh -->
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
                         <span x-show="!loading">🔄 Refresh All</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Auto-refresh Toggle -->
+                    <button class="btn" @click="toggleAutoRefresh()" 
+                            :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'">
+                        <span x-text="autoRefreshEnabled ? '🔄 Auto-refresh: ON' : '⏸️ Auto-refresh: OFF'"></span>
+                    </button>
+
+                    <!-- Last Updated -->
+                    <div class="d-flex align-items-center gap-1 text-muted small" x-show="lastUpdated">
+                        <span>Last updated:</span>
+                        <span x-text="lastUpdated" class="fw-bold"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -159,8 +158,8 @@
                 <div class="df-panel p-4">
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div>
-                            <h5 class="mb-1">📈 Exchange Comparison</h5>
-                            <small class="text-secondary">Reserve rankings and trends</small>
+                            <h5 class="mb-1">📈 Binance Reserve Data</h5>
+                            <small class="text-secondary">Binance reserve trends and statistics</small>
                         </div>
                         <div class="d-flex gap-2">
                             <span x-show="loadingStates.reserves" class="spinner-border spinner-border-sm text-primary"></span>

@@ -28,46 +28,40 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <!-- Asset Filter -->
-                    <select class="form-select" style="width: 120px;" x-model="selectedAsset" @change="refreshAll()">
+                    <!-- Asset Filter - Focused on Mining Assets Only -->
+                    <select class="form-select" style="width: 120px;" x-model="selectedAsset" @change="handleLimitChange()">
                         <option value="BTC">Bitcoin</option>
-                        <option value="ETH">Ethereum</option>
                     </select>
 
-                    <!-- Token Filter (for ERC20) -->
-                    <select class="form-select" style="width: 120px;" x-model="selectedToken" @change="refreshPriceData()">
-                        <option value="">Major Assets</option>
-                        <option value="link">LINK</option>
-                        <option value="matic">MATIC</option>
-                        <option value="uni">UNI</option>
-                        <option value="aave">AAVE</option>
-                    </select>
-
-                    <!-- Stablecoin Filter -->
-                    <select class="form-select" style="width: 140px;" x-model="selectedStablecoin" @change="refreshPriceData()">
-                        <option value="">No Stablecoin</option>
-                        <option value="usdt_eth">USDT (ETH)</option>
-                        <option value="usdc_eth">USDC (ETH)</option>
-                        <option value="dai_eth">DAI (ETH)</option>
-                    </select>
-
-                    <!-- Time Window -->
-                    <select class="form-select" style="width: 120px;" x-model="selectedWindow" @change="refreshAll()">
-                        <option value="day">Daily</option>
-                        <option value="hour">Hourly</option>
-                    </select>
-
-                    <!-- Data Limit -->
-                    <select class="form-select" style="width: 120px;" x-model="selectedLimit" @change="refreshAll()">
+                    <!-- Data Limit - Enhanced with more options -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedLimit" @change="handleLimitChange()">
+                        <option value="30">30 Records</option>
+                        <option value="50">50 Records</option>
                         <option value="100">100 Records</option>
                         <option value="200">200 Records</option>
+                        <option value="365">365 Records</option>
+                        <option value="500">500 Records</option>
+                        <option value="1000">1000 Records</option>
+                        <option value="2000">2000 Records</option>
                     </select>
 
-                    <!-- Refresh Button -->
+                    <!-- Manual Refresh Button - Moved before auto-refresh -->
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
                         <span x-show="!loading">🔄 Refresh All</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Auto-refresh Toggle -->
+                    <button class="btn" @click="toggleAutoRefresh()" 
+                            :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'">
+                        <span x-text="autoRefreshEnabled ? '🔄 Auto-refresh: ON' : '⏸️ Auto-refresh: OFF'"></span>
+                    </button>
+
+                    <!-- Last Updated -->
+                    <div class="d-flex align-items-center gap-1 text-muted small" x-show="lastUpdated">
+                        <span>Last updated:</span>
+                        <span x-text="lastUpdated" class="fw-bold"></span>
+                    </div>
                 </div>
             </div>
         </div>
