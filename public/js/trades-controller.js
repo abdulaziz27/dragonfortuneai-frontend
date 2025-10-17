@@ -33,40 +33,193 @@ const API_BASE_URL = getApiBaseUrl() + "/api/spot-microstructure";
 function tradesController() {
     return {
         // Global state
-        globalSymbol: "BTCUSDT",
-        globalInterval: "1m",
-        globalLoading: false,
+        loading: false,
+        selectedSymbol: 'BTCUSDT',
+        selectedInterval: '5m',
+        selectedLimit: 200,
+        
+        // Auto-refresh State
+        autoRefreshEnabled: true,
+        autoRefreshTimer: null,
+        autoRefreshInterval: 5000,   // 5 seconds
+        lastUpdated: null,
+        
+        // Debouncing
+        filterDebounceTimer: null,
+        filterDebounceDelay: 300,
 
         // Initialize
         init() {
-            console.log("🚀 Trades Analysis Dashboard initialized");
-            console.log("📊 Symbol:", this.globalSymbol);
-            console.log("⏱️ Interval:", this.globalInterval);
-        },
+            console.log('🚀 Initializing Trades Analysis Controller');
+            
+            // Load shared state
+            this.loadSharedState();
+            
+            // Subscribe to shared state changes
+            this.subscribeToSharedState();
+            
+            this.loadAllData();
 
-        // Update symbol globally
-        updateSymbol() {
-            console.log("📊 Symbol changed to:", this.globalSymbol);
-            this.$dispatch("symbol-changed", { symbol: this.globalSymbol });
-        },
-
-        // Update interval globally
-        updateInterval() {
-            console.log("⏱️ Interval changed to:", this.globalInterval);
-            this.$dispatch("interval-changed", {
-                interval: this.globalInterval,
+            // Start auto-refresh system
+            this.startAutoRefresh();
+            
+            // Add visibility API integration
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log('👁️ Tab hidden, pausing auto-refresh');
+                    this.pauseAutoRefresh();
+                } else {
+                    console.log('👁️ Tab visible, resuming auto-refresh');
+                    this.resumeAutoRefresh();
+                }
             });
+        },
+        
+        // Load shared state
+        loadSharedState() {
+            if (window.SpotMicrostructureSharedState) {
+                const sharedFilters = window.SpotMicrostructureSharedState.getAllFilters();
+                this.selectedSymbol = sharedFilters.selectedSymbol || 'BTCUSDT';
+                this.selectedInterval = sharedFilters.selectedInterval || '5m';
+                this.selectedLimit = sharedFilters.selectedLimit || 200;
+            }
+        },
+        
+        // Subscribe to shared state changes
+        subscribeToSharedState() {
+            if (window.SpotMicrostructureSharedState) {
+                // Subscribe to symbol changes
+                window.SpotMicrostructureSharedState.subscribe('selectedSymbol', (value) => {
+                    if (this.selectedSymbol !== value) {
+                        this.selectedSymbol = value;
+                        this.refreshAll();
+                    }
+                });
+                
+                // Subscribe to interval changes
+                window.SpotMicrostructureSharedState.subscribe('selectedInterval', (value) => {
+                    if (this.selectedInterval !== value) {
+                        this.selectedInterval = value;
+                        this.refreshAll();
+                    }
+                });
+                
+                // Subscribe to limit changes
+                window.SpotMicrostructureSharedState.subscribe('selectedLimit', (value) => {
+                    if (this.selectedLimit !== value) {
+                        this.selectedLimit = value;
+                        this.refreshAll();
+                    }
+                });
+            }
+        },
+        
+        // Update shared state when local state changes
+        updateSharedState() {
+            if (window.SpotMicrostructureSharedState) {
+                window.SpotMicrostructureSharedState.setFilter('selectedSymbol', this.selectedSymbol);
+                window.SpotMicrostructureSharedState.setFilter('selectedInterval', this.selectedInterval);
+                window.SpotMicrostructureSharedState.setFilter('selectedLimit', this.selectedLimit);
+            }
+        },
+
+        // Load all data
+        async loadAllData() {
+            this.loading = true;
+            try {
+                // Dispatch refresh event to all components
+                this.$dispatch('refresh-all');
+                
+                // Update timestamp on successful load
+                this.updateLastUpdated();
+            } catch (error) {
+                console.error('❌ Error loading trades data:', error);
+            } finally {
+                this.loading = false;
+            }
         },
 
         // Refresh all components
         async refreshAll() {
-            this.globalLoading = true;
-            console.log("🔄 Refreshing all components...");
-            this.$dispatch("refresh-all");
+            this.updateSharedState();
+            await this.loadAllData();
+        },
+        
+        // Debounced refresh for better performance
+        handleFilterChange() {
+            console.log('🔄 Filter changed');
+            
+            // Clear existing timer
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+            
+            // Set new timer with debouncing
+            this.filterDebounceTimer = setTimeout(() => {
+                console.log('⏰ Debounced filter change executing...');
+                this.loadAllData();
+            }, this.filterDebounceDelay);
+        },
+        
+        // Auto-refresh system methods
+        startAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+            }
+            
+            console.log('🔄 Starting auto-refresh with', this.autoRefreshInterval, 'ms interval');
+            this.autoRefreshTimer = setInterval(() => {
+                if (this.autoRefreshEnabled && !document.hidden) {
+                    console.log('⏰ Auto-refresh triggered');
+                    this.loadAllData();
+                }
+            }, this.autoRefreshInterval);
+        },
+        
+        pauseAutoRefresh() {
+            console.log('⏸️ Pausing auto-refresh');
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+                this.autoRefreshTimer = null;
+            }
+        },
+        
+        resumeAutoRefresh() {
+            if (this.autoRefreshEnabled) {
+                console.log('▶️ Resuming auto-refresh');
+                this.startAutoRefresh();
+            }
+        },
+        
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+            console.log('🔄 Auto-refresh toggled:', this.autoRefreshEnabled ? 'ON' : 'OFF');
+            
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            } else {
+                this.pauseAutoRefresh();
+            }
+        },
+        
+        // Update timestamp on successful data load
+        updateLastUpdated() {
+            this.lastUpdated = new Date().toLocaleTimeString('en-US', {
+                hour12: true,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            console.log('🕒 Last updated:', this.lastUpdated);
+        },
 
-            setTimeout(() => {
-                this.globalLoading = false;
-            }, 2000);
+        // Legacy methods for backward compatibility
+        updateSymbol() {
+            this.handleFilterChange();
+        },
+
+        updateInterval() {
+            this.handleFilterChange();
         },
     };
 }
@@ -87,17 +240,19 @@ function tradeBiasCard() {
             this.loadBias();
 
             // Listen to global events
-            this.$watch("$root.globalSymbol", () => this.loadBias());
+            this.$watch("$root.selectedSymbol", () => this.loadBias());
+            this.$watch("$root.selectedLimit", () => this.loadBias());
             window.addEventListener("refresh-all", () => this.loadBias());
         },
 
         async loadBias() {
             this.loading = true;
-            const symbol = this.$root.globalSymbol || "BTCUSDT";
+            const symbol = this.$root.selectedSymbol || "BTCUSDT";
+            const limit = this.$root.selectedLimit || 200;
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/trade-bias?symbol=${symbol}&limit=1000`
+                    `${API_BASE_URL}/trade-bias?symbol=${symbol}&limit=${limit}`
                 );
 
                 if (!response.ok) {
@@ -151,18 +306,20 @@ function cvdTable() {
             this.loadData();
 
             // Listen to global events
-            this.$watch("$root.globalSymbol", () => this.loadData());
+            this.$watch("$root.selectedSymbol", () => this.loadData());
+            this.$watch("$root.selectedLimit", () => this.loadData());
             window.addEventListener("refresh-all", () => this.loadData());
         },
 
         async loadData() {
             this.loading = true;
             console.log('📊 CVD Table: Loading data...');
-            const symbol = this.$root.globalSymbol || "BTCUSDT";
+            const symbol = this.$root.selectedSymbol || "BTCUSDT";
+            const limit = this.$root.selectedLimit || 200;
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/cvd?exchange=binance&symbol=${symbol.toLowerCase()}&limit=100`
+                    `${API_BASE_URL}/cvd?exchange=binance&symbol=${symbol.toLowerCase()}&limit=${limit}`
                 );
 
                 if (!response.ok) {
@@ -265,17 +422,19 @@ function cvdStats() {
             this.loadStats();
 
             // Listen to global events
-            this.$watch("$root.globalSymbol", () => this.loadStats());
+            this.$watch("$root.selectedSymbol", () => this.loadStats());
+            this.$watch("$root.selectedLimit", () => this.loadStats());
             window.addEventListener("refresh-all", () => this.loadStats());
         },
 
         async loadStats() {
             this.loading = true;
-            const symbol = this.$root.globalSymbol || "BTCUSDT";
+            const symbol = this.$root.selectedSymbol || "BTCUSDT";
+            const limit = this.$root.selectedLimit || 200;
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/cvd?exchange=binance&symbol=${symbol.toLowerCase()}&limit=500`
+                    `${API_BASE_URL}/cvd?exchange=binance&symbol=${symbol.toLowerCase()}&limit=${limit}`
                 );
 
                 if (!response.ok) {
@@ -342,19 +501,21 @@ function tradeSummaryTable() {
             this.loadSummary();
 
             // Listen to global events
-            this.$watch("$root.globalSymbol", () => this.loadSummary());
-            this.$watch("$root.globalInterval", () => this.loadSummary());
+            this.$watch("$root.selectedSymbol", () => this.loadSummary());
+            this.$watch("$root.selectedInterval", () => this.loadSummary());
+            this.$watch("$root.selectedLimit", () => this.loadSummary());
             window.addEventListener("refresh-all", () => this.loadSummary());
         },
 
         async loadSummary() {
             this.loading = true;
-            const symbol = this.$root.globalSymbol || "BTCUSDT";
-            const interval = this.$root.globalInterval || "1m";
+            const symbol = this.$root.selectedSymbol || "BTCUSDT";
+            const interval = this.$root.selectedInterval || "5m";
+            const limit = this.$root.selectedLimit || 200;
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/trades/summary?symbol=${symbol}&interval=${interval}&limit=100`
+                    `${API_BASE_URL}/trades/summary?symbol=${symbol}&interval=${interval}&limit=${limit}`
                 );
 
                 if (!response.ok) {
@@ -433,19 +594,21 @@ function volumeFlowStats() {
             this.loadStats();
 
             // Listen to global events
-            this.$watch("$root.globalSymbol", () => this.loadStats());
-            this.$watch("$root.globalInterval", () => this.loadStats());
+            this.$watch("$root.selectedSymbol", () => this.loadStats());
+            this.$watch("$root.selectedInterval", () => this.loadStats());
+            this.$watch("$root.selectedLimit", () => this.loadStats());
             window.addEventListener("refresh-all", () => this.loadStats());
         },
 
         async loadStats() {
             this.loading = true;
-            const symbol = this.$root.globalSymbol || "BTCUSDT";
-            const interval = this.$root.globalInterval || "1m";
+            const symbol = this.$root.selectedSymbol || "BTCUSDT";
+            const interval = this.$root.selectedInterval || "5m";
+            const limit = this.$root.selectedLimit || 200;
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/trades/summary?symbol=${symbol}&interval=${interval}&limit=100`
+                    `${API_BASE_URL}/trades/summary?symbol=${symbol}&interval=${interval}&limit=${limit}`
                 );
 
                 if (!response.ok) {
@@ -532,17 +695,19 @@ function recentTradesStream() {
             this.loadTrades();
 
             // Listen to global events
-            this.$watch("$root.globalSymbol", () => this.loadTrades());
+            this.$watch("$root.selectedSymbol", () => this.loadTrades());
+            this.$watch("$root.selectedLimit", () => this.loadTrades());
             window.addEventListener("refresh-all", () => this.loadTrades());
         },
 
         async loadTrades() {
             this.loading = true;
-            const symbol = this.$root.globalSymbol || "BTCUSDT";
+            const symbol = this.$root.selectedSymbol || "BTCUSDT";
+            const limit = Math.min(this.$root.selectedLimit || 200, 100); // Cap at 100 for recent trades
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/trades?symbol=${symbol}&limit=50`
+                    `${API_BASE_URL}/trades?symbol=${symbol}&limit=${limit}`
                 );
 
                 if (!response.ok) {
@@ -599,4 +764,44 @@ function recentTradesStream() {
     };
 }
 
-console.log("✅ Trades controller loaded");
+// Shared State Management for Spot Microstructure
+window.SpotMicrostructureSharedState = {
+    filters: {
+        selectedSymbol: 'BTCUSDT',
+        selectedInterval: '5m',
+        selectedLimit: 200,
+        selectedExchange: 'binance'
+    },
+    
+    subscribers: {},
+    
+    setFilter(key, value) {
+        if (this.filters[key] !== value) {
+            this.filters[key] = value;
+            this.notifySubscribers(key, value);
+        }
+    },
+    
+    getFilter(key) {
+        return this.filters[key];
+    },
+    
+    getAllFilters() {
+        return { ...this.filters };
+    },
+    
+    subscribe(key, callback) {
+        if (!this.subscribers[key]) {
+            this.subscribers[key] = [];
+        }
+        this.subscribers[key].push(callback);
+    },
+    
+    notifySubscribers(key, value) {
+        if (this.subscribers[key]) {
+            this.subscribers[key].forEach(callback => callback(value));
+        }
+    }
+};
+
+console.log("✅ Trades controller loaded with shared state management");

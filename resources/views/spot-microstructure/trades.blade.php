@@ -30,25 +30,53 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <select class="form-select" style="width: 140px;" x-model="globalSymbol" @change="updateSymbol()">
+                    <!-- Symbol Filter -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="handleFilterChange()">
                         <option value="BTCUSDT">BTC/USDT</option>
                         <option value="ETHUSDT">ETH/USDT</option>
                         <option value="SOLUSDT">SOL/USDT</option>
                         <option value="BNBUSDT">BNB/USDT</option>
                         <option value="XRPUSDT">XRP/USDT</option>
+                        <option value="ADAUSDT">ADA/USDT</option>
+                        <option value="DOGEUSDT">DOGE/USDT</option>
+                        <option value="MATICUSDT">MATIC/USDT</option>
                     </select>
 
-                    <select class="form-select" style="width: 130px;" x-model="globalInterval" @change="updateInterval()">
+                    <!-- Interval Filter -->
+                    <select class="form-select" style="width: 130px;" x-model="selectedInterval" @change="handleFilterChange()">
                         <option value="1m">1 Minute</option>
                         <option value="5m">5 Minutes</option>
                         <option value="15m">15 Minutes</option>
                         <option value="1h">1 Hour</option>
+                        <option value="4h">4 Hours</option>
                     </select>
 
-                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
-                        <span x-show="!globalLoading">🔄 Refresh All</span>
-                        <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
+                    <!-- Data Limit -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedLimit" @change="handleFilterChange()">
+                        <option value="50">50 Records</option>
+                        <option value="100">100 Records</option>
+                        <option value="200">200 Records</option>
+                        <option value="500">500 Records</option>
+                        <option value="1000">1000 Records</option>
+                    </select>
+
+                    <!-- Manual Refresh Button -->
+                    <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
+                        <span x-show="!loading">🔄 Refresh All</span>
+                        <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Auto-refresh Toggle -->
+                    <button class="btn" @click="toggleAutoRefresh()" 
+                            :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'">
+                        <span x-text="autoRefreshEnabled ? '🔄 Auto-refresh: ON' : '⏸️ Auto-refresh: OFF'"></span>
+                    </button>
+
+                    <!-- Last Updated -->
+                    <div class="d-flex align-items-center gap-1 text-muted small" x-show="lastUpdated">
+                        <span>Last updated:</span>
+                        <span x-text="lastUpdated" class="fw-bold"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -124,10 +152,7 @@
                             <small class="text-secondary">Recent CVD data points</small>
                         </div>
                         <div class="d-flex gap-2 align-items-center">
-                            <button class="btn btn-sm btn-outline-primary" @click="loadData()" :disabled="loading">
-                                <span x-show="!loading">🔄 Refresh</span>
-                                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-                            </button>
+                            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
                         </div>
                     </div>
 
@@ -315,8 +340,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0">🔴 Recent Trades (Live Stream)</h5>
                         <div class="d-flex gap-2 align-items-center">
-                            <span class="badge bg-secondary" x-show="loading">Loading...</span>
-                            <button class="btn btn-sm btn-outline-primary" @click="refresh()">Refresh</button>
+                            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
                         </div>
                     </div>
 
