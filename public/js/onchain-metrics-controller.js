@@ -693,15 +693,8 @@ function onchainMetricsController() {
             this.loadingStates.flows = true;
 
             try {
-                // Use new filter parameter system with additional legacy filters
-                const additionalParams = {};
-
-                const exchangeFilter = this.getExchangeFilter();
-                if (exchangeFilter) {
-                    additionalParams.exchange = exchangeFilter;
-                }
-
-                const url = this.buildApiUrl("/api/onchain/flow/exchange-netflow", additionalParams);
+                // Use new filter parameter system for precise period filtering
+                const url = this.buildApiUrl("/api/onchain/flow/exchange-netflow");
                 console.log(`📊 Loading Exchange Flows with filters: ${url}`);
 
                 const response = await fetch(url);
@@ -748,15 +741,8 @@ function onchainMetricsController() {
          */
         async loadExchangeSummary() {
             try {
-                // Use new filter parameter system with additional legacy filters
-                const additionalParams = {};
-
-                const exchangeFilter = this.getExchangeFilter();
-                if (exchangeFilter) {
-                    additionalParams.exchange = exchangeFilter;
-                }
-
-                const url = this.buildApiUrl("/api/onchain/exchange/summary", additionalParams);
+                // Use new filter parameter system for precise period filtering
+                const url = this.buildApiUrl("/api/onchain/exchange/summary");
                 console.log(`📊 Loading Exchange Summary with filters: ${url}`);
 
                 const response = await fetch(url);
@@ -868,12 +854,9 @@ function onchainMetricsController() {
             this.loadingStates.chainHealth = true;
 
             try {
-                // Use new filter parameter system with additional metric parameter
-                const additionalParams = {
-                    metric: this.chainHealthMetric
-                };
-
-                const url = this.buildApiUrl("/api/onchain/chain-health/reserve-risk", additionalParams);
+                // Use new filter parameter system for precise period filtering
+                // Note: chainHealthMetric will be handled by backend based on endpoint
+                const url = this.buildApiUrl("/api/onchain/chain-health/reserve-risk");
                 console.log(`📊 Loading Chain Health with filters: ${url}`);
 
                 const response = await fetch(url);
@@ -960,14 +943,9 @@ function onchainMetricsController() {
             this.loadingStates.whales = true;
 
             try {
-                // Use new filter parameter system with additional cohort parameter
-                const additionalParams = {};
-
-                if (this.whaleCohort) {
-                    additionalParams.cohort = this.whaleCohort;
-                }
-
-                const url = this.buildApiUrl("/api/onchain/whale/holdings", additionalParams);
+                // Use new filter parameter system for precise period filtering
+                // Note: whaleCohort will be handled by backend based on endpoint
+                const url = this.buildApiUrl("/api/onchain/whale/holdings");
                 console.log(`📊 Loading Whale Holdings with filters: ${url}`);
 
                 const response = await fetch(url);

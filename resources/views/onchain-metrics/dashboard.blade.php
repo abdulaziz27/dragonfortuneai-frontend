@@ -121,7 +121,6 @@
                         </div>
                         <div class="d-flex gap-2">
                             <span x-show="loadingStates.mvrv" class="spinner-border spinner-border-sm text-primary"></span>
-                            <button class="btn btn-sm btn-outline-primary" @click="refreshAll()">Refresh</button>
                         </div>
                     </div>
                     <div style="height: 350px; position: relative;">
@@ -202,7 +201,6 @@
                                 <option value="USDT">USDT</option>
                             </select>
                             <span x-show="loadingStates.flows" class="spinner-border spinner-border-sm text-primary"></span>
-                            <button class="btn btn-sm btn-outline-primary" @click="refreshAll()">Refresh</button>
                         </div>
                     </div>
                     <div style="height: 350px; position: relative;">
@@ -268,7 +266,6 @@
                         </div>
                         <div class="d-flex gap-2">
                             <span x-show="loadingStates.supply" class="spinner-border spinner-border-sm text-primary"></span>
-                            <button class="btn btn-sm btn-outline-primary" @click="refreshAll()">Refresh</button>
                         </div>
                     </div>
                     <div style="height: 350px; position: relative;">
@@ -286,7 +283,6 @@
                         </div>
                         <div class="d-flex gap-2">
                             <span x-show="loadingStates.hodl" class="spinner-border spinner-border-sm text-primary"></span>
-                            <button class="btn btn-sm btn-outline-primary" @click="refreshAll()">Refresh</button>
                         </div>
                     </div>
                     <div style="height: 350px; position: relative;">
@@ -314,7 +310,6 @@
                                 <option value="CDD">CDD</option>
                             </select>
                             <span x-show="loadingStates.chainHealth" class="spinner-border spinner-border-sm text-primary"></span>
-                            <button class="btn btn-sm btn-outline-primary" @click="refreshAll()">Refresh</button>
                         </div>
                     </div>
                     <div style="height: 300px; position: relative;">
@@ -335,7 +330,6 @@
                         </div>
                         <div class="d-flex gap-2">
                             <span x-show="loadingStates.miners" class="spinner-border spinner-border-sm text-primary"></span>
-                            <button class="btn btn-sm btn-outline-primary" @click="refreshAll()">Refresh</button>
                         </div>
                     </div>
                     <div style="height: 350px; position: relative;">
@@ -394,7 +388,6 @@
                                 <option value="ETF Custodians">ETF Custodians</option>
                             </select>
                             <span x-show="loadingStates.whales" class="spinner-border spinner-border-sm text-primary"></span>
-                            <button class="btn btn-sm btn-outline-primary" @click="refreshAll()">Refresh</button>
                         </div>
                     </div>
                     <div style="height: 350px; position: relative;">
@@ -460,7 +453,6 @@
                         </div>
                         <div class="d-flex gap-2">
                             <span x-show="loadingStates.realizedCap" class="spinner-border spinner-border-sm text-primary"></span>
-                            <button class="btn btn-sm btn-outline-primary" @click="refreshAll()">Refresh</button>
                         </div>
                     </div>
                     <div style="height: 300px; position: relative;">
