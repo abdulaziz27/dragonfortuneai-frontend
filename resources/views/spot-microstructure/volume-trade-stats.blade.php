@@ -24,29 +24,57 @@
                     <p class="mb-0 text-secondary">
                         Comprehensive volume analysis and trade statistics for spot microstructure insights
                     </p>
+                    <!-- <small class="text-info">
+                        📊 Live data: BTCUSDT/Binance/5min only - Other combinations have no data
+                    </small> -->
                 </div>
 
-                <!-- Global Controls -->
+                <!-- Enhanced Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <select class="form-select" style="width: 150px;" x-model="globalSymbol" @change="updateSymbol()">
+                    <!-- Symbol Filter -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="onSymbolChange()">
                         <option value="BTCUSDT">BTC/USDT</option>
-                        <option value="ETHUSDT">ETH/USDT</option>
-                        <option value="SOLUSDT">SOL/USDT</option>
-                        <option value="BNBUSDT">BNB/USDT</option>
-                        <option value="XRPUSDT">XRP/USDT</option>
+                        <!-- Only BTCUSDT has data -->
                     </select>
 
-                    <select class="form-select" style="width: 120px;" x-model="globalTimeframe" @change="updateTimeframe()">
-                        <option value="1m">1 Minute</option>
-                        <option value="5m" selected>5 Minutes</option>
-                        <option value="15m">15 Minutes</option>
-                        <option value="1h">1 Hour</option>
+                    <!-- Interval Filter -->
+                    <select class="form-select" style="width: 120px;" x-model="selectedInterval" @change="onIntervalChange()">
+                        <option value="5m">5 Minutes</option>
+                        <!-- Only 5min timeframe has data -->
                     </select>
 
-                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
-                        <span x-show="!globalLoading">🔄 Refresh</span>
-                        <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
+                    <!-- Data Limit Filter -->
+                    <select class="form-select" style="width: 130px;" x-model="selectedLimit" @change="onLimitChange()">
+                        <option value="50">50 Records</option>
+                        <option value="100">100 Records</option>
+                        <option value="200">200 Records</option>
+                        <option value="500">500 Records</option>
+                        <option value="1000">1000 Records</option>
+                    </select>
+
+                    <!-- Exchange Filter -->
+                    <select class="form-select" style="width: 130px;" x-model="selectedExchange" @change="onExchangeChange()">
+                        <option value="binance">Binance</option>
+                        <!-- Only Binance has data -->
+                    </select>
+
+                    <!-- Manual Refresh -->
+                    <button class="btn btn-primary" @click="manualRefresh()" :disabled="loading">
+                        <span x-show="!loading">Refresh All</span>
+                        <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Auto-refresh Toggle -->
+                    <button class="btn" :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'" 
+                            @click="toggleAutoRefresh()" style="width: 200px;">
+                        <span x-show="autoRefreshEnabled">Auto-Refresh: ON</span>
+                        <span x-show="!autoRefreshEnabled">⏸️ Auto-Refresh: OFF</span>
+                    </button>
+
+                    <!-- Last Updated -->
+                    <small class="text-muted" x-show="lastUpdated">
+                        Last: <span x-text="lastUpdated"></span>
+                    </small>
                 </div>
             </div>
         </div>
@@ -191,7 +219,7 @@
                                 </div>
                             </template>
                             <template x-if="!volumeProfileData">
-                                <div class="text-secondary">Loading...</div>
+                                <div class="text-secondary">No profile data available</div>
                             </template>
                         </div>
 
@@ -312,12 +340,12 @@
                             <tbody>
                                 <template x-for="(item, index) in tradeStatsData.slice(-20).reverse()" :key="index">
                                     <tr>
-                                        <td class="small" x-text="new Date(item.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })"></td>
+                                        <td class="small" x-text="new Date(item.ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })"></td>
                                         <td>
                                             <span class="badge bg-light text-dark border text-uppercase" x-text="item.exchange"></span>
                                         </td>
-                                        <td class="fw-semibold small" x-text="item.symbol"></td>
-                                        <td class="text-end" x-text="formatNumber(item.total_trades)"></td>
+                                        <td class="fw-semibold small" x-text="item.pair"></td>
+                                        <td class="text-end" x-text="formatNumber(item.trades_count)"></td>
                                         <td class="text-end text-success" x-text="formatNumber(item.buy_trades)"></td>
                                         <td class="text-end text-danger" x-text="formatNumber(item.sell_trades)"></td>
                                         <td class="text-end" x-text="formatNumber(item.avg_trade_size)"></td>
@@ -333,9 +361,9 @@
                                 <template x-if="tradeStatsData.length === 0">
                                     <tr>
                                         <td colspan="9" class="text-center text-secondary py-4">
-                                            <div class="spinner-border spinner-border-sm me-2" role="status" x-show="globalLoading"></div>
-                                            <span x-show="globalLoading">Loading trade statistics...</span>
-                                            <span x-show="!globalLoading">No data available</span>
+                                            <div class="spinner-border spinner-border-sm me-2" role="status" x-show="loading"></div>
+                                            <span x-show="loading">Loading trade statistics...</span>
+                                            <span x-show="!loading">No data available</span>
                                         </td>
                                     </tr>
                                 </template>
@@ -401,9 +429,9 @@
                                 <template x-if="volumeStatsData.length === 0">
                                     <tr>
                                         <td colspan="9" class="text-center text-secondary py-4">
-                                            <div class="spinner-border spinner-border-sm me-2" role="status" x-show="globalLoading"></div>
-                                            <span x-show="globalLoading">Loading volume statistics...</span>
-                                            <span x-show="!globalLoading">No data available</span>
+                                            <div class="spinner-border spinner-border-sm me-2" role="status" x-show="loading"></div>
+                                            <span x-show="loading">Loading volume statistics...</span>
+                                            <span x-show="!loading">No data available</span>
                                         </td>
                                     </tr>
                                 </template>

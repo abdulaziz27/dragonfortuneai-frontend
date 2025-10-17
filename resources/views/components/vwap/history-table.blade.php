@@ -29,10 +29,6 @@
                 <option value="50" selected>50 rows</option>
                 <option value="100">100 rows</option>
             </select>
-            <button class="btn btn-sm btn-outline-secondary" @click="refresh()" :disabled="loading">
-                <span x-show="!loading">🔄</span>
-                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-            </button>
         </div>
     </div>
 
@@ -72,7 +68,7 @@
                     <tbody>
                         <template x-for="(row, index) in displayedData" :key="index">
                             <tr>
-                                <td class="small text-secondary" x-text="formatTimestamp(row.timestamp)">--</td>
+                                <td class="small text-secondary" x-text="formatTimestamp(row)">--</td>
                                 <td class="text-end">
                                     <span class="fw-semibold" x-text="formatPrice(row.vwap)">$0.00</span>
                                 </td>
@@ -139,81 +135,42 @@ function vwapHistoryTable(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', 
         },
 
         init() {
-            setTimeout(() => {
-                this.loadData();
-            }, 1000);
-
-            // Listen to global filter changes
-            window.addEventListener('symbol-changed', (e) => {
-                this.symbol = e.detail?.symbol || this.symbol;
-                this.timeframe = e.detail?.timeframe || this.timeframe;
-                this.exchange = e.detail?.exchange || this.exchange;
-                this.loadData();
-            });
-            window.addEventListener('timeframe-changed', (e) => {
-                this.timeframe = e.detail?.timeframe || this.timeframe;
-                this.loadData();
-            });
-            window.addEventListener('exchange-changed', (e) => {
-                this.exchange = e.detail?.exchange || this.exchange;
-                this.loadData();
-            });
-
-            // Listen for centralized data
+            console.log('📋 VWAP History Table component initialized');
+            
+            // Listen for centralized data (primary data source)
             window.addEventListener('vwap-data-ready', (e) => {
                 if (e.detail?.historical && Array.isArray(e.detail.historical)) {
-                    this.data = e.detail.historical.sort((a, b) =>
-                        new Date(b.timestamp) - new Date(a.timestamp)
-                    );
+                    // Sort by timestamp descending (newest first) with proper timestamp handling
+                    this.data = e.detail.historical.sort((a, b) => {
+                        const timestampA = a.timestamp || a.ts;
+                        const timestampB = b.timestamp || b.ts;
+                        return new Date(timestampB) - new Date(timestampA);
+                    });
+                    
+                    this.symbol = e.detail.symbol || this.symbol;
+                    this.timeframe = e.detail.timeframe || this.timeframe;
+                    this.exchange = e.detail.exchange || this.exchange;
                     this.lastUpdate = new Date().toLocaleTimeString();
                     this.error = null;
+                    this.loading = false;
+                    
+                    console.log('✅ History Table received data:', this.data.length, 'records');
                 }
             });
-        },
 
-        async loadData() {
-            this.loading = true;
-            this.error = null;
-            try {
-                const params = new URLSearchParams({
-                    symbol: this.symbol,
-                    timeframe: this.timeframe,
-                    exchange: this.exchange,
-                    limit: this.limit.toString(),
-                });
-
-                const baseMeta = document.querySelector('meta[name="api-base-url"]');
-                const configuredBase = (baseMeta?.content || '').trim();
-                const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
-                const url = base ? `${base}/api/spot-microstructure/vwap?${params}` : `/api/spot-microstructure/vwap?${params}`;
-
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-                const result = await response.json();
-                const rawData = result.data || [];
-
-                // Sort by timestamp descending (newest first)
-                this.data = rawData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                this.lastUpdate = new Date().toLocaleTimeString();
-
-                if (this.data.length === 0) {
-                    this.error = 'No data available for the selected filters';
-                }
-
-                console.log('✅ VWAP table data loaded:', this.data.length, 'records');
-            } catch (error) {
-                console.error('❌ Error loading VWAP table data:', error);
-                this.error = 'Unable to fetch historical data. Please try again.';
-                this.data = [];
-            } finally {
+            // Listen for error events
+            window.addEventListener('vwap-data-error', (e) => {
+                this.error = e.detail?.error || 'Failed to load historical data';
                 this.loading = false;
-            }
+                console.error('❌ History Table received error:', this.error);
+            });
+
+            // No individual API calls - rely entirely on centralized data
+            console.log('📋 History Table waiting for centralized data...');
         },
 
-        refresh() {
-            this.loadData();
-        },
+        // Removed individual loadData() and refresh() methods
+        // Component now relies entirely on centralized data management
 
         updateDisplay() {
             // Just update the display, data is already loaded
@@ -230,9 +187,25 @@ function vwapHistoryTable(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', 
             }).format(parseFloat(value));
         },
 
-        formatTimestamp(timestamp) {
+        formatTimestamp(timestampOrItem) {
+            let timestamp;
+            
+            // Handle both direct timestamp and data object
+            if (typeof timestampOrItem === 'object' && timestampOrItem !== null) {
+                timestamp = timestampOrItem.timestamp || timestampOrItem.ts;
+            } else {
+                timestamp = timestampOrItem;
+            }
+            
             if (!timestamp) return 'N/A';
+            
+            // Validate and parse timestamp
             const date = new Date(timestamp);
+            if (isNaN(date.getTime())) {
+                console.warn('📋 Invalid timestamp in table:', timestamp);
+                return 'Invalid Date';
+            }
+            
             return date.toLocaleString('en-US', {
                 month: 'short',
                 day: 'numeric',

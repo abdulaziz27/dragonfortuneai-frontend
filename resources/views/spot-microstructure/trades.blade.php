@@ -62,14 +62,14 @@
 
                     <!-- Manual Refresh Button -->
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
-                        <span x-show="!loading">🔄 Refresh All</span>
+                        <span x-show="!loading">Refresh All</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
 
                     <!-- Auto-refresh Toggle -->
                     <button class="btn" @click="toggleAutoRefresh()" 
                             :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'">
-                        <span x-text="autoRefreshEnabled ? '🔄 Auto-refresh: ON' : '⏸️ Auto-refresh: OFF'"></span>
+                        <span x-text="autoRefreshEnabled ? 'Auto-refresh: ON' : '⏸️ Auto-refresh: OFF'"></span>
                     </button>
 
                     <!-- Last Updated -->
@@ -169,9 +169,9 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="(item, index) in cvdData" :key="'cvd-' + index + '-' + item.timestamp">
+                                <template x-for="(item, index) in cvdData" :key="'cvd-' + index + '-' + item.ts">
                                     <tr>
-                                        <td x-text="formatTime(item.timestamp)">--</td>
+                                        <td x-text="formatTime(item.ts)">--</td>
                                         <td>
                                             <span class="badge bg-secondary" x-text="item.exchange">--</span>
                                         </td>
@@ -180,6 +180,11 @@
                                         <td class="text-center">
                                             <span class="badge" :class="getTrendClass(item.cvd)" x-text="getTrendText(item.cvd)">--</span>
                                         </td>
+                                    </tr>
+                                </template>
+                                <template x-if="!loading && cvdData.length === 0">
+                                    <tr>
+                                        <td colspan="5" class="text-center text-secondary py-4">No CVD data available</td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -275,21 +280,19 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-if="!loading && trades.length > 0">
-                                    <template x-for="trade in trades" :key="trade.ts_ms">
-                                        <tr>
-                                            <td class="small" x-text="formatTime(trade.bucket_time)"></td>
-                                            <td class="small" x-text="formatPrice(trade.avg_price)"></td>
-                                            <td class="small text-success" x-text="formatVolume(trade.buy_volume_quote)"></td>
-                                            <td class="small text-danger" x-text="formatVolume(trade.sell_volume_quote)"></td>
-                                            <td class="small" :class="trade.net_flow_quote >= 0 ? 'text-success' : 'text-danger'" x-text="formatVolume(trade.net_flow_quote)"></td>
-                                            <td class="small" x-text="trade.trades_count"></td>
-                                        </tr>
-                                    </template>
+                                <template x-for="trade in trades" :key="trade.ts_ms">
+                                    <tr>
+                                        <td class="small" x-text="formatTime(trade.bucket_time)"></td>
+                                        <td class="small" x-text="formatPrice(trade.avg_price)"></td>
+                                        <td class="small text-success" x-text="formatVolume(trade.buy_volume_quote)"></td>
+                                        <td class="small text-danger" x-text="formatVolume(trade.sell_volume_quote)"></td>
+                                        <td class="small" :class="trade.net_flow_quote >= 0 ? 'text-success' : 'text-danger'" x-text="formatVolume(trade.net_flow_quote)"></td>
+                                        <td class="small" x-text="trade.trades_count"></td>
+                                    </tr>
                                 </template>
                                 <template x-if="!loading && trades.length === 0">
                                     <tr>
-                                        <td colspan="6" class="text-center text-secondary">No trade summary data available</td>
+                                        <td colspan="6" class="text-center text-secondary py-4">No trade summary data available</td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -358,24 +361,22 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-if="!loading && trades.length > 0">
-                                    <template x-for="trade in trades" :key="trade.trade_id">
-                                        <tr :class="trade.side === 'buy' ? 'table-success-subtle' : 'table-danger-subtle'">
-                                            <td class="small" x-text="formatTime(trade.timestamp)"></td>
-                                            <td class="small"><span class="badge bg-secondary" x-text="trade.exchange"></span></td>
-                                            <td>
-                                                <span class="badge" :class="trade.side === 'buy' ? 'bg-success' : 'bg-danger'" x-text="trade.side.toUpperCase()"></span>
-                                            </td>
-                                            <td class="small" x-text="formatPrice(trade.price)"></td>
-                                            <td class="small" x-text="trade.quantity.toFixed(6)"></td>
-                                            <td class="small" x-text="formatVolume(trade.quote_quantity)"></td>
-                                            <td class="small text-secondary" x-text="trade.trade_id"></td>
-                                        </tr>
-                                    </template>
+                                <template x-for="trade in trades" :key="trade.trade_id">
+                                    <tr :class="trade.side === 'buy' ? 'table-success-subtle' : 'table-danger-subtle'">
+                                        <td class="small" x-text="formatTime(trade.timestamp)"></td>
+                                        <td class="small"><span class="badge bg-secondary" x-text="trade.exchange"></span></td>
+                                        <td>
+                                            <span class="badge" :class="trade.side === 'buy' ? 'bg-success' : 'bg-danger'" x-text="trade.side.toUpperCase()"></span>
+                                        </td>
+                                        <td class="small" x-text="formatPrice(trade.price)"></td>
+                                        <td class="small" x-text="(trade.qty || 0).toFixed(6)"></td>
+                                        <td class="small" x-text="formatVolume(trade.quote_quantity)"></td>
+                                        <td class="small text-secondary" x-text="trade.trade_id"></td>
+                                    </tr>
                                 </template>
                                 <template x-if="!loading && trades.length === 0">
                                     <tr>
-                                        <td colspan="7" class="text-center text-secondary">No recent trades available</td>
+                                        <td colspan="7" class="text-center text-secondary py-4">No recent trades available</td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -487,6 +488,11 @@
 
         .table-danger-subtle {
             background-color: rgba(239, 68, 68, 0.05) !important;
+        }
+
+        /* Smooth transitions for data updates */
+        .table-responsive tbody {
+            transition: opacity 0.2s ease-in-out;
         }
 
         /* Responsive adjustments */

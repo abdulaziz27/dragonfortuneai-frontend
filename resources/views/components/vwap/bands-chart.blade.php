@@ -21,10 +21,6 @@
             <h5 class="mb-1">📈 VWAP & Bands</h5>
             <p class="small text-secondary mb-0">Volume-Weighted Average Price with volatility bands</p>
         </div>
-        <button class="btn btn-sm btn-outline-secondary" @click="refresh()" :disabled="loading">
-            <span x-show="!loading">🔄</span>
-            <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-        </button>
     </div>
 
     <!-- Loading State -->
@@ -99,19 +95,49 @@ function vwapBandsChart(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', in
             this.listenForData();
         },
 
+        // Centralized chart destruction
+        destroyChart() {
+            if (this.chartInstance) {
+                try {
+                    if (typeof this.chartInstance.stop === 'function') {
+                        this.chartInstance.stop();
+                    }
+                    this.chartInstance.destroy();
+                } catch (e) {
+                    console.warn('📈 Error destroying chart:', e);
+                }
+                this.chartInstance = null;
+            }
+        },
+
         listenForData() {
+            console.log('📈 VWAP Chart listening for centralized data...');
+            
             // Listen for centralized data (primary source)
             const handleData = (e) => {
                 if (e.detail?.historical && Array.isArray(e.detail.historical)) {
+                    console.log('📈 Chart received data:', e.detail.historical.length, 'points');
                     this.data = e.detail.historical;
                     this.error = null;
                     this.loading = false;
-                    // Small delay to ensure DOM is ready
-                    setTimeout(() => this.renderChart(), 100);
+                    
+                    // Use requestAnimationFrame for smooth rendering
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            this.renderChart();
+                        });
+                    });
                 }
             };
 
             window.addEventListener('vwap-data-ready', handleData);
+
+            // Listen for error events
+            window.addEventListener('vwap-data-error', (e) => {
+                this.error = e.detail?.error || 'Failed to load chart data';
+                this.loading = false;
+                console.error('❌ Chart received error:', this.error);
+            });
 
             // Listen to filter changes (will trigger controller to reload data)
             window.addEventListener('symbol-changed', () => {
@@ -125,51 +151,58 @@ function vwapBandsChart(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', in
             });
         },
 
-        refresh() {
-            // Trigger global refresh which will broadcast vwap-data-ready
-            window.dispatchEvent(new CustomEvent('refresh-all'));
-        },
-
         renderChart() {
             if (!this.data || this.data.length === 0) {
-                console.warn('No data to render chart');
+                console.warn('📈 No data to render chart');
                 return;
             }
             if (typeof Chart === 'undefined') {
-                console.warn('Chart.js not loaded');
+                console.warn('📈 Chart.js not loaded');
                 return;
             }
 
             const canvas = this.$refs.chartCanvas;
             if (!canvas) {
-                console.warn('Canvas not found');
+                console.warn('📈 Canvas not found');
                 return;
-            }
-
-            // Destroy existing chart instance FIRST
-            if (this.chartInstance) {
-                try {
-                    this.chartInstance.destroy();
-                    this.chartInstance = null;
-                } catch (e) {
-                    console.warn('Error destroying chart:', e);
-                }
             }
 
             const ctx = canvas.getContext('2d');
             if (!ctx) {
-                console.warn('Cannot get canvas context');
+                console.warn('📈 Cannot get canvas context');
                 return;
             }
 
             // Prepare data - take only recent data points to avoid overload
             const sortedData = [...this.data]
-                .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+                .filter(d => d && (d.timestamp || d.ts)) // Filter out items without timestamps
+                .sort((a, b) => {
+                    const timestampA = a.timestamp || a.ts;
+                    const timestampB = b.timestamp || b.ts;
+                    return new Date(timestampA) - new Date(timestampB);
+                })
                 .slice(-100); // Take last 100 points
 
-            // Format labels as readable strings (avoid time scale issues)
+            if (sortedData.length === 0) {
+                console.warn('📈 No valid data points with timestamps');
+                this.error = 'No valid data points found';
+                return;
+            }
+
+            // Enhanced timestamp handling with validation
             const labels = sortedData.map(d => {
-                const date = new Date(d.timestamp);
+                const timestamp = d.timestamp || d.ts;
+                if (!timestamp) {
+                    console.warn('📈 Missing timestamp in data:', d);
+                    return 'N/A';
+                }
+                
+                const date = new Date(timestamp);
+                if (isNaN(date.getTime())) {
+                    console.warn('📈 Invalid timestamp:', timestamp);
+                    return 'Invalid';
+                }
+                
                 return date.toLocaleTimeString('en-US', {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -177,12 +210,34 @@ function vwapBandsChart(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', in
                 });
             });
 
-            const vwapData = sortedData.map(d => parseFloat(d.vwap));
-            const upperBandData = sortedData.map(d => parseFloat(d.upper_band));
-            const lowerBandData = sortedData.map(d => parseFloat(d.lower_band));
+            const vwapData = sortedData.map(d => parseFloat(d.vwap) || 0);
+            const upperBandData = sortedData.map(d => parseFloat(d.upper_band) || 0);
+            const lowerBandData = sortedData.map(d => parseFloat(d.lower_band) || 0);
+
+            // Check if we should update existing chart or create new one
+            if (this.chartInstance && this.chartInstance.data) {
+                try {
+                    // Update existing chart data (prevents flickering)
+                    this.chartInstance.data.labels = labels;
+                    this.chartInstance.data.datasets[0].data = vwapData;
+                    this.chartInstance.data.datasets[1].data = upperBandData;
+                    this.chartInstance.data.datasets[2].data = lowerBandData;
+                    this.chartInstance.update('none'); // No animation for smoother updates
+                    
+                    console.log('✅ Chart updated with', sortedData.length, 'data points');
+                    return;
+                } catch (updateError) {
+                    console.warn('📈 Chart update failed, recreating:', updateError);
+                    // If update fails, destroy and recreate
+                    this.destroyChart();
+                }
+            }
+
+            // Destroy existing chart instance if it exists but is corrupted
+            this.destroyChart();
 
             try {
-                // Create new chart with category scale (simpler than time scale)
+                // Create new chart with DISABLED ANIMATIONS (prevents stack overflow)
                 this.chartInstance = new Chart(ctx, {
                     type: 'line',
                     data: {
@@ -228,6 +283,9 @@ function vwapBandsChart(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', in
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        animation: {
+                            duration: 0  // ← CRITICAL: Disable animations to prevent stack overflow
+                        },
                         interaction: {
                             mode: 'index',
                             intersect: false,
@@ -293,9 +351,33 @@ function vwapBandsChart(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', in
             } catch (error) {
                 console.error('❌ Error creating chart:', error);
                 this.error = 'Failed to render chart. Please refresh the page.';
+                this.handleChartError(error);
             }
         },
+
+        // Chart error recovery mechanism
+        handleChartError(error) {
+            console.error('📈 Chart rendering error:', error);
+            
+            // Destroy problematic chart instance
+            this.destroyChart();
+            
+            // Set error state
+            this.error = 'Chart rendering failed. Data will retry on next update.';
+            
+            // Retry after delay
+            setTimeout(() => {
+                if (this.data && this.data.length > 0) {
+                    console.log('📈 Retrying chart render...');
+                    this.renderChart();
+                }
+            }, 2000);
+        },
+
+        // Cleanup on component destroy
+        beforeDestroy() {
+            this.destroyChart();
+        }
     };
 }
 </script>
-

@@ -33,36 +33,135 @@ const API_BASE_URL = getApiBaseUrl() + "/api/spot-microstructure";
 function orderbookController() {
     return {
         // Global state
-        globalSymbol: "BTCUSDT",
-        globalExchange: "binance",
-        globalLoading: false,
-        
+        loading: false,
+        selectedSymbol: 'BTCUSDT',
+        selectedInterval: '5m',
+        selectedLimit: 200,
+        selectedExchange: 'binance',
+
+        // Auto-refresh State
+        autoRefreshEnabled: true,
+        autoRefreshTimer: null,
+        autoRefreshInterval: 5000,   // 5 seconds
+        lastUpdated: null,
+
+        // Debouncing
+        filterDebounceTimer: null,
+        filterDebounceDelay: 300,
+
         // Data storage
         bookPressureData: [],
         liquidityData: [],
         marketDepthData: [],
         orderbookSnapshot: null,
-        
+
         // Chart instances
         bookPressureChart: null,
         liquidityChart: null,
 
         // Initialize
         init() {
-            console.log("🚀 Orderbook Snapshots Dashboard initialized");
-            console.log("📊 Symbol:", this.globalSymbol);
-            console.log("🏦 Exchange:", this.globalExchange);
-            
+            console.log("🚀 Enhanced Orderbook Snapshots Dashboard initialized");
+            console.log("📊 Symbol:", this.selectedSymbol);
+            console.log("🏦 Exchange:", this.selectedExchange);
+            console.log("🔄 Auto-refresh:", this.autoRefreshEnabled ? 'ON' : 'OFF');
+
+            // Initialize shared state
+            this.initializeSharedState();
+
             // Load all data
             this.loadAllData();
-            
-            // Auto refresh every 30 seconds
-            setInterval(() => this.loadAllData(), 30000);
+
+            // Start auto-refresh
+            this.startAutoRefresh();
+
+            // Setup visibility API
+            this.setupVisibilityAPI();
         },
-        
+
+        // Initialize shared state management
+        initializeSharedState() {
+            if (!window.SpotMicrostructureSharedState) {
+                window.SpotMicrostructureSharedState = {
+                    filters: {
+                        selectedSymbol: this.selectedSymbol,
+                        selectedInterval: this.selectedInterval,
+                        selectedLimit: this.selectedLimit,
+                        selectedExchange: this.selectedExchange
+                    },
+                    subscribers: {},
+
+                    setFilter(key, value) {
+                        this.filters[key] = value;
+                        this.notifySubscribers(key, value);
+                    },
+
+                    subscribe(key, callback) {
+                        if (!this.subscribers[key]) {
+                            this.subscribers[key] = [];
+                        }
+                        this.subscribers[key].push(callback);
+                    },
+
+                    notifySubscribers(key, value) {
+                        if (this.subscribers[key]) {
+                            this.subscribers[key].forEach(callback => callback(value));
+                        }
+                    }
+                };
+            }
+
+            // Subscribe to shared state changes
+            window.SpotMicrostructureSharedState.subscribe('selectedSymbol', (value) => {
+                if (this.selectedSymbol !== value) {
+                    this.selectedSymbol = value;
+                    this.handleFilterChange();
+                }
+            });
+
+            window.SpotMicrostructureSharedState.subscribe('selectedInterval', (value) => {
+                if (this.selectedInterval !== value) {
+                    this.selectedInterval = value;
+                    this.handleFilterChange();
+                }
+            });
+
+            window.SpotMicrostructureSharedState.subscribe('selectedLimit', (value) => {
+                if (this.selectedLimit !== value) {
+                    this.selectedLimit = value;
+                    this.handleFilterChange();
+                }
+            });
+
+            window.SpotMicrostructureSharedState.subscribe('selectedExchange', (value) => {
+                if (this.selectedExchange !== value) {
+                    this.selectedExchange = value;
+                    this.handleFilterChange();
+                }
+            });
+        },
+
+        // Handle filter changes with debouncing
+        handleFilterChange() {
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+
+            this.filterDebounceTimer = setTimeout(() => {
+                console.log('🎛️ Filter changed:', {
+                    symbol: this.selectedSymbol,
+                    interval: this.selectedInterval,
+                    limit: this.selectedLimit,
+                    exchange: this.selectedExchange
+                });
+
+                this.loadAllData();
+            }, this.filterDebounceDelay);
+        },
+
         // Load all data
         async loadAllData() {
-            this.globalLoading = true;
+            this.loading = true;
             try {
                 await Promise.all([
                     this.loadBookPressureData(),
@@ -70,90 +169,170 @@ function orderbookController() {
                     this.loadMarketDepthData(),
                     this.loadOrderbookSnapshot()
                 ]);
+
+                this.lastUpdated = new Date().toLocaleTimeString();
+                console.log('✅ All orderbook data loaded at:', this.lastUpdated);
             } catch (error) {
                 console.error('❌ Error loading orderbook data:', error);
             } finally {
-                this.globalLoading = false;
+                this.loading = false;
             }
         },
-        
+
+        // Auto-refresh methods
+        startAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+            }
+
+            if (this.autoRefreshEnabled) {
+                this.autoRefreshTimer = setInterval(() => {
+                    if (this.autoRefreshEnabled && !document.hidden) {
+                        console.log('🔄 Auto-refreshing orderbook data...');
+                        this.loadAllData();
+                    }
+                }, this.autoRefreshInterval);
+
+                console.log('✅ Auto-refresh started (5s intervals)');
+            }
+        },
+
+        stopAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+                this.autoRefreshTimer = null;
+                console.log('⏹️ Auto-refresh stopped');
+            }
+        },
+
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+            console.log('🔄 Auto-refresh toggled:', this.autoRefreshEnabled ? 'ON' : 'OFF');
+
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            } else {
+                this.stopAutoRefresh();
+            }
+        },
+
+        // Setup Visibility API for tab switching
+        setupVisibilityAPI() {
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log('👁️ Tab hidden - pausing auto-refresh');
+                } else {
+                    console.log('👁️ Tab visible - resuming auto-refresh');
+                    if (this.autoRefreshEnabled) {
+                        this.loadAllData(); // Immediate refresh when tab becomes visible
+                    }
+                }
+            });
+        },
+
+        // Filter change handlers
+        onSymbolChange() {
+            window.SpotMicrostructureSharedState.setFilter('selectedSymbol', this.selectedSymbol);
+        },
+
+        onIntervalChange() {
+            window.SpotMicrostructureSharedState.setFilter('selectedInterval', this.selectedInterval);
+        },
+
+        onLimitChange() {
+            window.SpotMicrostructureSharedState.setFilter('selectedLimit', this.selectedLimit);
+        },
+
+        onExchangeChange() {
+            window.SpotMicrostructureSharedState.setFilter('selectedExchange', this.selectedExchange);
+        },
+
+        // Cleanup on destroy
+        beforeDestroy() {
+            this.stopAutoRefresh();
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+        },
+
         // Load book pressure data
         async loadBookPressureData() {
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/book-pressure?symbol=${this.globalSymbol}&exchange=${this.globalExchange}&limit=100`
+                    `${API_BASE_URL}/book-pressure?symbol=${this.selectedSymbol}&exchange=${this.selectedExchange}&limit=${this.selectedLimit}`
                 );
-                
+
                 if (!response.ok) {
                     throw new Error("Failed to fetch book pressure");
                 }
-                
+
                 const data = await response.json();
                 this.bookPressureData = data.data || [];
-                
+
                 console.log('✅ Book pressure data loaded:', this.bookPressureData.length, 'records');
             } catch (error) {
                 console.error('❌ Error loading book pressure data:', error);
                 this.bookPressureData = [];
             }
         },
-        
+
         // Load liquidity data
         async loadLiquidityData() {
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/orderbook/liquidity?symbol=${this.globalSymbol}&depth=20`
+                    `${API_BASE_URL}/orderbook/liquidity?symbol=${this.selectedSymbol}&depth=${Math.min(this.selectedLimit, 50)}`
                 );
-                
+
                 if (!response.ok) {
                     throw new Error("Failed to fetch liquidity data");
                 }
-                
+
                 const data = await response.json();
-                this.liquidityData = data.data || [];
-                
+                // Fix: Liquidity endpoint returns object, not array
+                this.liquidityData = data ? [data] : [];
+
                 console.log('✅ Liquidity data loaded:', this.liquidityData.length, 'records');
             } catch (error) {
                 console.error('❌ Error loading liquidity data:', error);
                 this.liquidityData = [];
             }
         },
-        
+
         // Load market depth data
         async loadMarketDepthData() {
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/market-depth?symbol=${this.globalSymbol}&exchange=${this.globalExchange}&limit=20`
+                    `${API_BASE_URL}/market-depth?symbol=${this.selectedSymbol}&exchange=${this.selectedExchange}&limit=${Math.min(this.selectedLimit, 100)}`
                 );
-                
+
                 if (!response.ok) {
                     throw new Error("Failed to fetch market depth");
                 }
-                
+
                 const data = await response.json();
                 this.marketDepthData = data.data || [];
-                
+
                 console.log('✅ Market depth data loaded:', this.marketDepthData.length, 'records');
             } catch (error) {
                 console.error('❌ Error loading market depth data:', error);
                 this.marketDepthData = [];
             }
         },
-        
+
         // Load orderbook snapshot
         async loadOrderbookSnapshot() {
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/orderbook/snapshot?symbol=${this.globalSymbol}&depth=15`
+                    `${API_BASE_URL}/orderbook/snapshot?symbol=${this.selectedSymbol}&depth=${Math.min(this.selectedLimit, 50)}`
                 );
-                
+
                 if (!response.ok) {
                     throw new Error("Failed to fetch orderbook snapshot");
                 }
-                
+
                 const data = await response.json();
                 this.orderbookSnapshot = data.data?.[0] || null;
-                
+
                 console.log('✅ Orderbook snapshot loaded');
             } catch (error) {
                 console.error('❌ Error loading orderbook snapshot:', error);
@@ -161,51 +340,10 @@ function orderbookController() {
             }
         },
 
-        // Update symbol globally
-        updateSymbol() {
-            console.log("📊 Symbol changed to:", this.globalSymbol);
-            this.loadAllData();
-            window.dispatchEvent(
-                new CustomEvent("symbol-changed", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        exchange: this.globalExchange,
-                    },
-                })
-            );
-        },
-
-        // Update exchange globally
-        updateExchange() {
-            console.log("🏦 Exchange changed to:", this.globalExchange);
-            window.dispatchEvent(
-                new CustomEvent("exchange-changed", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        exchange: this.globalExchange,
-                    },
-                })
-            );
-        },
-
-        // Refresh all components
-        async refreshAll() {
-            this.globalLoading = true;
-            console.log("🔄 Refreshing all components...");
-
-            window.dispatchEvent(
-                new CustomEvent("refresh-all", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        exchange: this.globalExchange,
-                    },
-                })
-            );
-
-            setTimeout(() => {
-                this.globalLoading = false;
-                console.log("✅ All components refreshed");
-            }, 2000);
+        // Manual refresh method
+        async manualRefresh() {
+            console.log("🔄 Manual refresh triggered");
+            await this.loadAllData();
         },
     };
 }
@@ -225,24 +363,23 @@ function bookPressureCard() {
         init() {
             this.loadPressure();
 
-            // Listen to global events
-            window.addEventListener("symbol-changed", () =>
-                this.loadPressure()
-            );
-            window.addEventListener("exchange-changed", () =>
-                this.loadPressure()
-            );
-            window.addEventListener("refresh-all", () => this.loadPressure());
+            // Listen to shared state events
+            if (window.SpotMicrostructureSharedState) {
+                window.SpotMicrostructureSharedState.subscribe('selectedSymbol', () => this.loadPressure());
+                window.SpotMicrostructureSharedState.subscribe('selectedExchange', () => this.loadPressure());
+                window.SpotMicrostructureSharedState.subscribe('selectedLimit', () => this.loadPressure());
+            }
         },
 
         async loadPressure() {
             this.loading = true;
-            const symbol = this.$root?.globalSymbol || "BTCUSDT";
-            const exchange = this.$root?.globalExchange || "binance";
+            const symbol = this.$root?.selectedSymbol || "BTCUSDT";
+            const exchange = this.$root?.selectedExchange || "binance";
+            const limit = this.$root?.selectedLimit || 200;
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/book-pressure?symbol=${symbol}&exchange=${exchange}&limit=100`
+                    `${API_BASE_URL}/book-pressure?symbol=${symbol}&exchange=${exchange}&limit=${limit}`
                 );
 
                 if (!response.ok) {
@@ -335,20 +472,21 @@ function liquidityImbalance() {
         init() {
             this.loadLiquidity();
 
-            // Listen to global events
-            window.addEventListener("symbol-changed", () =>
-                this.loadLiquidity()
-            );
-            window.addEventListener("refresh-all", () => this.loadLiquidity());
+            // Listen to shared state events
+            if (window.SpotMicrostructureSharedState) {
+                window.SpotMicrostructureSharedState.subscribe('selectedSymbol', () => this.loadLiquidity());
+                window.SpotMicrostructureSharedState.subscribe('selectedLimit', () => this.loadLiquidity());
+            }
         },
 
         async loadLiquidity() {
             this.loading = true;
-            const symbol = this.$root?.globalSymbol || "BTCUSDT";
+            const symbol = this.$root?.selectedSymbol || "BTCUSDT";
+            const limit = Math.min(this.$root?.selectedLimit || 200, 50);
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/orderbook/liquidity?symbol=${symbol}&depth=20`
+                    `${API_BASE_URL}/orderbook/liquidity?symbol=${symbol}&depth=${limit}`
                 );
 
                 if (!response.ok) {
@@ -438,8 +576,8 @@ function marketDepthStats() {
 
         async loadDepthStats() {
             this.loading = true;
-            const symbol = this.$root?.globalSymbol || "BTCUSDT";
-            const exchange = this.$root?.globalExchange || "binance";
+            const symbol = this.$root?.selectedSymbol || "BTCUSDT";
+            const exchange = this.$root?.selectedExchange || "binance";
 
             try {
                 const response = await fetch(
@@ -515,11 +653,11 @@ function quickStats() {
 
         async loadQuickStats() {
             this.loading = true;
-            const symbol = this.$root?.globalSymbol || "BTCUSDT";
+            const symbol = this.$root?.selectedSymbol || "BTCUSDT";
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/orderbook/snapshot?symbol=${symbol}&depth=1`
+                    `${API_BASE_URL}/orderbook/snapshot?symbol=${symbol}&depth=20`
                 );
 
                 if (!response.ok) {
@@ -528,22 +666,31 @@ function quickStats() {
 
                 const data = await response.json();
 
+                // Fix: Access orderbook data from data.data[0] structure
+                const orderbook = data.data && data.data[0];
+
                 if (
-                    data.asks &&
-                    data.asks.length > 0 &&
-                    data.bids &&
-                    data.bids.length > 0
+                    orderbook &&
+                    orderbook.asks &&
+                    orderbook.asks.length > 0 &&
+                    orderbook.bids &&
+                    orderbook.bids.length > 0
                 ) {
-                    const bestAsk = data.asks[0].price;
-                    const bestBid = data.bids[0].price;
+                    const bestAsk = orderbook.asks[0].price;
+                    const bestBid = orderbook.bids[0].price;
 
                     this.currentSpread = bestAsk - bestBid;
                     this.midPrice = (bestAsk + bestBid) / 2;
                     this.spreadPercent =
                         (this.currentSpread / this.midPrice) * 100;
 
-                    console.log("✅ Quick stats loaded");
+                    console.log("✅ Quick stats loaded:", {
+                        spread: this.currentSpread,
+                        midPrice: this.midPrice,
+                        spreadPercent: this.spreadPercent
+                    });
                 } else {
+                    console.warn("⚠️ No orderbook data available for quick stats");
                     this.resetData();
                 }
             } catch (error) {
@@ -561,6 +708,10 @@ function quickStats() {
         },
 
         formatPrice(value) {
+            // Fix: Handle NaN, null, undefined values
+            if (value === null || value === undefined || isNaN(value) || value === 0) {
+                return "$0.00";
+            }
             return (
                 "$" +
                 value.toLocaleString(undefined, {
@@ -571,6 +722,10 @@ function quickStats() {
         },
 
         formatPercent(value) {
+            // Fix: Handle NaN, null, undefined values
+            if (value === null || value === undefined || isNaN(value)) {
+                return "0.0000%";
+            }
             return value.toFixed(4) + "%";
         },
     };
@@ -590,10 +745,7 @@ function liveOrderbookSnapshot() {
         init() {
             this.loadSnapshot();
 
-            // Auto refresh every 5 seconds
-            setInterval(() => this.loadSnapshot(), 5000);
-
-            // Listen to global events
+            // Listen to global events (auto-refresh handled by main controller)
             window.addEventListener("symbol-changed", () =>
                 this.loadSnapshot()
             );
@@ -602,11 +754,12 @@ function liveOrderbookSnapshot() {
 
         async loadSnapshot() {
             this.loading = true;
-            const symbol = this.$root?.globalSymbol || "BTCUSDT";
+            const symbol = this.$root?.selectedSymbol || "BTCUSDT";
+            const depth = Math.min(this.$root?.selectedLimit || 200, 50);
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/orderbook/snapshot?symbol=${symbol}&depth=15`
+                    `${API_BASE_URL}/orderbook/snapshot?symbol=${symbol}&depth=${depth}`
                 );
 
                 if (!response.ok) {
@@ -615,17 +768,32 @@ function liveOrderbookSnapshot() {
 
                 const data = await response.json();
 
-                this.bids = (data.bids || []).slice(0, 10);
-                this.asks = (data.asks || []).slice(0, 10).reverse(); // Reverse asks for display
+                // Fix: Access orderbook data from data.data[0] structure
+                const orderbook = data.data && data.data[0];
 
-                if (this.bids.length > 0 && this.asks.length > 0) {
-                    const bestAsk = this.asks[0].price;
-                    const bestBid = this.bids[0].price;
-                    this.midPrice = (bestAsk + bestBid) / 2;
-                    this.spread = bestAsk - bestBid;
+                if (orderbook) {
+                    this.bids = (orderbook.bids || []).slice(0, 10);
+                    this.asks = (orderbook.asks || []).slice(0, 10).reverse(); // Reverse asks for display
+
+                    if (this.bids.length > 0 && this.asks.length > 0) {
+                        // Note: asks are reversed, so get the last item for best ask
+                        const bestAsk = this.asks[this.asks.length - 1].price;
+                        const bestBid = this.bids[0].price;
+                        this.midPrice = (bestAsk + bestBid) / 2;
+                        this.spread = bestAsk - bestBid;
+                    }
+
+                    console.log("✅ Orderbook snapshot loaded:", {
+                        bids: this.bids.length,
+                        asks: this.asks.length,
+                        spread: this.spread,
+                        midPrice: this.midPrice
+                    });
+                } else {
+                    console.warn("⚠️ No orderbook data available for snapshot");
+                    this.bids = [];
+                    this.asks = [];
                 }
-
-                console.log("✅ Orderbook snapshot loaded");
             } catch (error) {
                 console.error("❌ Error loading orderbook snapshot:", error);
                 this.bids = [];
@@ -642,10 +810,15 @@ function liveOrderbookSnapshot() {
 
         getMaxQuantity(orders) {
             if (orders.length === 0) return 0;
-            return Math.max(...orders.map((o) => o.quantity));
+            // Fix: Use 'size' field instead of 'quantity' (API returns 'size')
+            return Math.max(...orders.map((o) => o.size || 0));
         },
 
         formatPrice(price) {
+            // Fix: Handle NaN, null, undefined values
+            if (price === null || price === undefined || isNaN(price) || price === 0) {
+                return "$0.00";
+            }
             return (
                 "$" +
                 price.toLocaleString(undefined, {
@@ -656,10 +829,19 @@ function liveOrderbookSnapshot() {
         },
 
         formatQuantity(quantity) {
+            // Fix: Handle NaN, null, undefined values
+            if (quantity === null || quantity === undefined || isNaN(quantity)) {
+                return "0.0000";
+            }
             return quantity.toFixed(4);
         },
 
         formatTotal(price, quantity) {
+            // Fix: Handle NaN, null, undefined values
+            if (price === null || price === undefined || isNaN(price) || 
+                quantity === null || quantity === undefined || isNaN(quantity)) {
+                return "$0.00";
+            }
             const total = price * quantity;
             if (total >= 1000) {
                 return "$" + (total / 1000).toFixed(2) + "K";
@@ -793,12 +975,13 @@ function liquidityDistributionTable() {
 
         async loadData() {
             this.loading = true;
-            const symbol = this.$root?.globalSymbol || "BTCUSDT";
-            const exchange = this.$root?.globalExchange || "binance";
+            const symbol = this.$root?.selectedSymbol || "BTCUSDT";
+            const exchange = this.$root?.selectedExchange || "binance";
+            const limit = Math.min(this.$root?.selectedLimit || 200, 50);
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/liquidity-heatmap?symbol=${symbol}&exchange=${exchange}&limit=20`
+                    `${API_BASE_URL}/liquidity-heatmap?symbol=${symbol}&exchange=${exchange}&limit=${limit}`
                 );
 
                 if (!response.ok) {
@@ -825,6 +1008,10 @@ function liquidityDistributionTable() {
         },
 
         formatPrice(price) {
+            // Fix: Handle NaN, null, undefined values
+            if (price === null || price === undefined || isNaN(price) || price === 0) {
+                return "$0.00";
+            }
             return (
                 "$" +
                 price.toLocaleString(undefined, {
@@ -886,12 +1073,13 @@ function marketDepthTable() {
 
         async loadTable() {
             this.loading = true;
-            const symbol = this.$root?.globalSymbol || "BTCUSDT";
-            const exchange = this.$root?.globalExchange || "binance";
+            const symbol = this.$root?.selectedSymbol || "BTCUSDT";
+            const exchange = this.$root?.selectedExchange || "binance";
+            const limit = Math.min(this.$root?.selectedLimit || 200, 100);
 
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/market-depth?symbol=${symbol}&exchange=${exchange}&limit=20`
+                    `${API_BASE_URL}/market-depth?symbol=${symbol}&exchange=${exchange}&limit=${limit}`
                 );
 
                 if (!response.ok) {
@@ -952,16 +1140,18 @@ function orderbookDepthTable() {
 
         async loadTable() {
             this.loading = true;
-            const symbol = this.$root?.globalSymbol || "BTCUSDT";
-            const exchange = this.$root?.globalExchange || "binance";
+            const symbol = this.$root?.selectedSymbol || "BTCUSDT";
+            const exchange = this.$root?.selectedExchange || "binance";
+            const limit = Math.min(this.$root?.selectedLimit || 200, 100);
 
             try {
+                // Fix: Use market-depth endpoint instead of non-existent orderbook-depth
                 const response = await fetch(
-                    `${API_BASE_URL}/orderbook-depth?symbol=${symbol}&exchange=${exchange}&limit=20`
+                    `${API_BASE_URL}/market-depth?symbol=${symbol}&exchange=${exchange}&limit=${limit}`
                 );
 
                 if (!response.ok) {
-                    throw new Error("Failed to fetch orderbook depth data");
+                    throw new Error("Failed to fetch market depth data");
                 }
 
                 const result = await response.json();
@@ -981,6 +1171,10 @@ function orderbookDepthTable() {
         },
 
         formatPrice(price) {
+            // Fix: Handle NaN, null, undefined values
+            if (price === null || price === undefined || isNaN(price) || price === 0) {
+                return "$0.00";
+            }
             return (
                 "$" +
                 price.toLocaleString(undefined, {
@@ -991,10 +1185,18 @@ function orderbookDepthTable() {
         },
 
         formatQuantity(quantity) {
+            // Fix: Handle NaN, null, undefined values
+            if (quantity === null || quantity === undefined || isNaN(quantity)) {
+                return "0.0000";
+            }
             return quantity.toFixed(4);
         },
 
         formatTotal(total) {
+            // Fix: Handle NaN, null, undefined values
+            if (total === null || total === undefined || isNaN(total)) {
+                return "$0.00";
+            }
             if (total >= 1000000) {
                 return "$" + (total / 1000000).toFixed(2) + "M";
             } else if (total >= 1000) {
@@ -1002,6 +1204,131 @@ function orderbookDepthTable() {
             }
             return "$" + total.toFixed(2);
         },
+    };
+}
+
+/**
+ * Market Summary Component
+ */
+function marketSummary() {
+    return {
+        loading: false,
+        currentDepth: null,
+        
+        init() {
+            this.loadMarketSummary();
+            
+            // Listen to shared state events
+            if (window.SpotMicrostructureSharedState) {
+                window.SpotMicrostructureSharedState.subscribe('selectedSymbol', () => this.loadMarketSummary());
+                window.SpotMicrostructureSharedState.subscribe('selectedExchange', () => this.loadMarketSummary());
+            }
+        },
+        
+        async loadMarketSummary() {
+            this.loading = true;
+            const symbol = this.$root?.selectedSymbol || "BTCUSDT";
+            const exchange = this.$root?.selectedExchange || "binance";
+            
+            try {
+                const response = await fetch(
+                    `${API_BASE_URL}/market-depth?symbol=${symbol}&exchange=${exchange}&limit=1`
+                );
+                
+                if (!response.ok) {
+                    throw new Error("Failed to fetch market summary");
+                }
+                
+                const result = await response.json();
+                const data = result.data || [];
+                
+                if (data.length > 0) {
+                    this.currentDepth = data[0]; // Get latest data
+                    console.log("✅ Market summary loaded:", this.currentDepth);
+                } else {
+                    this.currentDepth = null;
+                    console.warn("⚠️ No market depth data available");
+                }
+            } catch (error) {
+                console.error("❌ Error loading market summary:", error);
+                this.currentDepth = null;
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        formatVolume(value) {
+            if (!value || value === 0) return "0";
+            if (value >= 1000000) {
+                return (value / 1000000).toFixed(1) + "M";
+            } else if (value >= 1000) {
+                return (value / 1000).toFixed(1) + "K";
+            }
+            return value.toFixed(0);
+        },
+        
+        getAvgVolumePerLevel(totalVolume, levels) {
+            if (!totalVolume || !levels || levels === 0) return 0;
+            return totalVolume / levels;
+        },
+        
+        getLiquidityAssessment(score) {
+            if (!score) return "No Data";
+            if (score >= 80) return "Excellent";
+            if (score >= 60) return "Good";
+            if (score >= 40) return "Moderate";
+            if (score >= 20) return "Low";
+            return "Very Low";
+        },
+        
+        getLiquidityClass(score) {
+            if (!score) return "text-secondary";
+            if (score >= 80) return "text-success";
+            if (score >= 60) return "text-info";
+            if (score >= 40) return "text-warning";
+            return "text-danger";
+        },
+        
+        getVolumeRatio(bidVolume, askVolume) {
+            if (!bidVolume || !askVolume) return "N/A";
+            const ratio = bidVolume / askVolume;
+            return ratio.toFixed(2) + ":1";
+        },
+        
+        getMarketInsight(depth) {
+            if (!depth) return "No market data available.";
+            
+            const bidVolume = depth.total_bid_volume || 0;
+            const askVolume = depth.total_ask_volume || 0;
+            const bidLevels = depth.bid_levels || 0;
+            const askLevels = depth.ask_levels || 0;
+            const depthScore = depth.depth_score || 0;
+            
+            // Volume imbalance analysis
+            const volumeRatio = bidVolume / (askVolume || 1);
+            let insight = "";
+            
+            if (volumeRatio > 1.5) {
+                insight = "Strong buying pressure detected with " + (volumeRatio * 100 - 100).toFixed(0) + "% more bid volume.";
+            } else if (volumeRatio < 0.67) {
+                insight = "Strong selling pressure detected with " + (100 - volumeRatio * 100).toFixed(0) + "% more ask volume.";
+            } else {
+                insight = "Balanced market with relatively equal bid/ask volumes.";
+            }
+            
+            // Liquidity assessment
+            if (depthScore >= 80) {
+                insight += " Excellent liquidity provides tight spreads and low slippage.";
+            } else if (depthScore >= 60) {
+                insight += " Good liquidity supports efficient trading.";
+            } else if (depthScore >= 40) {
+                insight += " Moderate liquidity - consider order size impact.";
+            } else {
+                insight += " Low liquidity may result in higher slippage.";
+            }
+            
+            return insight;
+        }
     };
 }
 

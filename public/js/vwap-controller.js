@@ -23,11 +23,21 @@
 function vwapController() {
     return {
         // Global state
-        globalSymbol: "BTCUSDT",
-        globalTimeframe: "5min",
-        globalExchange: "binance",
-        globalLimit: 2000,
-        globalLoading: false,
+        loading: false,
+        selectedSymbol: 'BTCUSDT',  // Only BTCUSDT has data
+        selectedInterval: '5m',     // Only 5m works properly
+        selectedLimit: 200,         // This filter works
+        selectedExchange: 'binance', // Only Binance has data
+        
+        // Auto-refresh State
+        autoRefreshEnabled: true,
+        autoRefreshTimer: null,
+        autoRefreshInterval: 5000,   // 5 seconds
+        lastUpdated: null,
+        
+        // Debouncing
+        filterDebounceTimer: null,
+        filterDebounceDelay: 300,
 
         // Component references
         components: {
@@ -43,10 +53,14 @@ function vwapController() {
 
         // Initialize dashboard
         init() {
-            console.log("🚀 VWAP/TWAP Dashboard initialized");
-            console.log("📊 Symbol:", this.globalSymbol);
-            console.log("⏱️ Timeframe:", this.globalTimeframe);
-            console.log("🏢 Exchange:", this.globalExchange);
+            console.log("🚀 Enhanced VWAP/TWAP Dashboard initialized");
+            console.log("📊 Symbol:", this.selectedSymbol);
+            console.log("⏱️ Interval:", this.selectedInterval);
+            console.log("🏢 Exchange:", this.selectedExchange);
+            console.log("🔄 Auto-refresh:", this.autoRefreshEnabled ? 'ON' : 'OFF');
+
+            // Initialize shared state
+            this.initializeSharedState();
 
             // Setup event listeners
             this.setupEventListeners();
@@ -56,6 +70,12 @@ function vwapController() {
                 console.warn("Initial data load failed:", e)
             );
 
+            // Start auto-refresh
+            this.startAutoRefresh();
+            
+            // Setup visibility API
+            this.setupVisibilityAPI();
+
             // Log dashboard ready
             setTimeout(() => {
                 console.log("✅ All components loaded");
@@ -63,9 +83,91 @@ function vwapController() {
             }, 2000);
         },
 
+        // Initialize shared state management
+        initializeSharedState() {
+            if (!window.SpotMicrostructureSharedState) {
+                window.SpotMicrostructureSharedState = {
+                    filters: {
+                        selectedSymbol: this.selectedSymbol,
+                        selectedInterval: this.selectedInterval,
+                        selectedLimit: this.selectedLimit,
+                        selectedExchange: this.selectedExchange
+                    },
+                    subscribers: {},
+                    
+                    setFilter(key, value) {
+                        this.filters[key] = value;
+                        this.notifySubscribers(key, value);
+                    },
+                    
+                    subscribe(key, callback) {
+                        if (!this.subscribers[key]) {
+                            this.subscribers[key] = [];
+                        }
+                        this.subscribers[key].push(callback);
+                    },
+                    
+                    notifySubscribers(key, value) {
+                        if (this.subscribers[key]) {
+                            this.subscribers[key].forEach(callback => callback(value));
+                        }
+                    }
+                };
+            }
+            
+            // Subscribe to shared state changes
+            window.SpotMicrostructureSharedState.subscribe('selectedSymbol', (value) => {
+                if (this.selectedSymbol !== value) {
+                    this.selectedSymbol = value;
+                    this.handleFilterChange();
+                }
+            });
+            
+            window.SpotMicrostructureSharedState.subscribe('selectedInterval', (value) => {
+                if (this.selectedInterval !== value) {
+                    this.selectedInterval = value;
+                    this.handleFilterChange();
+                }
+            });
+            
+            window.SpotMicrostructureSharedState.subscribe('selectedLimit', (value) => {
+                if (this.selectedLimit !== value) {
+                    this.selectedLimit = value;
+                    this.handleFilterChange();
+                }
+            });
+            
+            window.SpotMicrostructureSharedState.subscribe('selectedExchange', (value) => {
+                if (this.selectedExchange !== value) {
+                    this.selectedExchange = value;
+                    this.handleFilterChange();
+                }
+            });
+        },
+
+        // Handle filter changes with debouncing
+        handleFilterChange() {
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+            
+            this.filterDebounceTimer = setTimeout(() => {
+                console.log('🎛️ Filter changed:', {
+                    symbol: this.selectedSymbol,
+                    interval: this.selectedInterval,
+                    limit: this.selectedLimit,
+                    exchange: this.selectedExchange
+                });
+                
+                this.loadAllData().catch((e) =>
+                    console.warn("Data reload failed:", e)
+                );
+            }, this.filterDebounceDelay);
+        },
+
         // Setup global event listeners
         setupEventListeners() {
-            // Listen for filter changes
+            // Legacy event listeners for backward compatibility
             window.addEventListener("symbol-changed", () => {
                 this.loadAllData().catch((e) =>
                     console.warn("Data reload failed:", e)
@@ -88,172 +190,276 @@ function vwapController() {
             });
         },
 
-        // Update symbol globally
+        // Legacy methods for backward compatibility
         updateSymbol() {
-            console.log("🔄 Updating symbol to:", this.globalSymbol);
-
-            // Dispatch event to all components
-            window.dispatchEvent(
-                new CustomEvent("symbol-changed", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        timeframe: this.globalTimeframe,
-                        exchange: this.globalExchange,
-                    },
-                })
-            );
-
-            this.updateURL();
+            this.onSymbolChange();
         },
 
-        // Update timeframe globally
         updateTimeframe() {
-            console.log("🔄 Updating timeframe to:", this.globalTimeframe);
-
-            // Dispatch event to all components
-            window.dispatchEvent(
-                new CustomEvent("timeframe-changed", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        timeframe: this.globalTimeframe,
-                        exchange: this.globalExchange,
-                    },
-                })
-            );
-
-            this.updateURL();
+            this.onIntervalChange();
         },
 
-        // Update exchange globally
         updateExchange() {
-            console.log("🔄 Updating exchange to:", this.globalExchange);
-
-            // Dispatch event to all components
-            window.dispatchEvent(
-                new CustomEvent("exchange-changed", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        timeframe: this.globalTimeframe,
-                        exchange: this.globalExchange,
-                    },
-                })
-            );
-
-            this.updateURL();
+            this.onExchangeChange();
         },
 
-        // Load all VWAP data
+        // Auto-refresh methods
+        startAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+            }
+            
+            if (this.autoRefreshEnabled) {
+                this.autoRefreshTimer = setInterval(() => {
+                    if (this.autoRefreshEnabled && !document.hidden) {
+                        console.log('🔄 Auto-refreshing VWAP data...');
+                        this.loadAllData();
+                    }
+                }, this.autoRefreshInterval);
+                
+                console.log('✅ Auto-refresh started (5s intervals)');
+            }
+        },
+
+        stopAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+                this.autoRefreshTimer = null;
+                console.log('⏹️ Auto-refresh stopped');
+            }
+        },
+
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+            console.log('🔄 Auto-refresh toggled:', this.autoRefreshEnabled ? 'ON' : 'OFF');
+            
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            } else {
+                this.stopAutoRefresh();
+            }
+        },
+
+        // Setup Visibility API for tab switching
+        setupVisibilityAPI() {
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log('👁️ Tab hidden - pausing auto-refresh');
+                } else {
+                    console.log('👁️ Tab visible - resuming auto-refresh');
+                    if (this.autoRefreshEnabled) {
+                        this.loadAllData(); // Immediate refresh when tab becomes visible
+                    }
+                }
+            });
+        },
+
+        // Filter change handlers
+        onSymbolChange() {
+            window.SpotMicrostructureSharedState.setFilter('selectedSymbol', this.selectedSymbol);
+        },
+
+        onIntervalChange() {
+            window.SpotMicrostructureSharedState.setFilter('selectedInterval', this.selectedInterval);
+        },
+
+        onLimitChange() {
+            window.SpotMicrostructureSharedState.setFilter('selectedLimit', this.selectedLimit);
+        },
+
+        onExchangeChange() {
+            window.SpotMicrostructureSharedState.setFilter('selectedExchange', this.selectedExchange);
+        },
+
+        // Manual refresh method
+        async manualRefresh() {
+            console.log("🔄 Manual refresh triggered");
+            await this.loadAllData();
+        },
+
+        // Load all VWAP data with enhanced error handling
         async loadAllData() {
-            this.globalLoading = true;
+            this.loading = true;
+            const startTime = Date.now();
+            
             try {
+                console.log('🔄 Loading VWAP data...', {
+                    symbol: this.selectedSymbol,
+                    interval: this.selectedInterval,
+                    exchange: this.selectedExchange,
+                    limit: this.selectedLimit
+                });
+
                 // Load historical and latest data in parallel
                 const [historical, latest] = await Promise.all([
                     this.fetchHistoricalVWAP(),
                     this.fetchLatestVWAP(),
                 ]);
 
-                this.historicalData = historical || [];
+                // Validate and store data
+                this.historicalData = Array.isArray(historical) ? historical : [];
                 this.latestData = latest || null;
 
-                // Broadcast data-ready event
+                // Log data quality
+                const loadTime = Date.now() - startTime;
+                console.log('✅ VWAP data loaded:', {
+                    historical_count: this.historicalData.length,
+                    latest_available: !!this.latestData,
+                    current_price_available: !!(this.latestData?.current_price),
+                    load_time_ms: loadTime
+                });
+
+                // Broadcast enhanced data-ready event
                 window.dispatchEvent(
                     new CustomEvent("vwap-data-ready", {
                         detail: {
                             historical: this.historicalData,
                             latest: this.latestData,
-                            symbol: this.globalSymbol,
-                            timeframe: this.globalTimeframe,
-                            exchange: this.globalExchange,
+                            symbol: this.selectedSymbol,
+                            timeframe: this.selectedInterval,
+                            exchange: this.selectedExchange,
+                            timestamp: new Date().toISOString(),
+                            load_time: loadTime
                         },
                     })
                 );
 
-                console.log("✅ VWAP data loaded successfully");
+                this.lastUpdated = new Date().toLocaleTimeString();
+                console.log("✅ VWAP data broadcast completed at:", this.lastUpdated);
+                
             } catch (error) {
                 console.error("❌ Error loading VWAP data:", error);
+                
+                // Broadcast error event for components to handle
+                window.dispatchEvent(
+                    new CustomEvent("vwap-data-error", {
+                        detail: {
+                            error: error.message || 'Unknown error',
+                            symbol: this.selectedSymbol,
+                            timeframe: this.selectedInterval,
+                            exchange: this.selectedExchange,
+                            timestamp: new Date().toISOString()
+                        },
+                    })
+                );
+                
             } finally {
-                this.globalLoading = false;
+                this.loading = false;
             }
         },
 
-        // Fetch historical VWAP data
+        // Cleanup on destroy
+        beforeDestroy() {
+            this.stopAutoRefresh();
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+        },
+
+        // Fetch historical VWAP data with field normalization
         async fetchHistoricalVWAP() {
             const params = {
-                symbol: this.globalSymbol,
-                timeframe: this.globalTimeframe,
-                exchange: this.globalExchange,
-                limit: this.globalLimit,
+                symbol: this.selectedSymbol,
+                interval: this.selectedInterval,
+                exchange: this.selectedExchange,
+                limit: this.selectedLimit,
             };
 
             try {
-                const data = await this.fetchAPI("vwap", params);
-                return Array.isArray(data?.data) ? data.data : [];
+                const response = await this.fetchAPI("vwap", params);
+                
+                // Handle API response field variations and normalize data
+                if (response?.data && Array.isArray(response.data)) {
+                    return response.data.map(item => this.normalizeVWAPData(item));
+                }
+                
+                return [];
             } catch (error) {
                 console.error("❌ Error fetching historical VWAP:", error);
                 return [];
             }
         },
 
-        // Fetch latest VWAP data
+        // Fetch latest VWAP data with field normalization
         async fetchLatestVWAP() {
             const params = {
-                symbol: this.globalSymbol,
-                timeframe: this.globalTimeframe,
-                exchange: this.globalExchange,
+                symbol: this.selectedSymbol,
+                interval: this.selectedInterval,
+                exchange: this.selectedExchange,
             };
 
             try {
                 const data = await this.fetchAPI("vwap/latest", params);
-                return data || null;
+                
+                // Normalize latest data format
+                if (data) {
+                    const normalizedData = this.normalizeVWAPData(data);
+                    
+                    // Use VWAP as current price (most accurate for our use case)
+                    normalizedData.current_price = normalizedData.vwap;
+                    
+                    return normalizedData;
+                }
+                
+                return null;
             } catch (error) {
                 console.error("❌ Error fetching latest VWAP:", error);
                 return null;
             }
         },
 
+        // Normalize VWAP data to handle API response field variations
+        normalizeVWAPData(item) {
+            if (!item) return null;
+            
+            return {
+                ...item,
+                // Handle symbol/pair field variations
+                symbol: item.symbol || item.pair || this.selectedSymbol,
+                // Handle timestamp/ts field variations
+                timestamp: item.timestamp || item.ts,
+                // Ensure numeric values are properly parsed
+                vwap: parseFloat(item.vwap) || 0,
+                upper_band: parseFloat(item.upper_band) || 0,
+                lower_band: parseFloat(item.lower_band) || 0,
+                // Add exchange and timeframe if missing
+                exchange: item.exchange || this.selectedExchange,
+                timeframe: item.timeframe || this.selectedInterval
+            };
+        },
+
+        // Use VWAP as current price (no external API needed)
+        async fetchCurrentSpotPrice() {
+            // We already have accurate data from our API
+            // No need for external Binance API calls
+            console.log('ℹ️ Using VWAP as current price (internal API data)');
+            return null; // Will fallback to VWAP
+        },
+
         // Update URL with current filters
         updateURL() {
             if (window.history && window.history.pushState) {
                 const url = new URL(window.location);
-                url.searchParams.set("symbol", this.globalSymbol);
-                url.searchParams.set("timeframe", this.globalTimeframe);
-                url.searchParams.set("exchange", this.globalExchange);
+                url.searchParams.set("symbol", this.selectedSymbol);
+                url.searchParams.set("interval", this.selectedInterval);
+                url.searchParams.set("exchange", this.selectedExchange);
                 window.history.pushState({}, "", url);
             }
         },
 
-        // Refresh all components
+        // Legacy refresh method
         refreshAll() {
-            this.globalLoading = true;
-            console.log("🔄 Refreshing all components...");
-
-            // Dispatch refresh event to all components
-            window.dispatchEvent(
-                new CustomEvent("refresh-all", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        timeframe: this.globalTimeframe,
-                        exchange: this.globalExchange,
-                    },
-                })
-            );
-
-            // Reload data
-            this.loadAllData();
-
-            // Reset loading state after delay
-            setTimeout(() => {
-                this.globalLoading = false;
-                console.log("✅ All components refreshed");
-            }, 2000);
+            this.manualRefresh();
         },
 
         // Log dashboard status
         logDashboardStatus() {
-            console.group("📊 VWAP Dashboard Status");
-            console.log("Symbol:", this.globalSymbol);
-            console.log("Timeframe:", this.globalTimeframe);
-            console.log("Exchange:", this.globalExchange);
+            console.group("📊 Enhanced VWAP Dashboard Status");
+            console.log("Symbol:", this.selectedSymbol);
+            console.log("Interval:", this.selectedInterval);
+            console.log("Exchange:", this.selectedExchange);
+            console.log("Limit:", this.selectedLimit);
+            console.log("Auto-refresh:", this.autoRefreshEnabled ? 'ON' : 'OFF');
             console.log("Historical data points:", this.historicalData.length);
             console.log("Latest data:", this.latestData ? "Available" : "N/A");
             const baseMeta = document.querySelector(

@@ -37,13 +37,13 @@ function tradesController() {
         selectedSymbol: 'BTCUSDT',
         selectedInterval: '5m',
         selectedLimit: 200,
-        
+
         // Auto-refresh State
         autoRefreshEnabled: true,
         autoRefreshTimer: null,
         autoRefreshInterval: 5000,   // 5 seconds
         lastUpdated: null,
-        
+
         // Debouncing
         filterDebounceTimer: null,
         filterDebounceDelay: 300,
@@ -51,18 +51,18 @@ function tradesController() {
         // Initialize
         init() {
             console.log('🚀 Initializing Trades Analysis Controller');
-            
+
             // Load shared state
             this.loadSharedState();
-            
+
             // Subscribe to shared state changes
             this.subscribeToSharedState();
-            
+
             this.loadAllData();
 
             // Start auto-refresh system
             this.startAutoRefresh();
-            
+
             // Add visibility API integration
             document.addEventListener('visibilitychange', () => {
                 if (document.hidden) {
@@ -74,7 +74,7 @@ function tradesController() {
                 }
             });
         },
-        
+
         // Load shared state
         loadSharedState() {
             if (window.SpotMicrostructureSharedState) {
@@ -84,7 +84,7 @@ function tradesController() {
                 this.selectedLimit = sharedFilters.selectedLimit || 200;
             }
         },
-        
+
         // Subscribe to shared state changes
         subscribeToSharedState() {
             if (window.SpotMicrostructureSharedState) {
@@ -95,7 +95,7 @@ function tradesController() {
                         this.refreshAll();
                     }
                 });
-                
+
                 // Subscribe to interval changes
                 window.SpotMicrostructureSharedState.subscribe('selectedInterval', (value) => {
                     if (this.selectedInterval !== value) {
@@ -103,7 +103,7 @@ function tradesController() {
                         this.refreshAll();
                     }
                 });
-                
+
                 // Subscribe to limit changes
                 window.SpotMicrostructureSharedState.subscribe('selectedLimit', (value) => {
                     if (this.selectedLimit !== value) {
@@ -113,7 +113,7 @@ function tradesController() {
                 });
             }
         },
-        
+
         // Update shared state when local state changes
         updateSharedState() {
             if (window.SpotMicrostructureSharedState) {
@@ -129,7 +129,7 @@ function tradesController() {
             try {
                 // Dispatch refresh event to all components
                 this.$dispatch('refresh-all');
-                
+
                 // Update timestamp on successful load
                 this.updateLastUpdated();
             } catch (error) {
@@ -144,29 +144,29 @@ function tradesController() {
             this.updateSharedState();
             await this.loadAllData();
         },
-        
+
         // Debounced refresh for better performance
         handleFilterChange() {
             console.log('🔄 Filter changed');
-            
+
             // Clear existing timer
             if (this.filterDebounceTimer) {
                 clearTimeout(this.filterDebounceTimer);
             }
-            
+
             // Set new timer with debouncing
             this.filterDebounceTimer = setTimeout(() => {
                 console.log('⏰ Debounced filter change executing...');
                 this.loadAllData();
             }, this.filterDebounceDelay);
         },
-        
+
         // Auto-refresh system methods
         startAutoRefresh() {
             if (this.autoRefreshTimer) {
                 clearInterval(this.autoRefreshTimer);
             }
-            
+
             console.log('🔄 Starting auto-refresh with', this.autoRefreshInterval, 'ms interval');
             this.autoRefreshTimer = setInterval(() => {
                 if (this.autoRefreshEnabled && !document.hidden) {
@@ -175,7 +175,7 @@ function tradesController() {
                 }
             }, this.autoRefreshInterval);
         },
-        
+
         pauseAutoRefresh() {
             console.log('⏸️ Pausing auto-refresh');
             if (this.autoRefreshTimer) {
@@ -183,25 +183,25 @@ function tradesController() {
                 this.autoRefreshTimer = null;
             }
         },
-        
+
         resumeAutoRefresh() {
             if (this.autoRefreshEnabled) {
                 console.log('▶️ Resuming auto-refresh');
                 this.startAutoRefresh();
             }
         },
-        
+
         toggleAutoRefresh() {
             this.autoRefreshEnabled = !this.autoRefreshEnabled;
             console.log('🔄 Auto-refresh toggled:', this.autoRefreshEnabled ? 'ON' : 'OFF');
-            
+
             if (this.autoRefreshEnabled) {
                 this.startAutoRefresh();
             } else {
                 this.pauseAutoRefresh();
             }
         },
-        
+
         // Update timestamp on successful data load
         updateLastUpdated() {
             this.lastUpdated = new Date().toLocaleTimeString('en-US', {
@@ -303,7 +303,14 @@ function cvdTable() {
         minCvd: 0,
 
         init() {
-            this.loadData();
+            // Initialize with empty data first
+            this.cvdData = [];
+            this.loading = false;
+
+            // Load data after a short delay to ensure DOM is ready
+            setTimeout(() => {
+                this.loadData();
+            }, 100);
 
             // Listen to global events
             this.$watch("$root.selectedSymbol", () => this.loadData());
@@ -318,19 +325,26 @@ function cvdTable() {
             const limit = this.$root.selectedLimit || 200;
 
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
                 const response = await fetch(
-                    `${API_BASE_URL}/cvd?exchange=binance&symbol=${symbol.toLowerCase()}&limit=${limit}`
+                    `${API_BASE_URL}/cvd?exchange=binance&symbol=${symbol.toLowerCase()}&limit=${limit}`,
+                    { signal: controller.signal }
                 );
 
+                clearTimeout(timeoutId);
+
                 if (!response.ok) {
-                    throw new Error("Failed to fetch CVD data");
+                    throw new Error(`HTTP ${response.status}: Failed to fetch CVD data`);
                 }
 
                 const result = await response.json();
                 const data = result.data || [];
 
                 if (data.length > 0) {
-                    this.cvdData = data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                    // Fix: API returns 'ts' field, not 'timestamp'
+                    this.cvdData = data.sort((a, b) => new Date(b.ts) - new Date(a.ts));
                     this.calculateStats();
                     console.log("✅ CVD table loaded:", data.length, "records");
                 } else {
@@ -342,6 +356,7 @@ function cvdTable() {
                 this.cvdData = [];
             } finally {
                 this.loading = false;
+                console.log("🔄 CVD loading finished, loading =", this.loading);
             }
         },
 
@@ -355,7 +370,7 @@ function cvdTable() {
             }
 
             const cvdValues = this.cvdData.map(d => parseFloat(d.cvd || 0));
-            
+
             this.currentCvd = cvdValues[0]; // Most recent (first after sorting)
             this.avgCvd = cvdValues.reduce((a, b) => a + b, 0) / cvdValues.length;
             this.maxCvd = Math.max(...cvdValues);
@@ -366,7 +381,7 @@ function cvdTable() {
             if (value === null || value === undefined) return 'N/A';
             const num = parseFloat(value);
             if (isNaN(num)) return 'N/A';
-            
+
             if (Math.abs(num) >= 1e6) return (num / 1e6).toFixed(2) + 'M';
             if (Math.abs(num) >= 1e3) return (num / 1e3).toFixed(1) + 'K';
             return num.toFixed(2);
@@ -375,6 +390,7 @@ function cvdTable() {
         formatTime(timestamp) {
             if (!timestamp) return 'N/A';
             const date = new Date(timestamp);
+            if (isNaN(date.getTime())) return 'N/A';
             return date.toLocaleString('en-US', {
                 month: 'short',
                 day: 'numeric',
@@ -498,7 +514,14 @@ function tradeSummaryTable() {
         loading: false,
 
         init() {
-            this.loadSummary();
+            // Initialize with empty data first
+            this.trades = [];
+            this.loading = false;
+
+            // Load data after a short delay to ensure DOM is ready
+            setTimeout(() => {
+                this.loadSummary();
+            }, 100);
 
             // Listen to global events
             this.$watch("$root.selectedSymbol", () => this.loadSummary());
@@ -514,12 +537,20 @@ function tradeSummaryTable() {
             const limit = this.$root.selectedLimit || 200;
 
             try {
+                console.log("🔄 Loading trade summary for:", symbol, interval, limit);
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
                 const response = await fetch(
-                    `${API_BASE_URL}/trades/summary?symbol=${symbol}&interval=${interval}&limit=${limit}`
+                    `${API_BASE_URL}/trades/summary?symbol=${symbol}&interval=${interval}&limit=${limit}`,
+                    { signal: controller.signal }
                 );
 
+                clearTimeout(timeoutId);
+
                 if (!response.ok) {
-                    throw new Error("Failed to fetch trade summary");
+                    throw new Error(`HTTP ${response.status}: Failed to fetch trade summary`);
                 }
 
                 const result = await response.json();
@@ -535,6 +566,7 @@ function tradeSummaryTable() {
                 this.trades = [];
             } finally {
                 this.loading = false;
+                console.log("🔄 Trade summary loading finished, loading =", this.loading);
             }
         },
 
@@ -692,7 +724,14 @@ function recentTradesStream() {
         loading: false,
 
         init() {
-            this.loadTrades();
+            // Initialize with empty data first
+            this.trades = [];
+            this.loading = false;
+
+            // Load data after a short delay to ensure DOM is ready
+            setTimeout(() => {
+                this.loadTrades();
+            }, 100);
 
             // Listen to global events
             this.$watch("$root.selectedSymbol", () => this.loadTrades());
@@ -706,12 +745,20 @@ function recentTradesStream() {
             const limit = Math.min(this.$root.selectedLimit || 200, 100); // Cap at 100 for recent trades
 
             try {
+                console.log("🔄 Loading recent trades for:", symbol, limit);
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
                 const response = await fetch(
-                    `${API_BASE_URL}/trades?symbol=${symbol}&limit=${limit}`
+                    `${API_BASE_URL}/trades?symbol=${symbol}&limit=${limit}`,
+                    { signal: controller.signal }
                 );
 
+                clearTimeout(timeoutId);
+
                 if (!response.ok) {
-                    throw new Error("Failed to fetch recent trades");
+                    throw new Error(`HTTP ${response.status}: Failed to fetch recent trades`);
                 }
 
                 const result = await response.json();
@@ -727,6 +774,7 @@ function recentTradesStream() {
                 this.trades = [];
             } finally {
                 this.loading = false;
+                console.log("🔄 Recent trades loading finished, loading =", this.loading);
             }
         },
 
@@ -772,31 +820,31 @@ window.SpotMicrostructureSharedState = {
         selectedLimit: 200,
         selectedExchange: 'binance'
     },
-    
+
     subscribers: {},
-    
+
     setFilter(key, value) {
         if (this.filters[key] !== value) {
             this.filters[key] = value;
             this.notifySubscribers(key, value);
         }
     },
-    
+
     getFilter(key) {
         return this.filters[key];
     },
-    
+
     getAllFilters() {
         return { ...this.filters };
     },
-    
+
     subscribe(key, callback) {
         if (!this.subscribers[key]) {
             this.subscribers[key] = [];
         }
         this.subscribers[key].push(callback);
     },
-    
+
     notifySubscribers(key, value) {
         if (this.subscribers[key]) {
             this.subscribers[key].forEach(callback => callback(value));

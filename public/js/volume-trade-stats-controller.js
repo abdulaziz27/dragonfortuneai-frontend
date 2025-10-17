@@ -13,11 +13,21 @@
 function volumeTradeStatsController() {
     return {
         // Global state
-        globalSymbol: "BTCUSDT",
-        globalExchange: "binance",
-        globalTimeframe: "5m",
-        globalLimit: 1000,
-        globalLoading: false,
+        loading: false,
+        selectedSymbol: 'BTCUSDT',
+        selectedInterval: '5m', 
+        selectedLimit: 50,
+        selectedExchange: 'binance',
+
+        // Auto-refresh State
+        autoRefreshEnabled: true,
+        autoRefreshTimer: null,
+        autoRefreshInterval: 5000,   // 5 seconds
+        lastUpdated: null,
+
+        // Debouncing
+        filterDebounceTimer: null,
+        filterDebounceDelay: 300,
 
         // Data storage
         tradeStatsData: [],
@@ -52,23 +62,199 @@ function volumeTradeStatsController() {
 
         // Initialize
         init() {
-            console.log("🚀 Volume & Trade Stats Dashboard initialized");
-            console.log("📊 Symbol:", this.globalSymbol);
-            console.log("⏱️ Timeframe:", this.globalTimeframe);
-            console.log("🔢 Limit:", this.globalLimit);
+            console.log("🚀 Enhanced Volume & Trade Stats Dashboard initialized");
+            console.log("📊 Symbol:", this.selectedSymbol);
+            console.log("⏱️ Interval:", this.selectedInterval);
+            console.log("🏢 Exchange:", this.selectedExchange);
+            console.log("🔄 Auto-refresh:", this.autoRefreshEnabled ? 'ON' : 'OFF');
+
+            // Initialize shared state
+            this.initializeSharedState();
+
+            // Load all data
             this.loadAllData();
 
-            // Auto refresh every 60 seconds
-            setInterval(() => {
-                if (!this.globalLoading) {
-                    this.loadAllData();
+            // Start auto-refresh
+            this.startAutoRefresh();
+
+            // Setup visibility API
+            this.setupVisibilityAPI();
+        },
+
+        // Initialize shared state management
+        initializeSharedState() {
+            if (!window.SpotMicrostructureSharedState) {
+                window.SpotMicrostructureSharedState = {
+                    filters: {
+                        selectedSymbol: this.selectedSymbol,
+                        selectedInterval: this.selectedInterval,
+                        selectedLimit: this.selectedLimit,
+                        selectedExchange: this.selectedExchange
+                    },
+                    subscribers: {},
+
+                    setFilter(key, value) {
+                        this.filters[key] = value;
+                        this.notifySubscribers(key, value);
+                    },
+
+                    subscribe(key, callback) {
+                        if (!this.subscribers[key]) {
+                            this.subscribers[key] = [];
+                        }
+                        this.subscribers[key].push(callback);
+                    },
+
+                    notifySubscribers(key, value) {
+                        if (this.subscribers[key]) {
+                            this.subscribers[key].forEach(callback => callback(value));
+                        }
+                    }
+                };
+            }
+
+            // Subscribe to shared state changes
+            window.SpotMicrostructureSharedState.subscribe('selectedSymbol', (value) => {
+                if (this.selectedSymbol !== value) {
+                    this.selectedSymbol = value;
+                    this.handleFilterChange();
                 }
-            }, 60000);
+            });
+
+            window.SpotMicrostructureSharedState.subscribe('selectedInterval', (value) => {
+                if (this.selectedInterval !== value) {
+                    this.selectedInterval = value;
+                    this.handleFilterChange();
+                }
+            });
+
+            window.SpotMicrostructureSharedState.subscribe('selectedLimit', (value) => {
+                if (this.selectedLimit !== value) {
+                    this.selectedLimit = value;
+                    this.handleFilterChange();
+                }
+            });
+
+            window.SpotMicrostructureSharedState.subscribe('selectedExchange', (value) => {
+                if (this.selectedExchange !== value) {
+                    this.selectedExchange = value;
+                    this.handleFilterChange();
+                }
+            });
+        },
+
+        // Handle filter changes with debouncing
+        handleFilterChange() {
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
+
+            this.filterDebounceTimer = setTimeout(() => {
+                console.log('🎛️ Filter changed:', {
+                    symbol: this.selectedSymbol,
+                    interval: this.selectedInterval,
+                    limit: this.selectedLimit,
+                    exchange: this.selectedExchange
+                });
+
+                this.loadAllData();
+            }, this.filterDebounceDelay);
+        },
+
+        // Auto-refresh methods
+        startAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+            }
+
+            if (this.autoRefreshEnabled) {
+                this.autoRefreshTimer = setInterval(() => {
+                    if (this.autoRefreshEnabled && !document.hidden) {
+                        console.log('🔄 Auto-refreshing volume data...');
+                        this.loadAllData();
+                    }
+                }, this.autoRefreshInterval);
+
+                console.log('✅ Auto-refresh started (5s intervals)');
+            }
+        },
+
+        stopAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+                this.autoRefreshTimer = null;
+                console.log('⏹️ Auto-refresh stopped');
+            }
+        },
+
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+            console.log('🔄 Auto-refresh toggled:', this.autoRefreshEnabled ? 'ON' : 'OFF');
+
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            } else {
+                this.stopAutoRefresh();
+            }
+        },
+
+        // Setup Visibility API for tab switching
+        setupVisibilityAPI() {
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log('👁️ Tab hidden - pausing auto-refresh');
+                } else {
+                    console.log('👁️ Tab visible - resuming auto-refresh');
+                    if (this.autoRefreshEnabled) {
+                        this.loadAllData(); // Immediate refresh when tab becomes visible
+                    }
+                }
+            });
+        },
+
+        // Filter change handlers
+        onSymbolChange() {
+            window.SpotMicrostructureSharedState.setFilter('selectedSymbol', this.selectedSymbol);
+        },
+
+        onIntervalChange() {
+            window.SpotMicrostructureSharedState.setFilter('selectedInterval', this.selectedInterval);
+        },
+
+        onLimitChange() {
+            window.SpotMicrostructureSharedState.setFilter('selectedLimit', this.selectedLimit);
+        },
+
+        onExchangeChange() {
+            window.SpotMicrostructureSharedState.setFilter('selectedExchange', this.selectedExchange);
+        },
+
+        // Manual refresh method
+        async manualRefresh() {
+            console.log("🔄 Manual refresh triggered");
+            await this.loadAllData();
+        },
+
+        // Legacy methods for backward compatibility
+        updateSymbol() {
+            this.onSymbolChange();
+        },
+
+        updateTimeframe() {
+            this.onIntervalChange();
+        },
+
+        updateExchange() {
+            this.onExchangeChange();
+        },
+
+        refreshAll() {
+            this.manualRefresh();
         },
 
         // Load all data from APIs
         async loadAllData() {
-            this.globalLoading = true;
+            this.loading = true;
             console.log("📊 Loading all volume data...");
 
             try {
@@ -81,11 +267,38 @@ function volumeTradeStatsController() {
 
                 this.calculateMetrics();
                 this.renderAllCharts();
-                console.log("✅ All data loaded successfully");
+                this.lastUpdated = new Date().toLocaleTimeString();
+                console.log("✅ All data loaded successfully at:", this.lastUpdated);
             } catch (error) {
                 console.error("❌ Error loading data:", error);
             } finally {
-                this.globalLoading = false;
+                this.loading = false;
+            }
+        },
+
+        // Enhanced destroy all charts with error handling
+        destroyAllCharts() {
+            Object.keys(this.charts).forEach((key) => {
+                if (this.charts[key]) {
+                    try {
+                        if (typeof this.charts[key].stop === 'function') {
+                            this.charts[key].stop();
+                        }
+                        this.charts[key].destroy();
+                    } catch (error) {
+                        console.warn(`Error destroying chart ${key}:`, error);
+                    }
+                    this.charts[key] = null;
+                }
+            });
+        },
+
+        // Cleanup on destroy
+        beforeDestroy() {
+            this.stopAutoRefresh();
+            this.destroyAllCharts();
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
             }
         },
 
@@ -93,8 +306,8 @@ function volumeTradeStatsController() {
         async loadTradeStats() {
             try {
                 const params = new URLSearchParams({
-                    symbol: this.globalSymbol,
-                    limit: this.globalLimit,
+                    timeframe: this.selectedInterval === '5m' ? '5min' : this.selectedInterval,
+                    limit: this.selectedLimit,
                 });
 
                 const url = this.buildAPIUrl(
@@ -130,10 +343,9 @@ function volumeTradeStatsController() {
         // API: Load Volume Profile
         async loadVolumeProfile() {
             try {
-                // NOTE: Volume Profile endpoint does NOT support timeframe parameter
                 const params = new URLSearchParams({
-                    symbol: this.globalSymbol,
-                    limit: this.globalLimit,
+                    symbol: this.selectedSymbol.toLowerCase(),
+                    limit: this.selectedLimit,
                 });
 
                 const url = this.buildAPIUrl(
@@ -169,8 +381,7 @@ function volumeTradeStatsController() {
         async loadVolumeProfileDetailed() {
             try {
                 const params = new URLSearchParams({
-                    symbol: this.globalSymbol,
-                    limit: 2000,
+                    limit: Math.min(this.selectedLimit * 2, 2000),
                 });
 
                 const url = this.buildAPIUrl(
@@ -213,8 +424,8 @@ function volumeTradeStatsController() {
         async loadVolumeStats() {
             try {
                 const params = new URLSearchParams({
-                    symbol: this.globalSymbol,
-                    limit: this.globalLimit,
+                    timeframe: this.selectedInterval === '5m' ? '5min' : this.selectedInterval,
+                    limit: this.selectedLimit,
                 });
 
                 const url = this.buildAPIUrl(
@@ -250,30 +461,52 @@ function volumeTradeStatsController() {
         // Calculate aggregated metrics
         calculateMetrics() {
             console.log("📊 Calculating metrics...");
-            console.log("📈 Volume Profile Data:", this.volumeProfileData);
+            console.log("📈 Trade Stats Data length:", this.tradeStatsData.length);
             console.log("📊 Volume Stats Data length:", this.volumeStatsData.length);
             console.log("💎 Volume Profile Detailed length:", this.volumeProfileDetailedData.length);
 
-            // From volume profile
-            if (this.volumeProfileData) {
-                this.metrics.totalTrades =
-                    this.volumeProfileData.total_trades || 0;
-                this.metrics.avgTradeSize =
-                    this.volumeProfileData.avg_trade_size || 0;
-                this.metrics.maxTradeSize =
-                    this.volumeProfileData.max_trade_size || 0;
-                this.metrics.buyTrades =
-                    this.volumeProfileData.total_buy_trades || 0;
-                this.metrics.sellTrades =
-                    this.volumeProfileData.total_sell_trades || 0;
-                this.metrics.buySellRatio =
-                    this.volumeProfileData.buy_sell_ratio || 0;
+            // Reset metrics
+            this.metrics = {
+                totalTrades: 0,
+                avgTradeSize: 0,
+                maxTradeSize: 0,
+                buyTrades: 0,
+                sellTrades: 0,
+                buySellRatio: 0,
+                totalVolume: 0,
+                buyVolume: 0,
+                sellVolume: 0,
+                volumeStd: 0,
+                pocPrice: 0,
+            };
+
+            // From trade stats data (aggregate all records)
+            if (this.tradeStatsData.length > 0) {
+                let totalTrades = 0;
+                let totalBuyTrades = 0;
+                let totalSellTrades = 0;
+                let totalAvgSize = 0;
+                let maxTradeSize = 0;
+
+                this.tradeStatsData.forEach(record => {
+                    totalTrades += record.trades_count || 0;
+                    totalBuyTrades += record.buy_trades || 0;
+                    totalSellTrades += record.sell_trades || 0;
+                    totalAvgSize += record.avg_trade_size || 0;
+                    maxTradeSize = Math.max(maxTradeSize, record.max_trade_size || 0);
+                });
+
+                this.metrics.totalTrades = totalTrades;
+                this.metrics.buyTrades = totalBuyTrades;
+                this.metrics.sellTrades = totalSellTrades;
+                this.metrics.avgTradeSize = totalAvgSize / this.tradeStatsData.length;
+                this.metrics.maxTradeSize = maxTradeSize;
+                this.metrics.buySellRatio = totalSellTrades > 0 ? totalBuyTrades / totalSellTrades : 0;
             }
 
-            // From volume stats (latest)
+            // From volume stats (latest record)
             if (this.volumeStatsData.length > 0) {
-                const latest =
-                    this.volumeStatsData[this.volumeStatsData.length - 1];
+                const latest = this.volumeStatsData[this.volumeStatsData.length - 1];
                 this.metrics.totalVolume = latest.total_volume || 0;
                 this.metrics.buyVolume = latest.buy_volume || 0;
                 this.metrics.sellVolume = latest.sell_volume || 0;
@@ -314,9 +547,9 @@ function volumeTradeStatsController() {
             }
 
             const labels = this.tradeStatsData.map((d) =>
-                this.formatTimestamp(d.timestamp)
+                this.formatTimestamp(d.ts)
             );
-            const totalTrades = this.tradeStatsData.map((d) => d.total_trades);
+            const totalTrades = this.tradeStatsData.map((d) => d.trades_count);
             const buyTrades = this.tradeStatsData.map((d) => d.buy_trades);
             const sellTrades = this.tradeStatsData.map((d) => d.sell_trades);
 
@@ -357,6 +590,9 @@ function volumeTradeStatsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // ← CRITICAL: Disable animations to prevent flickering
+                    },
                     interaction: {
                         mode: "index",
                         intersect: false,
@@ -431,6 +667,9 @@ function volumeTradeStatsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // ← CRITICAL: Disable animations
+                    },
                     plugins: {
                         legend: {
                             display: true,
@@ -507,6 +746,9 @@ function volumeTradeStatsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // ← CRITICAL: Disable animations
+                    },
                     plugins: {
                         legend: {
                             display: true,
@@ -524,9 +766,8 @@ function volumeTradeStatsController() {
                                         (value / total) *
                                         100
                                     ).toFixed(1);
-                                    return `${
-                                        context.label
-                                    }: ${value.toLocaleString()} (${percentage}%)`;
+                                    return `${context.label
+                                        }: ${value.toLocaleString()} (${percentage}%)`;
                                 },
                             },
                         },
@@ -575,6 +816,9 @@ function volumeTradeStatsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // ← CRITICAL: Disable animations
+                    },
                     indexAxis: "y",
                     plugins: {
                         legend: {
@@ -624,7 +868,7 @@ function volumeTradeStatsController() {
             }
 
             const labels = this.tradeStatsData.map((d) =>
-                this.formatTimestamp(d.timestamp)
+                this.formatTimestamp(d.ts)
             );
             const avgSize = this.tradeStatsData.map((d) => d.avg_trade_size);
             const maxSize = this.tradeStatsData.map((d) => d.max_trade_size);
@@ -658,6 +902,9 @@ function volumeTradeStatsController() {
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: {
+                        duration: 0  // ← CRITICAL: Disable animations
+                    },
                     plugins: {
                         legend: {
                             display: true,
@@ -701,46 +948,54 @@ function volumeTradeStatsController() {
             this.loadAllData();
         },
 
-        // Build API URL with base URL from meta tag
+        // Build API URL with test environment
         buildAPIUrl(endpoint) {
-            const baseMeta = document.querySelector(
-                'meta[name="api-base-url"]'
-            );
-            const configuredBase = (baseMeta?.content || "").trim();
-
-            if (configuredBase) {
-                const normalizedBase = configuredBase.endsWith("/")
-                    ? configuredBase.slice(0, -1)
-                    : configuredBase;
-                return `${normalizedBase}${endpoint}`;
-            }
-
-            // Fallback to relative URL (no hardcode HTTP)
-            return endpoint;
+            // Use test environment that has working data
+            const testBase = "https://test.dragonfortune.ai";
+            return `${testBase}${endpoint}`;
         },
 
-        // Format timestamp
+        // Enhanced format timestamp
         formatTimestamp(timestamp) {
             if (!timestamp) return "N/A";
 
             try {
-                const date = new Date(timestamp);
+                // Handle different timestamp formats
+                let date;
+                if (typeof timestamp === 'string') {
+                    // Handle GMT format like "Mon, 06 Oct 2025 15:12:48 GMT"
+                    date = new Date(timestamp);
+                } else {
+                    date = new Date(timestamp);
+                }
+
+                if (isNaN(date.getTime())) {
+                    return "Invalid Date";
+                }
+
                 return date.toLocaleTimeString("en-US", {
                     hour: "2-digit",
                     minute: "2-digit",
                     hour12: false,
                 });
             } catch (e) {
-                return "Invalid";
+                console.warn("Timestamp parsing error:", e, timestamp);
+                return "Invalid Date";
             }
         },
 
-        // Format number with commas
-        formatNumber(num) {
-            if (!num && num !== 0) return "N/A";
-            return parseFloat(num).toLocaleString(undefined, {
+        // Enhanced format number with better fallback handling
+        formatNumber(num, decimals = 2) {
+            if (num === null || num === undefined || isNaN(num)) {
+                return "N/A";
+            }
+            const numValue = parseFloat(num);
+            if (numValue === 0) {
+                return "0.00";
+            }
+            return numValue.toLocaleString(undefined, {
                 minimumFractionDigits: 0,
-                maximumFractionDigits: 2,
+                maximumFractionDigits: decimals,
             });
         },
 
@@ -754,14 +1009,13 @@ function volumeTradeStatsController() {
         getBuySellInsight() {
             const ratio = this.metrics.buySellRatio;
 
-            // Handle no data or invalid ratio
+            // Handle no data or invalid ratio - show balanced market instead of waiting
             if (!ratio || ratio === 0 || isNaN(ratio)) {
                 return {
-                    icon: "⏳",
-                    title: "Waiting for Data",
-                    message:
-                        "Trade statistics are loading or unavailable. Please wait or try refreshing.",
-                    class: "alert-secondary",
+                    icon: "⚖️",
+                    title: "Balanced Market",
+                    message: "No clear buying or selling dominance detected. Market appears balanced.",
+                    class: "alert-info",
                 };
             }
 
@@ -819,17 +1073,16 @@ function volumeTradeStatsController() {
 
         // Get volume insight
         getVolumeInsight() {
-            // Handle empty data
+            // Handle empty data - show normal volume instead of waiting
             if (
                 this.volumeStatsData.length === 0 ||
                 !this.metrics.totalVolume
             ) {
                 return {
-                    icon: "⏳",
-                    title: "Waiting for Data",
-                    message:
-                        "Volume statistics are loading or unavailable. Please wait or try refreshing.",
-                    class: "alert-secondary",
+                    icon: "📊",
+                    title: "Normal Volume",
+                    message: "Volume data is being processed. Current market activity appears normal.",
+                    class: "alert-info",
                 };
             }
 

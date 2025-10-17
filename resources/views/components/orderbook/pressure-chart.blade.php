@@ -6,10 +6,7 @@
             <small class="text-secondary">Recent pressure data</small>
         </div>
         <div class="d-flex gap-2 align-items-center">
-            <button class="btn btn-sm btn-outline-primary" @click="loadData()" :disabled="loading">
-                <span x-show="!loading">🔄 Refresh</span>
-                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-            </button>
+            <span class="badge bg-secondary" x-show="loading">Loading...</span>
         </div>
     </div>
 

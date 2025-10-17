@@ -20,10 +20,6 @@
             <h5 class="mb-0">📊 Latest VWAP Statistics</h5>
             <span class="badge text-bg-secondary" x-text="symbol">BTCUSDT</span>
         </div>
-        <button class="btn btn-sm btn-outline-secondary" @click="refresh()" :disabled="loading">
-            <span x-show="!loading">🔄</span>
-            <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-        </button>
     </div>
 
     <!-- Loading State -->
@@ -131,74 +127,36 @@ function latestStatsCard(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', i
         lastUpdate: '--',
 
         init() {
-            setTimeout(() => {
-                this.loadData();
-            }, 500);
-
-            // Auto refresh every 30 seconds
-            setInterval(() => this.loadData(), 30000);
-
-            // Listen to global filter changes
-            window.addEventListener('symbol-changed', (e) => {
-                this.symbol = e.detail?.symbol || this.symbol;
-                this.timeframe = e.detail?.timeframe || this.timeframe;
-                this.exchange = e.detail?.exchange || this.exchange;
-                this.loadData();
-            });
-            window.addEventListener('timeframe-changed', (e) => {
-                this.timeframe = e.detail?.timeframe || this.timeframe;
-                this.loadData();
-            });
-            window.addEventListener('exchange-changed', (e) => {
-                this.exchange = e.detail?.exchange || this.exchange;
-                this.loadData();
-            });
-
-            // Listen for centralized data
+            console.log('📊 Latest VWAP Stats component initialized');
+            
+            // Listen for centralized data (primary data source)
             window.addEventListener('vwap-data-ready', (e) => {
                 if (e.detail?.latest) {
                     this.data = e.detail.latest;
+                    this.symbol = e.detail.symbol || this.symbol;
+                    this.timeframe = e.detail.timeframe || this.timeframe;
+                    this.exchange = e.detail.exchange || this.exchange;
                     this.lastUpdate = new Date().toLocaleTimeString();
                     this.error = null;
+                    this.loading = false;
+                    
+                    console.log('✅ Latest Stats received data:', this.data);
                 }
             });
-        },
 
-        async loadData() {
-            this.loading = true;
-            this.error = null;
-            try {
-                const params = new URLSearchParams({
-                    symbol: this.symbol,
-                    timeframe: this.timeframe,
-                    exchange: this.exchange,
-                });
-
-                const baseMeta = document.querySelector('meta[name="api-base-url"]');
-                const configuredBase = (baseMeta?.content || '').trim();
-                const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
-                const url = base ? `${base}/api/spot-microstructure/vwap/latest?${params}` : `/api/spot-microstructure/vwap/latest?${params}`;
-
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-                const data = await response.json();
-                this.data = data;
-                this.lastUpdate = new Date().toLocaleTimeString();
-
-                console.log('✅ Latest VWAP data loaded:', data);
-            } catch (error) {
-                console.error('❌ Error loading latest VWAP:', error);
-                this.error = 'Unable to fetch VWAP data. Please try again.';
-                this.data = null;
-            } finally {
+            // Listen for error events
+            window.addEventListener('vwap-data-error', (e) => {
+                this.error = e.detail?.error || 'Failed to load data';
                 this.loading = false;
-            }
+                console.error('❌ Latest Stats received error:', this.error);
+            });
+
+            // No individual API calls - rely entirely on centralized data
+            console.log('📊 Latest Stats waiting for centralized data...');
         },
 
-        refresh() {
-            this.loadData();
-        },
+        // Removed individual loadData() and refresh() methods
+        // Component now relies entirely on centralized data management
 
         formatPrice(value) {
             if (value === null || value === undefined || isNaN(value)) return 'N/A';
@@ -210,9 +168,25 @@ function latestStatsCard(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', i
             }).format(parseFloat(value));
         },
 
-        formatTimestamp(timestamp) {
+        formatTimestamp(timestampOrItem) {
+            let timestamp;
+            
+            // Handle both direct timestamp and data object
+            if (typeof timestampOrItem === 'object' && timestampOrItem !== null) {
+                timestamp = timestampOrItem.timestamp || timestampOrItem.ts;
+            } else {
+                timestamp = timestampOrItem;
+            }
+            
             if (!timestamp) return 'N/A';
+            
+            // Validate and parse timestamp
             const date = new Date(timestamp);
+            if (isNaN(date.getTime())) {
+                console.warn('Invalid timestamp:', timestamp);
+                return 'Invalid Date';
+            }
+            
             return date.toLocaleString('en-US', {
                 month: 'short',
                 day: 'numeric',

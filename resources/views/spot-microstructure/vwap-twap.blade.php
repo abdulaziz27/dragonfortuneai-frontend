@@ -25,43 +25,60 @@
                     <p class="mb-0 text-secondary">
                         Volume-Weighted Average Price analysis for institutional-grade trading insights
                     </p>
+                    <!-- <small class="text-warning">
+                        ⚠️ Note: API currently returns 5-minute data regardless of interval selection
+                    </small> -->
                 </div>
 
-                <!-- Global Controls -->
+                <!-- Enhanced Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <select class="form-select" style="width: 150px;" x-model="globalSymbol" @change="updateSymbol()">
-                        <option value="BTCUSDT">Bitcoin (BTC)</option>
-                        <option value="ETHUSDT">Ethereum (ETH)</option>
-                        <option value="SOLUSDT">Solana (SOL)</option>
-                        <option value="BNBUSDT">BNB</option>
-                        <option value="XRPUSDT">XRP</option>
-                        <option value="ADAUSDT">Cardano (ADA)</option>
-                        <option value="DOGEUSDT">Dogecoin (DOGE)</option>
-                        <option value="MATICUSDT">Polygon (MATIC)</option>
-                        <option value="DOTUSDT">Polkadot (DOT)</option>
-                        <option value="AVAXUSDT">Avalanche (AVAX)</option>
+                    <!-- Symbol Filter -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="onSymbolChange()">
+                        <option value="BTCUSDT">BTC/USDT</option>
+                        <!-- Other symbols disabled - only BTCUSDT has data -->
                     </select>
 
-                    <select class="form-select" style="width: 130px;" x-model="globalTimeframe" @change="updateTimeframe()">
-                        <option value="1min">1 Minute</option>
-                        <option value="5min" selected>5 Minutes</option>
-                        <option value="15min">15 Minutes</option>
-                        <option value="30min">30 Minutes</option>
+                    <!-- Interval Filter -->
+                    <select class="form-select" style="width: 120px;" x-model="selectedInterval" @change="onIntervalChange()">
+                        <!-- <option value="1m">1 Minute</option> -->
+                        <option value="5m">5 Minutes</option>
+                        <!-- <option value="15m">15 Minutes</option>
                         <option value="1h">1 Hour</option>
-                        <option value="4h">4 Hours</option>
+                        <option value="4h">4 Hours</option> -->
                     </select>
 
-                    <select class="form-select" style="width: 130px;" x-model="globalExchange" @change="updateExchange()">
-                        <option value="binance" selected>Binance</option>
-                        <option value="bybit">Bybit</option>
-                        <option value="okx">OKX</option>
-                        <option value="bitget">Bitget</option>
+                    <!-- Data Limit Filter -->
+                    <select class="form-select" style="width: 130px;" x-model="selectedLimit" @change="onLimitChange()">
+                        <option value="50">50 Records</option>
+                        <option value="100">100 Records</option>
+                        <option value="200">200 Records</option>
+                        <option value="500">500 Records</option>
+                        <option value="1000">1000 Records</option>
                     </select>
 
-                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
-                        <span x-show="!globalLoading">🔄 Refresh All</span>
-                        <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
+                    <!-- Exchange Filter -->
+                    <select class="form-select" style="width: 130px;" x-model="selectedExchange" @change="onExchangeChange()">
+                        <option value="binance">Binance</option>
+                        <!-- Other exchanges disabled - only Binance has data -->
+                    </select>
+
+                    <!-- Manual Refresh -->
+                    <button class="btn btn-primary" @click="manualRefresh()" :disabled="loading">
+                        <span x-show="!loading">Refresh</span>
+                        <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Auto-refresh Toggle -->
+                    <button class="btn" :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'" 
+                            @click="toggleAutoRefresh()" style="width: 200px;">
+                        <span x-show="autoRefreshEnabled">Auto-Refresh: ON</span>
+                        <span x-show="!autoRefreshEnabled">⏸️ Auto-Refresh: OFF</span>
+                    </button>
+
+                    <!-- Last Updated -->
+                    <small class="text-muted" x-show="lastUpdated">
+                        Last: <span x-text="lastUpdated"></span>
+                    </small>
                 </div>
             </div>
         </div>

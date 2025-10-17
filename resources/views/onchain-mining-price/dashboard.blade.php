@@ -47,14 +47,14 @@
 
                     <!-- Manual Refresh Button - Moved before auto-refresh -->
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
-                        <span x-show="!loading">🔄 Refresh All</span>
+                        <span x-show="!loading">Refresh All</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
 
                     <!-- Auto-refresh Toggle -->
                     <button class="btn" @click="toggleAutoRefresh()" 
                             :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'">
-                        <span x-text="autoRefreshEnabled ? '🔄 Auto-refresh: ON' : '⏸️ Auto-refresh: OFF'"></span>
+                        <span x-text="autoRefreshEnabled ? 'Auto-refresh: ON' : '⏸️ Auto-refresh: OFF'"></span>
                     </button>
 
                     <!-- Last Updated -->

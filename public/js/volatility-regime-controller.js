@@ -30,9 +30,22 @@ class VolatilityRegimeController {
         // Initialize state
         this.state = {
             selectedPair: 'BTCUSDT',
-            selectedCadence: '1d', // Default to EOD
+            selectedCadence: '1h', // Default to 1h
+            selectedPeriod: '7D', // Default period
             loading: false,
             lastUpdated: null,
+            autoRefreshEnabled: true, // Auto-refresh ON by default
+            autoRefreshInterval: null,
+
+            // OHLC data for display
+            ohlcData: {
+                open: 0,
+                high: 0,
+                low: 0,
+                close: 0,
+                volume: 0,
+                change: 0
+            },
 
             // Volatility metrics
             volatilityScore: 0,
@@ -224,6 +237,15 @@ class VolatilityRegimeController {
         this.state.selectedCadence = newCadence;
         this.logger.info(`Cadence changed to: ${newCadence}`);
 
+        // Reset period to default for new cadence
+        const defaultPeriods = {
+            '1m': '1H',
+            '5m': '1D',
+            '1h': '7D',
+            '1d': '30D'
+        };
+        this.state.selectedPeriod = defaultPeriods[newCadence] || '7D';
+
         // Clear cache for old cadence
         this.clearCache();
 
@@ -274,16 +296,19 @@ class VolatilityRegimeController {
      */
     setupAutoRefresh() {
         // Clear existing interval
-        if (this.refreshInterval) {
-            clearInterval(this.refreshInterval);
+        if (this.state.autoRefreshInterval) {
+            clearInterval(this.state.autoRefreshInterval);
         }
 
-        // Set up staggered refresh intervals
-        this.refreshInterval = setInterval(() => {
-            if (!document.hidden) {
-                this.refreshAll();
-            }
-        }, 30000); // 30 seconds
+        // Set up 5-second refresh if enabled
+        if (this.state.autoRefreshEnabled) {
+            this.state.autoRefreshInterval = setInterval(() => {
+                if (!document.hidden && !this.state.loading) {
+                    console.log('🔄 Auto-refresh triggered');
+                    this.refreshAll();
+                }
+            }, 5000); // 5 seconds
+        }
     }
 
     /**
@@ -575,10 +600,13 @@ class VolatilityRegimeController {
         try {
             this.logger.info('Fetching volatility metrics for meter');
 
+            // Calculate limit based on selected period
+            const limit = this.calculateLimit(this.state.selectedCadence, this.state.selectedPeriod);
+
             // Fetch all three metrics in parallel
             const [hvResponse, rvResponse, atrResponse] = await Promise.allSettled([
                 this.fetchHistoricalVolatility({ period: 30 }),
-                this.fetchRealizedVolatility({ period: 30 }),
+                this.fetchRealizedVolatility({ limit: limit }),
                 this.fetchATRAnalysis({ period: 14 })
             ]);
 
@@ -1069,6 +1097,11 @@ class VolatilityRegimeController {
 
             // Update state
             this.state.spotPrices = processedData.spotPrices;
+
+            // Update OHLC data for display section
+            if (processedData.spotPrices && processedData.spotPrices.length > 0) {
+                this.state.ohlcData = processedData.spotPrices[0];
+            }
 
             // Cache the result
             this.setCache(cacheKey, data);
@@ -4489,9 +4522,22 @@ function volatilityRegimeController() {
     const alpineData = {
         // State properties
         selectedPair: 'BTCUSDT',
-        selectedCadence: '1d', // Default to EOD
+        selectedCadence: '1h', // Default to 1h
+        selectedPeriod: '7D', // Default period
         loading: false,
         lastUpdated: null,
+        autoRefreshEnabled: true,
+        autoRefreshInterval: null,
+
+        // OHLC data for display
+        ohlcData: {
+            open: 0,
+            high: 0,
+            low: 0,
+            close: 0,
+            volume: 0,
+            change: 0
+        },
 
         // Volatility metrics
         volatilityScore: 0,
@@ -4591,7 +4637,8 @@ function volatilityRegimeController() {
         syncWithController() {
             if (controller.state) {
                 this.selectedPair = controller.state.selectedPair || 'BTCUSDT';
-                this.selectedCadence = controller.state.selectedCadence || '1d';
+                this.selectedCadence = controller.state.selectedCadence || '1h';
+                this.selectedPeriod = controller.state.selectedPeriod || '7D';
                 this.loading = controller.state.loading || false;
                 this.volatilityScore = controller.state.volatilityScore || 0;
                 this.metrics = { ...controller.state.metrics };
@@ -4601,6 +4648,12 @@ function volatilityRegimeController() {
                 this.hvPercentile = controller.state.hvPercentile || 50;
                 this.rvPercentile = controller.state.rvPercentile || 50;
                 this.atrPercentile = controller.state.atrPercentile || 50;
+                this.autoRefreshEnabled = controller.state.autoRefreshEnabled !== undefined ? controller.state.autoRefreshEnabled : true;
+
+                // Sync OHLC data
+                if (controller.state.ohlcData) {
+                    this.ohlcData = { ...controller.state.ohlcData };
+                }
 
                 // Sync additional data if available
                 if (controller.state.squeezeData) {
@@ -5234,6 +5287,211 @@ function volatilityRegimeController() {
                     });
                 }
             });
+        },
+
+        /**
+         * ========================================
+         * FILTER ENHANCEMENT METHODS
+         * ========================================
+         */
+
+        /**
+         * Get period options based on selected cadence
+         */
+        get currentPeriodOptions() {
+            const periodOptions = {
+                '1m': [
+                    { value: '1H', label: '1 Hour', points: 60 },
+                    { value: '4H', label: '4 Hours', points: 240 },
+                    { value: '1D', label: '1 Day', points: 1440 },
+                    { value: '3D', label: '3 Days', points: 4320 },
+                    { value: '7D', label: '7 Days', points: 10080 }
+                ],
+                '5m': [
+                    { value: '4H', label: '4 Hours', points: 48 },
+                    { value: '1D', label: '1 Day', points: 288 },
+                    { value: '3D', label: '3 Days', points: 864 },
+                    { value: '7D', label: '7 Days', points: 2016 },
+                    { value: '14D', label: '14 Days', points: 4032 }
+                ],
+                '1h': [
+                    { value: '1D', label: '1 Day', points: 24 },
+                    { value: '3D', label: '3 Days', points: 72 },
+                    { value: '7D', label: '7 Days', points: 168 },
+                    { value: '14D', label: '14 Days', points: 336 },
+                    { value: '30D', label: '30 Days', points: 720 }
+                ],
+                '1d': [
+                    { value: '7D', label: '7 Days', points: 7 },
+                    { value: '14D', label: '14 Days', points: 14 },
+                    { value: '30D', label: '30 Days', points: 30 },
+                    { value: '60D', label: '60 Days', points: 60 },
+                    { value: '90D', label: '90 Days', points: 90 }
+                ]
+            };
+            return periodOptions[this.selectedCadence] || periodOptions['1h'];
+        },
+
+        /**
+         * Handle period change
+         */
+        async handlePeriodChange() {
+            console.log(`📊 Alpine: Period changed to: ${this.selectedPeriod}`);
+            // Update controller state
+            if (controller && controller.state) {
+                controller.state.selectedPeriod = this.selectedPeriod;
+            }
+            // Trigger refresh
+            if (controller && typeof controller.refreshAll === 'function') {
+                await controller.refreshAll();
+                this.syncWithController();
+            }
+        },
+
+        /**
+         * Toggle auto-refresh
+         */
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+
+            // Update controller state
+            if (controller && controller.state) {
+                controller.state.autoRefreshEnabled = this.autoRefreshEnabled;
+            }
+
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+                // Also start controller auto-refresh
+                if (controller && typeof controller.setupAutoRefresh === 'function') {
+                    controller.setupAutoRefresh();
+                }
+                console.log('✅ Auto-refresh enabled (5s)');
+            } else {
+                this.stopAutoRefresh();
+                // Also stop controller auto-refresh
+                if (controller && controller.state && controller.state.autoRefreshInterval) {
+                    clearInterval(controller.state.autoRefreshInterval);
+                    controller.state.autoRefreshInterval = null;
+                }
+                console.log('⏸ Auto-refresh disabled');
+            }
+        },
+
+        /**
+         * Start auto-refresh
+         */
+        startAutoRefresh() {
+            if (this.autoRefreshInterval) {
+                clearInterval(this.autoRefreshInterval);
+            }
+            this.autoRefreshInterval = setInterval(async () => {
+                if (this.autoRefreshEnabled && !this.loading) {
+                    console.log('🔄 Auto-refresh triggered (Alpine)');
+                    if (controller && typeof controller.refreshAll === 'function') {
+                        await controller.refreshAll();
+                        this.syncWithController();
+                    }
+                }
+            }, 5000);
+        },
+
+        /**
+         * Stop auto-refresh
+         */
+        stopAutoRefresh() {
+            if (this.autoRefreshInterval) {
+                clearInterval(this.autoRefreshInterval);
+                this.autoRefreshInterval = null;
+            }
+        },
+
+        /**
+         * Get formatted last updated timestamp
+         */
+        get lastUpdated() {
+            if (!this.lastUpdated) return '';
+            const date = new Date(this.lastUpdated);
+            return date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            });
+        },
+
+        /**
+         * Get OHLC data for display
+         */
+        get ohlcData() {
+            // Return latest OHLC from spot prices if available
+            if (this.spotPrices && this.spotPrices.length > 0) {
+                const latest = this.spotPrices[0];
+                return {
+                    open: latest.open || 0,
+                    high: latest.high || 0,
+                    low: latest.low || 0,
+                    close: latest.close || 0,
+                    volume: latest.volume || 0,
+                    change: latest.change || 0
+                };
+            }
+            return {
+                open: 0,
+                high: 0,
+                low: 0,
+                close: 0,
+                volume: 0,
+                change: 0
+            };
+        },
+
+        /**
+         * Calculate limit parameter based on cadence and period
+         */
+        calculateLimit(cadence, period) {
+            const periodMap = {
+                '1m': {
+                    '1H': 60, '4H': 240, '1D': 1440, '3D': 4320, '7D': 10080
+                },
+                '5m': {
+                    '4H': 48, '1D': 288, '3D': 864, '7D': 2016, '14D': 4032
+                },
+                '1h': {
+                    '1D': 24, '3D': 72, '7D': 168, '14D': 336, '30D': 720
+                },
+                '1d': {
+                    '7D': 7, '14D': 14, '30D': 30, '60D': 60, '90D': 90
+                }
+            };
+
+            const limit = periodMap[cadence]?.[period];
+            if (limit) {
+                console.log(`📊 calculateLimit: cadence=${cadence}, period=${period}, limit=${limit}`);
+                return limit;
+            }
+
+            // Default fallback
+            console.warn(`⚠️ No limit found for cadence=${cadence}, period=${period}, using default 168`);
+            return 168;
+        },
+
+        /**
+         * Calculate time range (start_ms, end_ms) for OHLC endpoint
+         */
+        calculateTimeRange(period) {
+            const now = Date.now();
+            const periodDays = {
+                '1H': 1 / 24, '4H': 4 / 24, '1D': 1, '3D': 3, '7D': 7,
+                '14D': 14, '30D': 30, '60D': 60, '90D': 90
+            };
+
+            const days = periodDays[period] || 7;
+            const start_ms = now - (days * 24 * 60 * 60 * 1000);
+            const end_ms = now;
+
+            console.log(`📊 calculateTimeRange: period=${period}, days=${days}, start_ms=${start_ms}, end_ms=${end_ms}`);
+
+            return { start_ms, end_ms };
         }
     };
 
@@ -5253,3 +5511,4 @@ if (typeof module !== 'undefined' && module.exports) {
         Logger
     };
 }
+

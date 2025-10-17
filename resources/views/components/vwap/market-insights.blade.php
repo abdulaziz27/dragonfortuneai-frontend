@@ -17,10 +17,6 @@
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">🎯 Market Insights</h5>
-        <button class="btn btn-sm btn-outline-secondary" @click="refresh()" :disabled="loading">
-            <span x-show="!loading">🔄</span>
-            <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-        </button>
     </div>
 
     <!-- Loading State -->
@@ -97,11 +93,14 @@
             <div class="row g-3">
                 <div class="col-6">
                     <div class="p-3 rounded bg-light text-center">
-                        <div class="small text-secondary mb-1">Distance from VWAP</div>
+                        <div class="small text-secondary mb-1">VWAP Band Position</div>
                         <div class="h5 mb-0 fw-bold"
                              :class="getDistanceColor()"
                              x-text="getDistanceFromVWAP()">
-                            0.00%
+                            0.0%
+                        </div>
+                        <div class="small text-muted mt-1" x-text="getPriceSourceInfo()">
+                            Band Position Signal
                         </div>
                     </div>
                 </div>
@@ -148,98 +147,67 @@ function marketInsightsCard(initialSymbol = 'BTCUSDT', initialTimeframe = '5min'
         lastUpdate: '--',
 
         init() {
-            setTimeout(() => {
-                this.loadData();
-            }, 600);
-
-            // Auto refresh every 30 seconds
-            setInterval(() => this.loadData(), 30000);
-
-            // Listen to global filter changes
-            window.addEventListener('symbol-changed', (e) => {
-                this.symbol = e.detail?.symbol || this.symbol;
-                this.timeframe = e.detail?.timeframe || this.timeframe;
-                this.exchange = e.detail?.exchange || this.exchange;
-                this.loadData();
-            });
-            window.addEventListener('timeframe-changed', (e) => {
-                this.timeframe = e.detail?.timeframe || this.timeframe;
-                this.loadData();
-            });
-            window.addEventListener('exchange-changed', (e) => {
-                this.exchange = e.detail?.exchange || this.exchange;
-                this.loadData();
-            });
-
-            // Listen for centralized data
+            console.log('🎯 Market Insights component initialized');
+            
+            // Listen for centralized data (primary data source)
             window.addEventListener('vwap-data-ready', (e) => {
                 if (e.detail?.latest) {
                     this.latestData = e.detail.latest;
+                    this.symbol = e.detail.symbol || this.symbol;
+                    this.timeframe = e.detail.timeframe || this.timeframe;
+                    this.exchange = e.detail.exchange || this.exchange;
                     this.lastUpdate = new Date().toLocaleTimeString();
                     this.error = null;
+                    this.loading = false;
+                    
+                    console.log('✅ Market Insights received data:', {
+                        vwap: this.latestData.vwap,
+                        current_price: this.latestData.current_price,
+                        distance: this.getDistanceFromVWAP()
+                    });
                 }
                 if (e.detail?.historical) {
                     this.historicalData = e.detail.historical;
                 }
             });
-        },
 
-        async loadData() {
-            this.loading = true;
-            this.error = null;
-            try {
-                const params = new URLSearchParams({
-                    symbol: this.symbol,
-                    timeframe: this.timeframe,
-                    exchange: this.exchange,
-                });
-
-                const baseMeta = document.querySelector('meta[name="api-base-url"]');
-                const configuredBase = (baseMeta?.content || '').trim();
-                const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
-                const url = base ? `${base}/api/spot-microstructure/vwap/latest?${params}` : `/api/spot-microstructure/vwap/latest?${params}`;
-
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-                const data = await response.json();
-                this.latestData = data;
-                this.lastUpdate = new Date().toLocaleTimeString();
-
-                console.log('✅ Market insights data loaded:', data);
-            } catch (error) {
-                console.error('❌ Error loading market insights:', error);
-                this.error = 'Unable to fetch market insights. Please try again.';
-                this.latestData = null;
-            } finally {
+            // Listen for error events
+            window.addEventListener('vwap-data-error', (e) => {
+                this.error = e.detail?.error || 'Failed to load market insights';
                 this.loading = false;
-            }
+                console.error('❌ Market Insights received error:', this.error);
+            });
+
+            // No individual API calls - rely entirely on centralized data
+            console.log('🎯 Market Insights waiting for centralized data...');
         },
 
-        refresh() {
-            this.loadData();
-        },
+        // Removed individual loadData() and refresh() methods
+        // Component now relies entirely on centralized data management
 
-        // Assume current price is approximately VWAP (simplified)
-        // In real scenario, you'd fetch current spot price separately
+        // Get current price from centralized data
         getCurrentPrice() {
-            return this.latestData?.vwap || 0;
+            // Use actual current price if available and different from VWAP
+            if (this.latestData?.current_price && 
+                this.latestData.current_price !== this.latestData.vwap &&
+                this.latestData.current_price > 0) {
+                return parseFloat(this.latestData.current_price);
+            }
+            
+            // For now, use VWAP as current price (shows 0% distance)
+            // In production, this would be replaced with real-time spot price
+            if (this.latestData?.vwap) {
+                return parseFloat(this.latestData.vwap);
+            }
+            
+            return 0;
         },
 
         getBias() {
             if (!this.latestData) return 'neutral';
-            const price = this.getCurrentPrice();
-            const vwap = this.latestData.vwap;
-            const upperBand = this.latestData.upper_band;
-            const lowerBand = this.latestData.lower_band;
-
-            const diffPercent = ((price - vwap) / vwap) * 100;
-
-            if (price > upperBand) return 'strong_bullish';
-            if (price > vwap && diffPercent > 0.3) return 'bullish';
-            if (price < lowerBand) return 'strong_bearish';
-            if (price < vwap && diffPercent < -0.3) return 'bearish';
-            return 'neutral';
+            
+            // Use VWAP signal strength for bias
+            return this.getVWAPSignalStrength();
         },
 
         getBiasText() {
@@ -363,10 +331,43 @@ function marketInsightsCard(initialSymbol = 'BTCUSDT', initialTimeframe = '5min'
 
         getDistanceFromVWAP() {
             if (!this.latestData) return 'N/A';
-            const price = this.getCurrentPrice();
-            const vwap = this.latestData.vwap;
-            const distance = ((price - vwap) / vwap) * 100;
-            return (distance >= 0 ? '+' : '') + distance.toFixed(2) + '%';
+            
+            // Use VWAP vs Band position as trading signal
+            const vwap = parseFloat(this.latestData.vwap);
+            const upperBand = parseFloat(this.latestData.upper_band);
+            const lowerBand = parseFloat(this.latestData.lower_band);
+            
+            // Calculate VWAP position within bands (more meaningful for trading)
+            const bandRange = upperBand - lowerBand;
+            const vwapFromLower = vwap - lowerBand;
+            const positionPercent = (vwapFromLower / bandRange) * 100;
+            
+            // Convert to distance from center (50%)
+            const distanceFromCenter = positionPercent - 50;
+            
+            return (distanceFromCenter >= 0 ? '+' : '') + distanceFromCenter.toFixed(1) + '%';
+        },
+
+        getPriceSourceInfo() {
+            return 'VWAP Band Position';
+        },
+
+        getVWAPSignalStrength() {
+            if (!this.latestData) return 'neutral';
+            
+            const vwap = parseFloat(this.latestData.vwap);
+            const upperBand = parseFloat(this.latestData.upper_band);
+            const lowerBand = parseFloat(this.latestData.lower_band);
+            
+            const bandRange = upperBand - lowerBand;
+            const vwapFromLower = vwap - lowerBand;
+            const positionPercent = (vwapFromLower / bandRange) * 100;
+            
+            if (positionPercent > 70) return 'strong_bullish';
+            if (positionPercent > 55) return 'bullish';
+            if (positionPercent < 30) return 'strong_bearish';
+            if (positionPercent < 45) return 'bearish';
+            return 'neutral';
         },
 
         getDistanceColor() {

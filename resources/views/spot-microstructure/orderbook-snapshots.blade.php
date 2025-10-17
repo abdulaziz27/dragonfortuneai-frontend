@@ -27,28 +27,65 @@
                     </p>
                 </div>
 
-                <!-- Global Controls -->
+                <!-- Enhanced Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <select class="form-select" style="width: 140px;" x-model="globalSymbol" @change="updateSymbol()">
+                    <!-- Symbol Filter -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="onSymbolChange()">
                         <option value="BTCUSDT">BTC/USDT</option>
                         <option value="ETHUSDT">ETH/USDT</option>
                         <option value="SOLUSDT">SOL/USDT</option>
                         <option value="BNBUSDT">BNB/USDT</option>
                         <option value="XRPUSDT">XRP/USDT</option>
                         <option value="ADAUSDT">ADA/USDT</option>
+                        <option value="DOGEUSDT">DOGE/USDT</option>
+                        <option value="MATICUSDT">MATIC/USDT</option>
                     </select>
 
-                    <select class="form-select" style="width: 130px;" x-model="globalExchange" @change="updateExchange()">
+                    <!-- Interval Filter -->
+                    <select class="form-select" style="width: 120px;" x-model="selectedInterval" @change="onIntervalChange()">
+                        <option value="1m">1 Minute</option>
+                        <option value="5m">5 Minutes</option>
+                        <option value="15m">15 Minutes</option>
+                        <option value="1h">1 Hour</option>
+                        <option value="4h">4 Hours</option>
+                    </select>
+
+                    <!-- Data Limit Filter -->
+                    <select class="form-select" style="width: 130px;" x-model="selectedLimit" @change="onLimitChange()">
+                        <option value="50">50 Records</option>
+                        <option value="100">100 Records</option>
+                        <option value="200">200 Records</option>
+                        <option value="500">500 Records</option>
+                        <option value="1000">1000 Records</option>
+                    </select>
+
+                    <!-- Exchange Filter -->
+                    <select class="form-select" style="width: 130px;" x-model="selectedExchange" @change="onExchangeChange()">
                         <option value="binance">Binance</option>
                         <option value="okx">OKX</option>
                         <option value="bybit">Bybit</option>
                         <option value="bitget">Bitget</option>
                     </select>
 
-                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
-                        <span x-show="!globalLoading">🔄 Refresh All</span>
-                        <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
+    
+
+                    <!-- Manual Refresh -->
+                    <button class="btn btn-primary" @click="manualRefresh()" :disabled="loading">
+                        <span x-show="!loading">Refresh</span>
+                        <span x-show="loading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Auto-refresh Toggle -->
+                    <button class="btn" :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'" 
+                            @click="toggleAutoRefresh()" style="width: 200px;">
+                        <span x-show="autoRefreshEnabled">Auto-Refresh: ON</span>
+                        <span x-show="!autoRefreshEnabled">⏸️ Auto-Refresh: OFF</span>
+                    </button>
+
+                    <!-- Last Updated -->
+                    <small class="text-muted" x-show="lastUpdated">
+                        Last: <span x-text="lastUpdated"></span>
+                    </small>
                 </div>
             </div>
         </div>
@@ -105,9 +142,9 @@
                 @include('components.orderbook.market-depth-table')
             </div>
 
-            <!-- Orderbook Depth Table -->
+            <!-- Market Summary -->
             <div class="col-lg-6">
-                @include('components.orderbook.orderbook-depth-table')
+                @include('components.orderbook.market-summary')
             </div>
         </div>
 
