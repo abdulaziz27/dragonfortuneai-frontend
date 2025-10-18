@@ -300,7 +300,7 @@
     </script>
 
     <!-- Exchange Inflow CDD Controller -->
-    <script src="{{ asset('js/exchange-inflow-cdd-controller.js') }}"></script>
+    <script src="{{ asset('js/exchange-inflow-cdd-controller.js') }}?v={{ time() }}"></script>
 
     <style>
         /* Light Theme Chart Container */
