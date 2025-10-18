@@ -143,24 +143,7 @@
                         <small class="text-secondary">Rincian aktivitas per platform dalam 24 jam terakhir</small>
                     </div>
                     <div class="row g-3">
-                        <div class="col-md-4">
-                            <div class="p-3 rounded" style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6;">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div>
-                                        <div class="fw-bold">Twitter / X</div>
-                                        <div class="h4 mb-0 mt-1" x-text="socialBreakdown.twitter.mentions + ' mentions'">--</div>
-                                    </div>
-                                    <div class="text-end">
-                                        <div class="badge" :class="socialBreakdown.twitter.sentiment >= 0 ? 'text-bg-success' : 'text-bg-danger'" x-text="socialBreakdown.twitter.sentiment + '%'">--</div>
-                                        <div class="small text-secondary">Sentiment</div>
-                                    </div>
-                                </div>
-                                <div class="small text-secondary">
-                                    Top keywords: <span class="fw-semibold" x-text="socialBreakdown.twitter.keywords">--</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <div class="p-3 rounded" style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444;">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <div>
@@ -177,7 +160,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <div class="p-3 rounded" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e;">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <div>
@@ -376,7 +359,7 @@
             <div class="col-12">
                 <div class="df-panel p-3">
                     <div class="mb-3">
-                        <h5 class="mb-1">Social Mentions Trend (Twitter, Reddit, Google)</h5>
+                        <h5 class="mb-1">Social Mentions Trend (Reddit, Google)</h5>
                         <small class="text-secondary">Tracking volume penyebutan untuk detect FOMO atau kapitulasi</small>
                     </div>
                     <div style="height: 300px;">
@@ -461,7 +444,6 @@
                 fundingHeatmap: null,
                 whaleFlowChart: null,
                 socialBreakdown: {
-                    twitter: { mentions: 12847, sentiment: 42, keywords: 'halving, rally, breakout' },
                     reddit: { mentions: 3521, sentiment: 38, keywords: 'r/Bitcoin, r/CryptoCurrency' },
                     google: { score: 67, change: 5.2, region: 'Worldwide' }
                 },
@@ -508,11 +490,6 @@
                             data: {
                                 labels: this.generateDateLabels(30),
                                 datasets: [
-                                    {
-                                        label: 'Twitter',
-                                        data: this.generateSocialData(30, 5000, 2000),
-                                        backgroundColor: 'rgba(59, 130, 246, 0.7)'
-                                    },
                                     {
                                         label: 'Reddit',
                                         data: this.generateSocialData(30, 3000, 1500),
@@ -720,10 +697,12 @@
                 generateFearGreedTrend(days) {
                     const data = [];
                     let value = 50;
-                    for (let i = 0; i < days; i++) {
+                    for (let i = 0; i < days - 1; i++) {
                         value += (Math.random() - 0.5) * 15;
                         data.push(Math.floor(Math.max(10, Math.min(90, value))));
                     }
+                    // Last data point should match the current Fear & Greed meter
+                    data.push(this.fearGreedScore);
                     return data;
                 },
 
