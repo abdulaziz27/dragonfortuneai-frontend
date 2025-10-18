@@ -19,6 +19,7 @@ Route::view('/derivatives/long-short-ratio', 'derivatives.long-short-ratio')->na
 Route::view('/derivatives/liquidations', 'derivatives.liquidations')->name('derivatives.liquidations');
 Route::view('/derivatives/basis-term-structure', 'derivatives.basis-term-structure')->name('derivatives.basis-term-structure');
 Route::view('/derivatives/perp-quarterly-spread', 'derivatives.perp-quarterly-spread')->name('derivatives.perp-quarterly-spread');
+Route::view('/derivatives/exchange-inflow-cdd', 'derivatives.exchange-inflow-cdd')->name('derivatives.exchange-inflow-cdd');
 
 // Spot Microstructure Routes
 Route::view('/spot-microstructure/trades', 'spot-microstructure.trades')->name('spot-microstructure.trades');
@@ -57,5 +58,8 @@ Route::view('/macro-overlay/dashboard-legacy', 'macro-overlay.dashboard-legacy')
 
 // Sentiment & Flow Routes
 Route::view('/sentiment-flow/dashboard', 'sentiment-flow.dashboard')->name('sentiment-flow.dashboard');
+
+// CryptoQuant API Proxy Routes
+Route::get('/api/cryptoquant/exchange-inflow-cdd', [App\Http\Controllers\CryptoQuantController::class, 'getExchangeInflowCDD'])->name('api.cryptoquant.exchange-inflow-cdd');
 
 // API consumption happens directly from frontend using meta api-base-url
