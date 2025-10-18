@@ -23,7 +23,6 @@ function fundingRateController() {
     return {
         // Global state
         globalSymbol: "BTC",
-        globalMarginType: "",
         globalInterval: "1h",
         globalLoading: false,
 
@@ -43,7 +42,6 @@ function fundingRateController() {
         init() {
             console.log("🚀 Funding Rate Dashboard initialized");
             console.log("📊 Symbol:", this.globalSymbol);
-            console.log("💰 Margin Type:", this.globalMarginType || "All");
 
             // Setup event listeners
             this.setupEventListeners();

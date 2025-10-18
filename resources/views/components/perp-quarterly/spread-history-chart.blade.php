@@ -17,10 +17,7 @@
                 <h5 class="mb-1">📈 Spread History</h5>
                 <small class="text-secondary">Perp-Quarterly spread movement over time</small>
             </div>
-            <button class="btn btn-sm btn-outline-secondary" @click="refresh()" :disabled="loading">
-                <span x-show="!loading">🔄</span>
-                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-            </button>
+            <!-- Individual refresh button removed - using unified auto-refresh -->
         </div>
     </div>
 
@@ -48,7 +45,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <template x-for="(row, idx) in chartData.slice(0, displayLimit)" :key="idx">
+                    <template x-for="(row, idx) in getDisplayData()" :key="idx">
                         <tr>
                             <td class="small" x-text="formatTime(row.ts)">--</td>
                             <td class="small" x-text="row.exchange">--</td>
@@ -76,7 +73,10 @@
             <span class="badge bg-danger bg-opacity-10 text-danger ms-1">Backwardation (Quarterly > Perp)</span>
         </div>
         <div x-show="chartData.length > 0">
-            Showing <span class="fw-semibold" x-text="Math.min(chartData.length, displayLimit)">0</span> of <span x-text="dataPoints">0</span> data points
+            Displaying <span class="fw-semibold" x-text="getDisplayData().length">0</span> of <span x-text="chartData.length">0</span> records
+            <span x-show="parseInt(limit) > 1000" class="text-warning ms-2">
+                (⚡ Limited to 100 rows for performance)
+            </span>
         </div>
     </div>
 </div>
@@ -90,7 +90,7 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
         interval: '5m',
         perpSymbol: '', // Auto-generated if empty
         limit: '2000', // Data limit for API
-        displayLimit: 50, // Display limit for table
+        displayLimit: 50, // Display limit for table (will be optimized based on API limit)
         loading: false,
         chart: null,
         chartId: 'spreadHistoryChart_' + Math.random().toString(36).substr(2, 9),
@@ -150,7 +150,14 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
                 this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
-            window.addEventListener('refresh-all', () => {
+            window.addEventListener('refresh-all', (e) => {
+                // Update parameters from global filter
+                this.symbol = e.detail?.symbol || this.symbol;
+                this.quote = e.detail?.quote || this.quote;
+                this.exchange = e.detail?.exchange || this.exchange;
+                this.interval = e.detail?.interval || this.interval;
+                this.perpSymbol = e.detail?.perpSymbol || this.perpSymbol;
+                this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
 
@@ -652,9 +659,7 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
             return gradient;
         },
 
-        refresh() {
-            this.loadData();
-        },
+        // refresh() method removed - using unified auto-refresh system
 
         debugChart() {
             console.log('🔍 Chart Debug Info:');
@@ -668,6 +673,12 @@ function spreadHistoryChart(initialSymbol = 'BTC', initialExchange = 'Binance') 
             }
         },
 
+        getDisplayData() {
+            // For performance: limit display to reasonable amount
+            // If API limit > 1000, only show first 100 for table performance
+            const maxDisplayRows = parseInt(this.limit) > 1000 ? 100 : Math.min(parseInt(this.limit), this.displayLimit);
+            return this.chartData.slice(0, maxDisplayRows);
+        },
 
         formatTime(timestamp) {
             if (!timestamp) return '--';

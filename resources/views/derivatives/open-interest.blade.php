@@ -42,7 +42,7 @@
                         <label class="small text-secondary mb-0">Symbol:</label>
                         <select class="form-select" style="max-width: 120px;" x-model="globalSymbol" @change="updateSymbol()">
                             <option value="">All Symbols</option>
-                            <option value="BTC">BTC</option>
+                            <option value="BTC" selected>BTC</option>
                             <option value="ETH">ETH</option>
                             <option value="SOL">SOL</option>
                             <option value="XRP">XRP</option>
@@ -53,13 +53,14 @@
                         <label class="small text-secondary mb-0">Pair:</label>
                         <select class="form-select" style="max-width: 120px;" x-model="globalPair" @change="updatePair()">
                             <option value="">All Pairs</option>
-                            <option value="BTCUSDT">BTCUSDT</option>
+                            <option value="BTCUSDT" selected>BTCUSDT</option>
                             <option value="ETHUSDT">ETHUSDT</option>
                             <option value="SOLUSDT">SOLUSDT</option>
                             <option value="XRPUSDT">XRPUSDT</option>
                         </select>
                     </div>
 
+                    <!-- Exchange Filter Hidden - Default to Binance
                     <div class="d-flex align-items-center gap-2">
                         <label class="small text-secondary mb-0">Exchange:</label>
                         <select class="form-select" style="max-width: 120px;" x-model="globalExchange" @change="updateExchange()">
@@ -71,16 +72,13 @@
                             <option value="Gate.io">Gate.io</option>
                         </select>
                     </div>
+                    -->
 
                     <div class="d-flex align-items-center gap-2">
                         <label class="small text-secondary mb-0">Interval:</label>
                         <select class="form-select" style="max-width: 120px;" x-model="globalInterval" @change="updateInterval()">
                             <option value="1m">1 Minute</option>
-                            <option value="5m">5 Minutes</option>
-                            <option value="15m">15 Minutes</option>
-                            <option value="1h">1 Hour</option>
-                            <option value="4h">4 Hours</option>
-                            <option value="1d">1 Day</option>
+                            <option value="5m" selected>5 Minutes</option>
                         </select>
         </div>
 
@@ -90,7 +88,7 @@
                             <option value="100">100</option>
                             <option value="500">500</option>
                             <option value="1000">1000</option>
-                            <option value="2000">2000</option>
+                            <option value="2000" selected>2000</option>
                             <option value="5000">5000</option>
                         </select>
         </div>
@@ -360,11 +358,11 @@
         function openInterestController() {
             return {
                 // Global state
-                globalSymbol: "",
-                globalPair: "",
-                globalExchange: "",
-                globalInterval: "1h",
-                globalLimit: 1000,
+                globalSymbol: "BTC", // Default to BTC
+                globalPair: "BTCUSDT", // Default to BTCUSDT
+                globalExchange: "Binance", // Default to Binance since exchange filter is hidden
+                globalInterval: "5m", // Default to 5 minutes
+                globalLimit: 2000, // Default to 2000
                 globalLoading: false,
 
                 // Data state
@@ -380,6 +378,15 @@
 
                     // Load initial data
                     await this.loadOverview();
+                    
+                    // Broadcast initial filter state with delay to ensure components are ready
+                    setTimeout(() => {
+                        this.broadcastFilterChange();
+                    }, 100);
+                    
+                    // Setup auto-refresh every 5 seconds
+                    this.setupAutoRefresh();
+                    
                     console.log("✅ Open Interest dashboard loaded");
                 },
 
@@ -476,34 +483,83 @@
                     } else {
                         this.globalPair = "";
                     }
+                    
+                    console.log("📈 Pair auto-updated to:", this.globalPair);
+                    
                     this.loadOverview();
+                    // Trigger refresh for Exchange Data and History Data
+                    this.broadcastFilterChange();
                 },
 
                 updatePair() {
                     console.log("📈 Pair changed to:", this.globalPair);
                     this.loadOverview();
+                    // Trigger refresh for Exchange Data and History Data
+                    this.broadcastFilterChange();
+                },
+
+                // Broadcast filter changes to all components
+                broadcastFilterChange() {
+                    const filterData = {
+                        symbol: this.globalSymbol,
+                        pair: this.globalPair,
+                        exchange: this.globalExchange,
+                        interval: this.globalInterval,
+                        limit: this.globalLimit,
+                    };
+                    
+                    console.log("📡 Broadcasting filter change:", filterData);
+                    
+                    window.dispatchEvent(
+                        new CustomEvent("open-interest-filter-changed", {
+                            detail: filterData,
+                        })
+                    );
                 },
 
                 updateExchange() {
                     console.log("🏦 Exchange changed to:", this.globalExchange);
                     this.loadOverview();
+                    this.broadcastFilterChange();
                 },
 
                 updateInterval() {
                     console.log("⏰ Interval changed to:", this.globalInterval);
                     this.loadOverview();
+                    this.broadcastFilterChange();
                 },
 
                 updateLimit() {
                     console.log("📊 Limit changed to:", this.globalLimit);
                     this.loadOverview();
+                    this.broadcastFilterChange();
+                },
+
+                // Setup auto-refresh every 5 seconds
+                setupAutoRefresh() {
+                    console.log("🔄 Setting up auto-refresh every 5 seconds");
+                    
+                    setInterval(() => {
+                        this.refreshAll();
+                    }, 5000); // 5 seconds
                 },
 
                 // Refresh all components
                 refreshAll() {
                     this.globalLoading = true;
-                    console.log("🔄 Refreshing all components...");
-                    this.loadOverview().catch((e) => console.warn("Refresh failed:", e));
+                    console.log("🔄 Auto-refreshing all components...");
+                    
+                    // Load fresh overview data
+                    this.loadOverview().catch((e) => console.warn("Auto-refresh failed:", e));
+                    
+                    // Broadcast current filter state to refresh all components
+                    this.broadcastFilterChange();
+                    
+                    // Reset loading state after delay
+                    setTimeout(() => {
+                        this.globalLoading = false;
+                        console.log("✅ All components auto-refreshed");
+                    }, 2000);
                 },
 
                 // Utility functions
@@ -638,10 +694,25 @@
             return {
                 loading: false,
                 exchangeData: [],
+                currentFilters: {
+                    symbol: 'BTC',
+                    pair: 'BTCUSDT',
+                    exchange: 'Binance',
+                    limit: 2000
+                },
 
                 async init() {
                     // Listen for overview ready
                     window.addEventListener('open-interest-overview-ready', (e) => {
+                        this.loadData();
+                    });
+
+                    // Listen for filter changes
+                    window.addEventListener('open-interest-filter-changed', (e) => {
+                        console.log("🏦 Exchange Data: Filter changed, reloading data...", e.detail);
+                        if (e.detail) {
+                            this.currentFilters = { ...e.detail };
+                        }
                         this.loadData();
                     });
 
@@ -654,20 +725,31 @@
                 async loadData() {
                     this.loading = true;
                     try {
+                        // Use current filters from event or defaults
+                        const currentSymbol = this.currentFilters.symbol || 'BTC';
+                        const currentPair = this.currentFilters.pair || 'BTCUSDT';
+                        const currentExchange = this.currentFilters.exchange || 'Binance';
+                        const currentLimit = this.currentFilters.limit || 1000;
+
                         // Build params - exchange endpoint uses base symbol format (BTC)
                         const params = new URLSearchParams();
 
+                        // Always set exchange to Binance (default)
+                        params.append('exchange', currentExchange);
+                        
                         // Exchange endpoint uses base symbol format (BTC)
-                        if (this.$root.globalSymbol) {
-                            params.append('symbol', this.$root.globalSymbol);
-                        } else if (this.$root.globalPair) {
+                        if (currentSymbol) {
+                            params.append('symbol', currentSymbol);
+                        } else if (currentPair) {
                             // Extract base symbol from pair (BTCUSDT -> BTC)
-                            const baseSymbol = this.$root.globalPair.replace('USDT', '');
+                            const baseSymbol = currentPair.replace('USDT', '');
                             params.append('symbol', baseSymbol);
+                        } else {
+                            // Default to BTC if no symbol specified
+                            params.append('symbol', 'BTC');
                         }
 
-                        if (this.$root.globalExchange) params.append('exchange', this.$root.globalExchange);
-                        params.append('limit', this.$root.globalLimit || 1000);
+                        params.append('limit', currentLimit);
                         params.append('pivot', 'true');
 
                         const baseMeta = document.querySelector('meta[name="api-base-url"]');
@@ -675,15 +757,50 @@
                         const apiBase = configuredBase ? configuredBase : 'https://test.dragonfortune.ai';
                         const url = `${apiBase}/api/open-interest/exchange?${params.toString()}`;
 
+                        console.log('🏦 Exchange Data API call:', {
+                            symbol: currentSymbol,
+                            pair: currentPair,
+                            exchange: currentExchange,
+                            url: url
+                        });
+
 
                         const response = await fetch(url);
                         const data = await response.json();
                         
+                        // Filter and sort data
+                        let filteredData = data.data || [];
+                        
+                        // Filter by symbol if specified
+                        const targetSymbol = currentSymbol || (currentPair ? currentPair.replace('USDT', '') : 'BTC');
+                        if (targetSymbol) {
+                            filteredData = filteredData.filter(item => 
+                                item.symbol_coin === targetSymbol || 
+                                item.symbol === targetSymbol ||
+                                (item.symbol_coin && item.symbol_coin.toUpperCase() === targetSymbol.toUpperCase())
+                            );
+                        }
+                        
+                        // Filter by exchange (default Binance)
+                        const targetExchange = currentExchange;
+                        filteredData = filteredData.filter(item => 
+                            item.exchange === targetExchange ||
+                            (item.exchange && item.exchange.toLowerCase() === targetExchange.toLowerCase())
+                        );
+                        
                         // Sort by timestamp descending (newest first)
-                        this.exchangeData = (data.data || []).sort((a, b) => {
+                        this.exchangeData = filteredData.sort((a, b) => {
                             if (!a.ts) return 1;  // Move items without ts to end
                             if (!b.ts) return -1;
                             return new Date(b.ts) - new Date(a.ts);
+                        });
+
+                        console.log('🏦 Exchange Data filtered results:', {
+                            totalReceived: (data.data || []).length,
+                            afterFiltering: this.exchangeData.length,
+                            targetSymbol: targetSymbol,
+                            targetExchange: targetExchange,
+                            sampleData: this.exchangeData.slice(0, 3)
                         });
                     } catch (error) {
                         console.error('❌ Error loading exchange data:', error);
@@ -720,10 +837,25 @@
             return {
                 loading: false,
                 historyData: [],
+                currentFilters: {
+                    symbol: 'BTC',
+                    pair: 'BTCUSDT',
+                    interval: '5m',
+                    limit: 2000
+                },
 
                 async init() {
                     // Listen for overview ready
                     window.addEventListener('open-interest-overview-ready', (e) => {
+                        this.loadData();
+                    });
+
+                    // Listen for filter changes
+                    window.addEventListener('open-interest-filter-changed', (e) => {
+                        console.log("📈 History Data: Filter changed, reloading data...", e.detail);
+                        if (e.detail) {
+                            this.currentFilters = { ...e.detail };
+                        }
                         this.loadData();
                     });
 
@@ -736,18 +868,27 @@
                 async loadData() {
                     this.loading = true;
                     try {
+                        // Use current filters from event or defaults
+                        const currentSymbol = this.currentFilters.symbol || 'BTC';
+                        const currentPair = this.currentFilters.pair || 'BTCUSDT';
+                        const currentInterval = this.currentFilters.interval || '1h';
+                        const currentLimit = this.currentFilters.limit || 1000;
+
                         // Build params - history endpoint uses pair format (BTCUSDT)
                         const params = new URLSearchParams();
-                        params.append('interval', this.$root.globalInterval || '1h');
-                        params.append('limit', this.$root.globalLimit || 1000);
+                        params.append('interval', currentInterval);
+                        params.append('limit', currentLimit);
                         params.append('pivot', 'true');
                         params.append('with_price', 'true');
 
                         // History endpoint uses pair format (BTCUSDT)
-                        if (this.$root.globalPair) {
-                            params.append('symbol', this.$root.globalPair);
-                        } else if (this.$root.globalSymbol) {
-                            params.append('symbol', this.$root.globalSymbol + 'USDT');
+                        if (currentPair) {
+                            params.append('symbol', currentPair);
+                        } else if (currentSymbol) {
+                            params.append('symbol', currentSymbol + 'USDT');
+                        } else {
+                            // Default to BTCUSDT if no pair specified
+                            params.append('symbol', 'BTCUSDT');
                         }
 
                         const baseMeta = document.querySelector('meta[name="api-base-url"]');
@@ -763,14 +904,40 @@
                         }
 
 
+                        console.log('📈 History Data API call:', {
+                            pair: currentPair,
+                            symbol: currentSymbol,
+                            url: url
+                        });
+
                         const response = await fetch(url);
                         const data = await response.json();
                         
+                        // Filter and sort data
+                        let filteredData = data.data || [];
+                        
+                        // Filter by pair if specified
+                        const targetPair = currentPair || (currentSymbol ? currentSymbol + 'USDT' : 'BTCUSDT');
+                        if (targetPair) {
+                            filteredData = filteredData.filter(item => 
+                                item.pair === targetPair ||
+                                item.symbol === targetPair ||
+                                (item.pair && item.pair.toUpperCase() === targetPair.toUpperCase())
+                            );
+                        }
+                        
                         // Sort by timestamp descending (newest first)
-                        this.historyData = (data.data || []).sort((a, b) => {
+                        this.historyData = filteredData.sort((a, b) => {
                             if (!a.ts) return 1;  // Move items without ts to end
                             if (!b.ts) return -1;
                             return new Date(b.ts) - new Date(a.ts);
+                        });
+
+                        console.log('📈 History Data filtered results:', {
+                            totalReceived: (data.data || []).length,
+                            afterFiltering: this.historyData.length,
+                            targetPair: targetPair,
+                            sampleData: this.historyData.slice(0, 3)
                         });
                     } catch (error) {
                         console.error('Error loading history data:', error);
@@ -807,10 +974,24 @@
             return {
                 loading: false,
                 overview: null,
+                currentFilters: {
+                    symbol: 'BTC',
+                    pair: 'BTCUSDT',
+                    limit: 2000
+                },
 
                 async init() {
                     // Listen for overview ready
                     window.addEventListener('open-interest-overview-ready', (e) => {
+                        this.loadData();
+                    });
+
+                    // Listen for filter changes
+                    window.addEventListener('open-interest-filter-changed', (e) => {
+                        console.log("📊 Overview Summary: Filter changed, reloading data...", e.detail);
+                        if (e.detail) {
+                            this.currentFilters = { ...e.detail };
+                        }
                         this.loadData();
                     });
 
@@ -823,27 +1004,66 @@
                 async loadData() {
                     this.loading = true;
                     try {
-                        // Build params - overview endpoint uses pair format (BTCUSDT)
-                        const params = new URLSearchParams();
-                        params.append('unit', 'usd');
-                        params.append('limit', this.$root.globalLimit || 1000);
-
-                        // Overview endpoint uses pair format (BTCUSDT)
-                        if (this.$root.globalPair) {
-                            params.append('symbol', this.$root.globalPair);
-                        } else if (this.$root.globalSymbol) {
-                            params.append('symbol', this.$root.globalSymbol + 'USDT');
-                        }
+                        // Use current filters from event or defaults
+                        const currentSymbol = this.currentFilters.symbol || 'BTC';
+                        const currentPair = this.currentFilters.pair || 'BTCUSDT';
+                        const currentLimit = this.currentFilters.limit || 2000;
 
                         const baseMeta = document.querySelector('meta[name="api-base-url"]');
                         const configuredBase = (baseMeta?.content || "").trim();
                         const apiBase = configuredBase ? configuredBase : 'https://test.dragonfortune.ai';
-                        const url = `${apiBase}/api/open-interest/overview?${params.toString()}`;
 
+                        // 1. Get filtered summary statistics (with symbol filter)
+                        const summaryParams = new URLSearchParams();
+                        summaryParams.append('unit', 'usd');
+                        summaryParams.append('limit', currentLimit);
+                        
+                        if (currentPair) {
+                            summaryParams.append('symbol', currentPair);
+                        } else if (currentSymbol) {
+                            summaryParams.append('symbol', currentSymbol + 'USDT');
+                        }
 
-                        const response = await fetch(url);
-                        const data = await response.json();
-                        this.overview = data;
+                        const summaryUrl = `${apiBase}/api/open-interest/overview?${summaryParams.toString()}`;
+                        
+                        console.log('📊 Overview Summary API call (filtered):', {
+                            pair: currentPair,
+                            symbol: currentSymbol,
+                            limit: currentLimit,
+                            url: summaryUrl
+                        });
+
+                        const summaryResponse = await fetch(summaryUrl);
+                        const summaryData = await summaryResponse.json();
+
+                        // 2. Get all top symbols (without symbol filter)
+                        const topSymbolsParams = new URLSearchParams();
+                        topSymbolsParams.append('unit', 'usd');
+                        topSymbolsParams.append('limit', currentLimit);
+                        // No symbol parameter = get all symbols
+
+                        const topSymbolsUrl = `${apiBase}/api/open-interest/overview?${topSymbolsParams.toString()}`;
+                        
+                        console.log('📊 Top Symbols API call (all pairs):', {
+                            limit: currentLimit,
+                            url: topSymbolsUrl
+                        });
+
+                        const topSymbolsResponse = await fetch(topSymbolsUrl);
+                        const topSymbolsData = await topSymbolsResponse.json();
+
+                        // Combine results: filtered summary + all top symbols
+                        this.overview = {
+                            summary: summaryData.summary,
+                            exchange_breakdown: summaryData.exchange_breakdown,
+                            top_symbols: topSymbolsData.top_symbols || []
+                        };
+
+                        console.log('📊 Overview Summary results:', {
+                            observations: summaryData?.summary?.observations,
+                            totalOI: summaryData?.summary?.total_oi,
+                            topSymbolsCount: topSymbolsData?.top_symbols?.length || 0
+                        });
                     } catch (error) {
                         console.error('Error loading overview data:', error);
                         this.overview = null;

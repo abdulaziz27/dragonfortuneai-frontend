@@ -24,10 +24,16 @@ function liquidationsController() {
     return {
         // Global state
         globalSymbol: "BTC",
-        globalExchange: "",
-        globalInterval: "1m",
-        globalLimit: 2000,
+        globalExchange: "Binance", // Default to Binance since exchange filter is hidden
+        globalInterval: "5m", // Use 5m as default since it has data
+        globalLimit: "2000",
         globalLoading: false,
+
+        // Auto refresh state
+        autoRefreshEnabled: true,
+        autoRefreshInterval: 5000, // 5 seconds
+        autoRefreshTimer: null,
+        lastUpdated: null,
 
         // Overview data dari semua endpoints
         overview: null,
@@ -49,6 +55,9 @@ function liquidationsController() {
 
             // Setup event listeners
             this.setupEventListeners();
+
+            // Setup auto refresh
+            this.setupAutoRefresh();
 
             // Load initial overview
             this.loadOverview().catch((e) =>
@@ -90,14 +99,7 @@ function liquidationsController() {
                 );
             });
 
-            // Auto-refresh setiap 30 detik untuk data realtime
-            setInterval(() => {
-                if (!this.globalLoading) {
-                    this.loadOverview().catch((e) =>
-                        console.warn("Auto refresh failed:", e)
-                    );
-                }
-            }, 30000);
+            // Removed old auto-refresh - now handled by setupAutoRefresh()
         },
 
         // Update symbol globally
@@ -144,11 +146,100 @@ function liquidationsController() {
                         symbol: this.globalSymbol,
                         exchange: this.globalExchange,
                         interval: this.globalInterval,
+                        limit: this.globalLimit,
                     },
                 })
             );
 
             this.updateURL();
+        },
+
+        // Update data limit
+        updateLimit() {
+            console.log("🔄 Updating data limit to:", this.globalLimit);
+
+            window.dispatchEvent(
+                new CustomEvent("limit-changed", {
+                    detail: {
+                        symbol: this.globalSymbol,
+                        exchange: this.globalExchange,
+                        interval: this.globalInterval,
+                        limit: this.globalLimit,
+                    },
+                })
+            );
+
+            this.updateURL();
+        },
+
+        // Toggle auto refresh
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+            console.log("🔄 Auto refresh:", this.autoRefreshEnabled ? "Enabled" : "Disabled");
+            
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            } else {
+                this.stopAutoRefresh();
+            }
+        },
+
+        // Setup auto refresh system
+        setupAutoRefresh() {
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            }
+
+            // Listen for visibility changes to pause/resume auto refresh
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    this.pauseAutoRefresh();
+                } else if (this.autoRefreshEnabled) {
+                    this.resumeAutoRefresh();
+                }
+            });
+        },
+
+        // Start auto refresh timer
+        startAutoRefresh() {
+            this.stopAutoRefresh(); // Clear any existing timers
+            
+            if (!this.autoRefreshEnabled) return;
+
+            console.log("▶️ Starting liquidations auto refresh timer");
+            
+            // Start main refresh timer
+            this.autoRefreshTimer = setInterval(() => {
+                if (!this.globalLoading && this.autoRefreshEnabled) {
+                    console.log("🔄 Liquidations auto refresh triggered");
+                    this.refreshAll();
+                }
+            }, this.autoRefreshInterval);
+        },
+
+        // Stop auto refresh timer
+        stopAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+                this.autoRefreshTimer = null;
+                console.log("⏹️ Liquidations auto refresh timer stopped");
+            }
+        },
+
+        // Pause auto refresh (when tab hidden)
+        pauseAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                this.stopAutoRefresh();
+                console.log("⏸️ Liquidations auto refresh paused (tab hidden)");
+            }
+        },
+
+        // Resume auto refresh (when tab visible)
+        resumeAutoRefresh() {
+            if (this.autoRefreshEnabled && !this.autoRefreshTimer) {
+                this.startAutoRefresh();
+                console.log("▶️ Liquidations auto refresh resumed (tab visible)");
+            }
         },
 
         // Build pair from symbol
@@ -327,6 +418,9 @@ function liquidationsController() {
                     })
                 );
 
+                // Update last updated timestamp
+                this.lastUpdated = new Date().toLocaleTimeString();
+
                 console.log("✅ Overview loaded:", this.overview);
                 console.log(
                     "📊 Liquidations Controller: Pair history data points:",
@@ -370,6 +464,9 @@ function liquidationsController() {
                     },
                 })
             );
+
+            // Update last updated timestamp
+            this.lastUpdated = new Date().toLocaleTimeString();
 
             // Reset loading state
             setTimeout(() => {

@@ -29,40 +29,55 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <!-- Base Asset -->
                     <select class="form-select" style="width: 120px;" x-model="globalSymbol" @change="updateSymbol()">
-                        <option value="BTC">Bitcoin</option>
-                        <option value="ETH">Ethereum</option>
-                        <option value="SOL">Solana</option>
-                        <option value="BNB">BNB</option>
-                        <option value="XRP">XRP</option>
-                        <option value="ADA">Cardano</option>
-                        <option value="DOGE">Dogecoin</option>
-                        <option value="MATIC">Polygon</option>
-                        <option value="DOT">Polkadot</option>
-                        <option value="AVAX">Avalanche</option>
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
                     </select>
 
-                    <select class="form-select" style="width: 140px;" x-model="globalExchange" @change="updateExchange()">
+                    <!-- Exchange Filter -->
+                    <!-- <select class="form-select" style="width: 130px;" x-model="globalExchange" @change="updateExchange()">
                         <option value="">All Exchanges</option>
                         <option value="Binance">Binance</option>
                         <option value="Bybit">Bybit</option>
                         <option value="OKX">OKX</option>
-                        <option value="Bitget">Bitget</option>
-                        <option value="Hyperliquid">Hyperliquid</option>
-                    </select>
+                        <option value="HTX">HTX</option>
+                        <option value="Gate">Gate</option>
+                    </select> -->
 
-                    <select class="form-select" style="width: 120px;" x-model="globalInterval" @change="updateInterval()">
-                        <option value="1m">1 Minute</option>
+                    <!-- Interval Filter -->
+                    <select class="form-select" style="width: 130px;" x-model="globalInterval" @change="updateInterval()">
                         <option value="5m">5 Minutes</option>
                         <option value="15m">15 Minutes</option>
                         <option value="1h">1 Hour</option>
-                        <option value="4h">4 Hours</option>
                     </select>
 
+                    <!-- Data Limit -->
+                    <select class="form-select" style="width: 140px;" x-model="globalLimit" @change="updateLimit()">
+                        <option value="100">100 Records</option>
+                        <option value="500">500 Records</option>
+                        <option value="1000">1,000 Records</option>
+                        <option value="2000">2,000 Records</option>
+                        <option value="5000">5,000 Records</option>
+                    </select>
+
+                    <!-- Manual Refresh Button -->
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
-                        <span x-show="!globalLoading">🔄 Refresh All</span>
+                        <span x-show="!globalLoading">Refresh All</span>
                         <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Auto-refresh Toggle -->
+                    <button class="btn" @click="toggleAutoRefresh()" 
+                            :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'">
+                        <span x-text="autoRefreshEnabled ? 'Auto-refresh: ON' : '⏸️ Auto-refresh: OFF'"></span>
+                    </button>
+
+                    <!-- Last Updated -->
+                    <div class="d-flex align-items-center gap-1 text-muted small" x-show="lastUpdated">
+                        <span>Last updated:</span>
+                        <span x-text="lastUpdated" class="fw-bold"></span>
+                    </div>
                 </div>
             </div>
         </div>

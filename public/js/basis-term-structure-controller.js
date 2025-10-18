@@ -29,6 +29,14 @@ function basisTermStructureController() {
         globalLimit: "2000", // Data limit for API calls
         globalLoading: false,
 
+        // Auto refresh state
+        autoRefreshEnabled: true,
+        autoRefreshInterval: 30000, // 30 seconds
+        autoRefreshTimer: null,
+        autoRefreshCountdown: 30,
+        autoRefreshCountdownTimer: null,
+        lastUpdated: null,
+
         // Component references
         components: {
             analyticsPanel: null,
@@ -47,9 +55,13 @@ function basisTermStructureController() {
             console.log("🏢 Exchange:", this.globalExchange);
             console.log("⏱️ Interval:", this.globalInterval);
             console.log("📈 Data Limit:", this.globalLimit);
+            console.log("🔄 Auto Refresh:", this.autoRefreshEnabled ? "Enabled" : "Disabled");
 
             // Setup event listeners
             this.setupEventListeners();
+
+            // Setup auto refresh
+            this.setupAutoRefresh();
 
             // Prime overview on load
             this.loadOverview().catch((e) =>
@@ -189,6 +201,100 @@ function basisTermStructureController() {
             );
 
             this.updateURL();
+        },
+
+        // Toggle auto refresh
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+            console.log("🔄 Auto refresh:", this.autoRefreshEnabled ? "Enabled" : "Disabled");
+            
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            } else {
+                this.stopAutoRefresh();
+            }
+        },
+
+        // Setup auto refresh system
+        setupAutoRefresh() {
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            }
+
+            // Listen for visibility changes to pause/resume auto refresh
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    this.pauseAutoRefresh();
+                } else if (this.autoRefreshEnabled) {
+                    this.resumeAutoRefresh();
+                }
+            });
+        },
+
+        // Start auto refresh timer
+        startAutoRefresh() {
+            this.stopAutoRefresh(); // Clear any existing timers
+            
+            if (!this.autoRefreshEnabled) return;
+
+            console.log("▶️ Starting auto refresh timer");
+            
+            // Start countdown
+            this.autoRefreshCountdown = this.autoRefreshInterval / 1000;
+            this.startCountdown();
+            
+            // Start main refresh timer
+            this.autoRefreshTimer = setInterval(() => {
+                if (!this.globalLoading && this.autoRefreshEnabled) {
+                    console.log("🔄 Auto refresh triggered");
+                    this.refreshAll();
+                    this.autoRefreshCountdown = this.autoRefreshInterval / 1000;
+                }
+            }, this.autoRefreshInterval);
+        },
+
+        // Stop auto refresh timer
+        stopAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+                this.autoRefreshTimer = null;
+                console.log("⏹️ Auto refresh timer stopped");
+            }
+            
+            if (this.autoRefreshCountdownTimer) {
+                clearInterval(this.autoRefreshCountdownTimer);
+                this.autoRefreshCountdownTimer = null;
+            }
+        },
+
+        // Pause auto refresh (when tab hidden)
+        pauseAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                this.stopAutoRefresh();
+                console.log("⏸️ Auto refresh paused (tab hidden)");
+            }
+        },
+
+        // Resume auto refresh (when tab visible)
+        resumeAutoRefresh() {
+            if (this.autoRefreshEnabled && !this.autoRefreshTimer) {
+                this.startAutoRefresh();
+                console.log("▶️ Auto refresh resumed (tab visible)");
+            }
+        },
+
+        // Start countdown timer
+        startCountdown() {
+            if (this.autoRefreshCountdownTimer) {
+                clearInterval(this.autoRefreshCountdownTimer);
+            }
+            
+            this.autoRefreshCountdownTimer = setInterval(() => {
+                this.autoRefreshCountdown--;
+                if (this.autoRefreshCountdown <= 0) {
+                    this.autoRefreshCountdown = this.autoRefreshInterval / 1000;
+                }
+            }, 1000);
         },
 
         // Build pair (symbol + quote) consistently for endpoints that require pair
@@ -373,13 +479,20 @@ function basisTermStructureController() {
                         symbol: this.globalSymbol,
                         exchange: this.globalExchange,
                         interval: this.globalInterval,
+                        limit: this.globalLimit,
                     },
                 })
+            );
+
+            // Reload overview data
+            this.loadOverview().catch((e) =>
+                console.warn("Overview reload failed:", e)
             );
 
             // Reset loading state after delay
             setTimeout(() => {
                 this.globalLoading = false;
+                this.lastUpdated = new Date().toLocaleTimeString();
                 console.log("✅ All components refreshed");
             }, 2000);
         },

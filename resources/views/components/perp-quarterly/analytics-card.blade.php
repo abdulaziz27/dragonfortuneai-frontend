@@ -13,17 +13,14 @@
     - Spread narrowing → Convergence approaching
 --}}
 
-<div class="df-panel p-4" x-data="spreadAnalyticsCard('{{ $symbol ?? 'BTC' }}', '{{ $exchange ?? 'Binance' }}')">
+<div class="df-panel p-4" x-data="spreadAnalyticsCard('{{ $symbol ?? 'BTC' }}', '{{ $exchange ?? 'Binance' }}', '{{ $quote ?? 'USDT' }}')">
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div class="d-flex align-items-center gap-2">
             <h5 class="mb-0">📊 Spread Analytics</h5>
             <span class="badge text-bg-secondary" x-text="symbol + '/' + exchange">BTC/Binance</span>
         </div>
-        <button class="btn btn-sm btn-outline-secondary" @click="refresh()" :disabled="loading">
-            <span x-show="!loading">🔄</span>
-            <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-        </button>
+        <!-- Individual refresh button removed - using unified auto-refresh -->
     </div>
 
     <!-- Main Metrics -->
@@ -151,14 +148,14 @@
 </div>
 
 <script>
-function spreadAnalyticsCard(initialSymbol = 'BTC', initialExchange = 'Binance') {
+function spreadAnalyticsCard(initialSymbol = 'BTC', initialExchange = 'Binance', initialQuote = 'USDT') {
     return {
         symbol: initialSymbol,
-        quote: 'USDT',
+        quote: initialQuote,
         exchange: initialExchange,
         interval: '5m',
         perpSymbol: '', // Auto-generated if empty
-        limit: '2000', // Data limit
+        limit: '100', // Data limit (will be updated by global filter)
         loading: false,
 
         // Analytics data
@@ -233,7 +230,14 @@ function spreadAnalyticsCard(initialSymbol = 'BTC', initialExchange = 'Binance')
                 this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
-            window.addEventListener('refresh-all', () => {
+            window.addEventListener('refresh-all', (e) => {
+                // Update parameters from global filter
+                this.symbol = e.detail?.symbol || this.symbol;
+                this.quote = e.detail?.quote || this.quote;
+                this.exchange = e.detail?.exchange || this.exchange;
+                this.interval = e.detail?.interval || this.interval;
+                this.perpSymbol = e.detail?.perpSymbol || this.perpSymbol;
+                this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
 

@@ -10,8 +10,8 @@
 
     <div class="d-flex align-items-center justify-content-between mb-3">
         <div>
-            <h5 class="mb-0">📊 Exchange Comparison</h5>
-            <small class="text-secondary">Volume breakdown by exchange</small>
+            <h5 class="mb-0">🏦 Binance Data</h5>
+            <small class="text-secondary">Liquidation volume from Binance exchange</small>
         </div>
         <div class="d-flex gap-2 align-items-center">
             <select class="form-select form-select-sm" style="width: 100px;" x-model="selectedRange" @change="loadData()">
@@ -20,10 +20,7 @@
                 <option value="12h">12H</option>
                 <option value="24h">24H</option>
             </select>
-            <button class="btn btn-sm btn-outline-primary" @click="loadData()" :disabled="loading">
-                <span x-show="!loading">🔄 Refresh</span>
-                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-            </button>
+            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
         </div>
     </div>
 
@@ -32,28 +29,24 @@
         <table class="table table-sm table-striped">
             <thead class="sticky-top bg-white">
                 <tr>
-                    <th>Rank</th>
-                    <th>Exchange</th>
+                    <th>Time Range</th>
                     <th class="text-end">Total USD</th>
                     <th class="text-end text-danger">Long USD</th>
                     <th class="text-end text-success">Short USD</th>
-                    <th class="text-end">Market Share</th>
+                    <th class="text-end">Ratio</th>
                 </tr>
             </thead>
             <tbody>
                 <template x-for="(exchange, index) in displayedExchanges" :key="'exchange-' + index + '-' + exchange.exchange">
                     <tr>
                         <td>
-                            <span class="badge bg-primary" x-text="'#' + (index + 1)">#1</span>
-                        </td>
-                        <td>
-                            <span class="badge bg-secondary" x-text="exchange.exchange">--</span>
+                            <span class="badge bg-primary" x-text="selectedRange.toUpperCase()">1H</span>
                         </td>
                         <td class="text-end fw-bold" x-text="formatUSD(exchange.liquidation_usd)">--</td>
                         <td class="text-end text-danger" x-text="formatUSD(exchange.long_liquidation_usd)">--</td>
                         <td class="text-end text-success" x-text="formatUSD(exchange.short_liquidation_usd)">--</td>
                         <td class="text-end">
-                            <span class="badge bg-info" x-text="exchange.percentage + '%'">--</span>
+                            <span class="badge" :class="getLongShortRatioClass(exchange)" x-text="getLongShortRatio(exchange)">--</span>
                         </td>
                     </tr>
                 </template>
@@ -81,8 +74,8 @@
 
     <!-- No Data State -->
     <div x-show="!loading && displayedExchanges.length === 0" class="text-center py-4">
-        <div class="text-secondary mb-2" style="font-size: 3rem;">📊</div>
-        <div class="text-secondary">No exchange comparison data available</div>
+        <div class="text-secondary mb-2" style="font-size: 3rem;">🏦</div>
+        <div class="text-secondary">No Binance liquidation data available</div>
         <div class="small text-muted mt-2">Try changing symbol or refresh data</div>
     </div>
 </div>
@@ -169,9 +162,9 @@ function liquidationsExchangeComparisonTable() {
         },
 
         updateDisplayedData() {
-            // Filter out "All" exchange and sort by total volume
+            // Filter to show only Binance data (since exchange filter is hidden and defaults to Binance)
             const exchanges = this.exchangeData
-                .filter(ex => ex.exchange !== 'All')
+                .filter(ex => ex.exchange === 'Binance')
                 .map(ex => ({
                     exchange: ex.exchange,
                     liquidation_usd: parseFloat(ex.liquidation_usd) || 0,
@@ -201,6 +194,26 @@ function liquidationsExchangeComparisonTable() {
             if (num >= 1e6) return '$' + (num / 1e6).toFixed(1) + 'M';
             if (num >= 1e3) return '$' + (num / 1e3).toFixed(0) + 'K';
             return '$' + num.toFixed(0);
+        },
+
+        getLongShortRatio(exchange) {
+            const longUsd = parseFloat(exchange.long_liquidation_usd) || 0;
+            const shortUsd = parseFloat(exchange.short_liquidation_usd) || 0;
+            
+            if (longUsd === 0 && shortUsd === 0) return 'N/A';
+            if (shortUsd === 0) return '∞:1';
+            
+            const ratio = longUsd / shortUsd;
+            return ratio.toFixed(2) + ':1';
+        },
+
+        getLongShortRatioClass(exchange) {
+            const longUsd = parseFloat(exchange.long_liquidation_usd) || 0;
+            const shortUsd = parseFloat(exchange.short_liquidation_usd) || 0;
+            
+            if (longUsd > shortUsd) return 'bg-danger';
+            if (shortUsd > longUsd) return 'bg-success';
+            return 'bg-secondary';
         },
     };
 }

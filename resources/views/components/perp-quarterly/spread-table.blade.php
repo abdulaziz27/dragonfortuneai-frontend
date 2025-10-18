@@ -9,7 +9,7 @@
 --}}
 
 <div class="df-panel p-3"
-     x-data="spreadDataTable('{{ $symbol ?? 'BTC' }}', '{{ $exchange ?? 'Binance' }}', {{ $limit ?? 50 }})">
+     x-data="spreadDataTable('{{ $symbol ?? 'BTC' }}', '{{ $exchange ?? 'Binance' }}', {{ $limit ?? 50 }}, '{{ $quote ?? 'USDT' }}')">
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
@@ -17,10 +17,7 @@
             <small class="text-secondary">Recent spread measurements</small>
         </div>
         <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-secondary" @click="refresh()" :disabled="loading">
-                <span x-show="!loading">🔄</span>
-                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-            </button>
+            <!-- Individual refresh button removed - using unified auto-refresh -->
         </div>
     </div>
 
@@ -78,7 +75,10 @@
     <!-- Footer Info -->
     <div class="mt-3 pt-3 border-top d-flex justify-content-between align-items-center text-secondary small">
         <div x-show="tableData.length > 0">
-            Showing <span class="fw-semibold" x-text="tableData.length">0</span> of <span x-text="totalPoints">0</span> data points
+            Displaying <span class="fw-semibold" x-text="tableData.length">0</span> of <span x-text="totalPoints">0</span> records
+            <span x-show="parseInt(limit) > 1000" class="text-warning ms-2">
+                (⚡ Limited to 100 rows for performance)
+            </span>
         </div>
         <div>
             Last updated: <span x-text="lastUpdate">--</span>
@@ -87,14 +87,14 @@
 </div>
 
 <script>
-function spreadDataTable(initialSymbol = 'BTC', initialExchange = 'Binance', displayLimit = 50) {
+function spreadDataTable(initialSymbol = 'BTC', initialExchange = 'Binance', displayLimit = 50, initialQuote = 'USDT') {
     return {
         symbol: initialSymbol,
-        quote: 'USDT',
+        quote: initialQuote,
         exchange: initialExchange,
         interval: '5m',
         perpSymbol: '', // Auto-generated if empty
-        limit: '2000', // Data limit for API
+        limit: '100', // Data limit for API (will be updated by global filter)
         displayLimit: displayLimit, // Display limit for table
         loading: false,
         tableData: [],
@@ -143,7 +143,14 @@ function spreadDataTable(initialSymbol = 'BTC', initialExchange = 'Binance', dis
                 this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
-            window.addEventListener('refresh-all', () => {
+            window.addEventListener('refresh-all', (e) => {
+                // Update parameters from global filter
+                this.symbol = e.detail?.symbol || this.symbol;
+                this.quote = e.detail?.quote || this.quote;
+                this.exchange = e.detail?.exchange || this.exchange;
+                this.interval = e.detail?.interval || this.interval;
+                this.perpSymbol = e.detail?.perpSymbol || this.perpSymbol;
+                this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
 
@@ -196,13 +203,18 @@ function spreadDataTable(initialSymbol = 'BTC', initialExchange = 'Binance', dis
         updateTable(data) {
             this.totalPoints = data.length;
             // Sort by timestamp descending (newest first)
-            this.tableData = data
-                .sort((a, b) => {
-                    if (!a.ts) return 1;
-                    if (!b.ts) return -1;
-                    return new Date(b.ts) - new Date(a.ts);
-                })
-                .slice(0, this.displayLimit);
+            const sortedData = data.sort((a, b) => {
+                if (!a.ts) return 1;
+                if (!b.ts) return -1;
+                return new Date(b.ts) - new Date(a.ts);
+            });
+            
+            // For performance: limit display to reasonable amount
+            // If API limit > 1000, only show first 100 for table performance
+            const maxDisplayRows = parseInt(this.limit) > 1000 ? 100 : Math.min(parseInt(this.limit), this.displayLimit);
+            this.tableData = sortedData.slice(0, maxDisplayRows);
+            
+            console.log(`📊 Table: Showing ${this.tableData.length} of ${this.totalPoints} records (API limit: ${this.limit})`);
         },
 
         updateFromOverview(timeseries) {
@@ -218,9 +230,7 @@ function spreadDataTable(initialSymbol = 'BTC', initialExchange = 'Binance', dis
                 .slice(0, this.displayLimit);
         },
 
-        refresh() {
-            this.loadData();
-        },
+        // refresh() method removed - using unified auto-refresh system
 
         formatTime(ts) {
             if (!ts) return '--';

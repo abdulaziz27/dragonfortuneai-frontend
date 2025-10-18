@@ -13,15 +13,15 @@
             <h5 class="mb-1">Term Structure Analysis</h5>
             <small class="text-secondary">Basis across different contract expiries</small>
         </div>
-        <button class="btn btn-sm btn-outline-secondary" @click="refresh()" :disabled="loading">
-            <span x-show="!loading">🔄</span>
-            <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-        </button>
+        <div class="d-flex align-items-center gap-2">
+            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+            <small class="text-secondary" x-show="termData.length > 0" x-text="termData.length + ' contracts'">Loading...</small>
+        </div>
     </div>
 
     <!-- Chart Canvas -->
-    <div style="height: 300px; position: relative;">
-        <canvas :id="chartId" style="display: block; box-sizing: border-box; height: 100%; width: 100%;"></canvas>
+    <div style="height: 300px; max-height: 300px; position: relative;">
+        <canvas :id="chartId" style="display: block; box-sizing: border-box; height: 300px; width: 100%;"></canvas>
     </div>
 </div>
 
@@ -61,6 +61,11 @@ function termStructureChart(initialSymbol = 'BTC') {
                 this.loadData();
             });
             window.addEventListener('refresh-all', () => this.loadData());
+            
+            // Listen for auto refresh events
+            window.addEventListener('auto-refresh-tick', () => {
+                if (!this.loading) this.loadData();
+            });
         },
 
         async loadData() {
@@ -199,10 +204,6 @@ function termStructureChart(initialSymbol = 'BTC') {
                     }
                 }
             });
-        },
-
-        refresh() {
-            this.loadData();
         }
     };
 }

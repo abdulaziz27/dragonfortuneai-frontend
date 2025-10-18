@@ -41,12 +41,6 @@
                         <option value="AVAX">Avalanche</option>
                     </select>
 
-                    <select class="form-select" style="width: 140px;" x-model="globalMarginType" @change="updateMarginType()">
-                        <option value="">All Margin Types</option>
-                        <option value="stablecoin">Stablecoin</option>
-                        <option value="token">Token</option>
-                    </select>
-
                     <select class="form-select" style="width: 120px;" x-model="globalInterval" @change="updateInterval()">
                         <option value="1h">1 Hour</option>
                         <option value="4h" disabled>4 Hours (soon)</option>
@@ -81,59 +75,91 @@
                 <div class="df-panel p-3 h-100" x-data="quickStatsPanel()" x-init="init()">
                     <h5 class="mb-3">📈 Quick Stats</h5>
 
-                    <div class="d-flex flex-column gap-3">
-                        <!-- Funding Trend (Window) -->
+                    <div class="d-flex flex-column gap-2">
+                        <!-- Current vs Average -->
                         <div class="stat-item">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small text-secondary">Funding Trend (Window)</span>
-                                <span class="badge" :class="getTrendBadgeClass(windowAvgFunding)" x-text="getTrendText(windowAvgFunding)">Loading...</span>
+                                <span class="small text-secondary">Current Rate</span>
+                                <span class="badge" :class="currentRate >= 0 ? 'text-bg-success' : 'text-bg-danger'" x-text="currentRate >= 0 ? 'Positive' : 'Negative'">--</span>
                             </div>
-                            <div class="h4 mb-0" :class="getTrendClass(windowAvgFunding)" x-text="formatRate(windowAvgFunding)">--</div>
-                            <div class="small text-secondary">Window avg based on Bias (interval/limit)</div>
+                            <div class="h4 mb-1" :class="currentRate >= 0 ? 'text-success' : 'text-danger'" x-text="formatRate(currentRate)">--</div>
+                            <div class="small text-secondary">
+                                Avg: <span :class="getTrendClass(windowAvgFunding)" x-text="formatRate(windowAvgFunding)">--</span>
+                                <span class="mx-1">•</span>
+                                Median: <span x-text="formatRate(medianRate)">--</span>
+                            </div>
                         </div>
 
-                        <!-- Snapshot Avg Across Exchanges -->
+                        <!-- Range & Volatility -->
                         <div class="stat-item">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small text-secondary">Snapshot Avg Across Exchanges</span>
+                                <span class="small text-secondary">Volatility</span>
+                                <span class="badge" :class="getVolatilityBadgeClass()" x-text="volatility">--</span>
                             </div>
-                            <div class="h5 mb-0" :class="snapshotAvgFunding >= 0 ? 'text-success' : 'text-danger'" x-text="formatRate(snapshotAvgFunding)">--</div>
-                            <div class="small text-secondary">Current avg across exchanges</div>
+                            <div class="small">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="text-secondary">Range:</span>
+                                    <span x-text="formatRate(minRate) + ' to ' + formatRate(maxRate)">--</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-secondary">Std Dev:</span>
+                                    <span x-text="formatRate(stdDev)">--</span>
+                                </div>
+                            </div>
                         </div>
 
-                        <hr class="my-2">
-
-                        <!-- Market Sentiment -->
+                        <!-- Trend Direction -->
                         <div class="stat-item">
-                            <div class="small text-secondary mb-2">Market Sentiment</div>
-                            <div class="progress" style="height: 25px;">
-                                <div class="progress-bar bg-success" role="progressbar"
-                                    :style="'width: ' + positivePercentage + '%'" :aria-valuenow="positivePercentage">
-                                    <span class="fw-semibold" x-text="'Long ' + positivePercentage + '%'">Long 0%</span>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small text-secondary">Trend</span>
+                                <span class="badge" :class="getTrendDirectionBadgeClass()" x-text="trendDirection">--</span>
+                            </div>
+                            <div class="small">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="text-secondary">Recent:</span>
+                                    <span :class="getTrendClass(recentAvg)" x-text="formatRate(recentAvg)">--</span>
                                 </div>
-                                <div class="progress-bar bg-danger" role="progressbar"
-                                    :style="'width: ' + negativePercentage + '%'" :aria-valuenow="negativePercentage">
-                                    <span class="fw-semibold" x-text="'Short ' + negativePercentage + '%'">Short 0%</span>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-secondary">Change:</span>
+                                    <span :class="getTrendClass(trendChange)" x-text="formatRate(trendChange)">--</span>
                                 </div>
                             </div>
-                            <div class="small text-secondary mt-1">Based on positive vs negative rates</div>
                         </div>
 
-                        <hr class="my-2">
+                        <!-- Market Bias Summary -->
+                        <div class="stat-item">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small text-secondary">Market Bias</span>
+                                <span class="badge" :class="getStrengthBadgeClass()" x-text="biasStrengthLabel">--</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <div class="h5 mb-0 text-uppercase" :class="getBiasColorClass()" x-text="biasDirection">--</div>
+                                <span class="small text-secondary" x-text="'(' + Math.round(biasStrength * 100) + '%)'">0%</span>
+                            </div>
+                            <div class="small text-secondary" x-text="getBiasExplanation()">Loading...</div>
+                        </div>
+
+                        <!-- Extremes Alert -->
+                        <div class="alert alert-warning mb-2 py-2" x-show="extremePercentage > 3">
+                            <div class="small">
+                                <strong>⚠️ <span x-text="extremePercentage.toFixed(1)">0</span>% Extreme Events</strong><br>
+                                <span x-text="extremeCount">0</span> outliers detected beyond threshold
+                            </div>
+                        </div>
 
                         <!-- Next Funding -->
                         <div class="stat-item">
-                            <div class="small text-secondary mb-2">Next Major Funding</div>
-                            <div class="h3 mb-0 fw-bold" x-text="nextFundingTime">--</div>
+                            <div class="small text-secondary mb-1">Next Funding</div>
+                            <div class="h5 mb-1 fw-bold" x-text="nextFundingTime">--</div>
                             <div class="small text-secondary" x-text="nextFundingDetails">Loading...</div>
                         </div>
 
-                        <hr class="my-2">
-
-                        <!-- Trading Insight -->
-                        <div class="alert mb-0" :class="getInsightAlertClass()">
-                            <div class="fw-semibold small mb-1" x-text="getInsightIcon() + ' ' + getInsightTitle()">💡 Trading Insight</div>
-                            <div class="small" x-text="getInsightMessage()">Loading market analysis...</div>
+                        <!-- Data Coverage -->
+                        <div class="text-center pt-2 border-top">
+                            <small class="text-secondary">
+                                <span x-text="dataPoints">0</span> data points • 
+                                <span x-text="durationHours">0</span>h coverage
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -247,21 +273,36 @@
         function quickStatsPanel() {
             return {
                 symbol: 'BTC',
-                marginType: '',
-                snapshotAvgFunding: 0,
+                // Summary data
                 windowAvgFunding: 0,
-                positivePercentage: 0,
-                negativePercentage: 0,
+                currentRate: 0,
+                medianRate: 0,
+                minRate: 0,
+                maxRate: 0,
+                stdDev: 0,
+                volatility: 'low',
+                // Bias data
+                biasDirection: 'neutral',
+                biasStrength: 0,
+                biasStrengthLabel: 'neutral',
+                // Trend data
+                trendDirection: 'stable',
+                trendChange: 0,
+                recentAvg: 0,
+                olderAvg: 0,
+                // Extremes
+                extremeCount: 0,
+                extremePercentage: 0,
+                // Meta
+                dataPoints: 0,
+                durationHours: 0,
                 nextFundingTime: '--',
                 nextFundingDetails: 'Loading...',
-                exchangeData: [],
-                biasData: null,
                 loading: false,
 
                 init() {
                     // Get initial from parent
                     this.symbol = this.$root?.globalSymbol || 'BTC';
-                    this.marginType = this.$root?.globalMarginType || '';
 
                     // Load data immediately on init
                     this.loadData();
@@ -272,51 +313,55 @@
                     // Listen for filter changes
                     window.addEventListener('symbol-changed', (e) => {
                         this.symbol = e.detail?.symbol || this.symbol;
-                        this.marginType = e.detail?.marginType ?? this.marginType;
                         this.loadData();
-                    });
-                    window.addEventListener('margin-type-changed', (e) => {
-                        this.marginType = e.detail?.marginType ?? '';
-                        this.loadData();
-                    });
-
-                    // Listen for overview composite (analytics + exchanges + resampled history)
-                    // This is a fallback - main data loading happens in loadData()
-                    window.addEventListener('funding-overview-ready', (e) => {
-                        try {
-                            const o = e.detail || {};
-                            if (Array.isArray(o.exchanges)) {
-                                this.exchangeData = o.exchanges;
-                            }
-                            if (o.analytics) {
-                                const avg = o.analytics?.summary?.average ?? 0;
-                                this.biasData = {
-                                    bias: o.analytics?.bias?.direction || 'neutral',
-                                    strength: Math.abs(o.analytics?.bias?.strength || 0),
-                                    avg_funding_close: avg,
-                                };
-                                this.windowAvgFunding = avg;
-                            }
-                            this.calculateStats();
-                        } catch (err) {
-                            console.warn('Overview apply failed:', err);
-                        }
                     });
                 },
 
                 async loadData() {
                     this.loading = true;
                     try {
-                        // Use stored symbol and marginType
-                        const symbol = this.symbol;
+                        // Use analytics endpoint for consistent data
+                        const pair = `${this.symbol}USDT`.toLowerCase();
+                        const baseMeta = document.querySelector('meta[name="api-base-url"]');
+                        const configuredBase = (baseMeta?.content || '').trim();
+                        const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
+                        const url = base ? `${base}/api/funding-rate/analytics?symbol=${pair}&exchange=binance&interval=1h&limit=2000` : `/api/funding-rate/analytics?symbol=${pair}&exchange=binance&interval=1h&limit=2000`;
+                        
+                        const response = await fetch(url);
+                        const data = await response.json();
 
-                        // Load exchange data for calculations
-                        await this.loadExchangeData(symbol);
+                        // Extract summary data
+                        this.windowAvgFunding = data.summary?.average || 0;
+                        this.currentRate = data.summary?.current || 0;
+                        this.medianRate = data.summary?.median || 0;
+                        this.minRate = data.summary?.min || 0;
+                        this.maxRate = data.summary?.max || 0;
+                        this.stdDev = data.summary?.std_dev || 0;
+                        this.volatility = data.summary?.volatility || 'low';
 
-                        // Load bias data for insights
-                        await this.loadBiasData(symbol);
+                        // Extract bias data
+                        this.biasDirection = data.bias?.direction || 'neutral';
+                        this.biasStrength = data.bias?.strength || 0;
+                        this.biasStrengthLabel = data.bias?.strength_label || 'neutral';
 
-                        this.calculateStats();
+                        // Extract trend data
+                        this.trendDirection = data.trend?.direction || 'stable';
+                        this.trendChange = data.trend?.change || 0;
+                        this.recentAvg = data.trend?.recent_avg || 0;
+                        this.olderAvg = data.trend?.older_avg || 0;
+
+                        // Extract extremes
+                        this.extremeCount = data.extremes?.count || 0;
+                        this.extremePercentage = data.extremes?.percentage || 0;
+
+                        // Extract meta
+                        this.dataPoints = data.data_points || 0;
+                        this.durationHours = Math.round(data.time_range?.duration_hours || 0);
+
+                        // Calculate next funding time (8-hour intervals)
+                        this.calculateNextFunding();
+
+                        console.log('✅ Quick stats loaded:', data);
                     } catch (error) {
                         console.error('❌ Error loading quick stats:', error);
                     } finally {
@@ -324,226 +369,67 @@
                     }
                 },
 
-                async loadExchangeData(symbol) {
-                    try {
-                        // Convert symbol to pair format (BTC -> BTCUSDT)
-                        const pair = `${symbol}USDT`;
-                        const params = new URLSearchParams({
-                            symbol: pair,
-                            limit: '50',
-                            ...(this.marginType && { margin_type: this.marginType })
-                        });
-                        const response = await fetch(
-                            (function(){
-                                const baseMeta = document.querySelector('meta[name="api-base-url"]');
-                                const configuredBase = (baseMeta?.content || '').trim();
-                                const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
-                                const url = base ? `${base}/api/funding-rate/exchanges?${params}` : `/api/funding-rate/exchanges?${params}`;
-                                return url;
-                            })());
-                        const data = await response.json();
-                        this.exchangeData = data.data || [];
-                    } catch (error) {
-                        console.error('❌ Error loading exchange data:', error);
-                        this.exchangeData = [];
-                    }
-                },
-
-                async loadBiasData(symbol) {
-                    try {
-                        const response = await fetch(
-                            (function(){
-                                const baseMeta = document.querySelector('meta[name="api-base-url"]');
-                                const configuredBase = (baseMeta?.content || '').trim();
-                                const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
-                                const url = base ? `${base}/api/funding-rate/bias?symbol=${symbol}USDT&limit=1000&with_price=true` : `/api/funding-rate/bias?symbol=${symbol}USDT&limit=1000&with_price=true`;
-                                return url;
-                            })());
-                        const data = await response.json();
-                        this.biasData = data;
-                    } catch (error) {
-                        console.error('❌ Error loading bias data:', error);
-                        this.biasData = null;
-                    }
-                },
-
-                calculateStats() {
-                    // Calculate snapshot average from exchange data
-                    if (this.exchangeData.length > 0) {
-                        const validRates = this.exchangeData
-                            .map(e => parseFloat(e.funding_rate))
-                            .filter(r => !isNaN(r));
-                        this.snapshotAvgFunding = validRates.length ? (validRates.reduce((sum, r) => sum + r, 0) / validRates.length) : 0;
-                    } else {
-                        // Fallback: use bias data if exchange data is not available
-                        this.snapshotAvgFunding = this.biasData?.avg_funding_close ?? 0;
-                    }
-
-                    // window average from bias
-                    this.windowAvgFunding = this.biasData?.avg_funding_close ?? 0;
-
-                    // Calculate sentiment percentages
-                    const positiveCount = this.exchangeData.filter(e => parseFloat(e.funding_rate) > 0).length;
-                    const negativeCount = this.exchangeData.filter(e => parseFloat(e.funding_rate) < 0).length;
-                    const total = positiveCount + negativeCount;
-
-                    if (total > 0) {
-                        this.positivePercentage = Math.round((positiveCount / total) * 100);
-                        this.negativePercentage = Math.round((negativeCount / total) * 100);
-                    } else {
-                        // Fallback: calculate sentiment from bias data
-                        if (this.biasData?.avg_funding_close !== undefined) {
-                            const avgRate = this.biasData.avg_funding_close;
-                            if (avgRate > 0.0001) {
-                                this.positivePercentage = 100;
-                                this.negativePercentage = 0;
-                            } else if (avgRate < -0.0001) {
-                                this.positivePercentage = 0;
-                                this.negativePercentage = 100;
-                            } else {
-                                this.positivePercentage = 50;
-                                this.negativePercentage = 50;
-                            }
-                        }
-                    }
-
-                    // Calculate next funding time
-                    this.calculateNextFunding();
-                },
-
                 calculateNextFunding() {
-                    // Find the nearest funding time from exchange data
-                    if (this.exchangeData.length > 0) {
-                        const now = Date.now();
-                        let nearestTime = null;
-                        let nearestExchange = '';
-
-                        this.exchangeData.forEach(exchange => {
-                            if (exchange.next_funding_time && exchange.next_funding_time > now) {
-                                if (!nearestTime || exchange.next_funding_time < nearestTime) {
-                                    nearestTime = exchange.next_funding_time;
-                                    nearestExchange = exchange.exchange;
-                                }
-                            }
-                        });
-
-                        if (nearestTime) {
-                            const diff = nearestTime - now;
-                            const hours = Math.floor(diff / (1000 * 60 * 60));
-                            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-                            this.nextFundingTime = `${hours}h ${minutes}m`;
-
-                            const time = new Date(nearestTime);
-                            this.nextFundingDetails = `${time.toLocaleTimeString('en-US', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: false
-                            })} UTC • ${nearestExchange}`;
-                        } else {
-                            this.nextFundingTime = 'N/A';
-                            this.nextFundingDetails = 'No upcoming funding times available';
-                        }
-                    } else {
-                        // Fallback: calculate next funding time based on 8-hour intervals
-                        const now = Date.now();
-                        const eightHours = 8 * 60 * 60 * 1000; // 8 hours in milliseconds
-                        
-                        // Find next 8-hour funding time (00:00, 08:00, 16:00 UTC)
-                        const nextFunding = Math.ceil(now / eightHours) * eightHours;
-                        const diff = nextFunding - now;
-                        const hours = Math.floor(diff / (1000 * 60 * 60));
-                        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-                        this.nextFundingTime = `${hours}h ${minutes}m`;
-
-                        const time = new Date(nextFunding);
-                        this.nextFundingDetails = `${time.toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false
-                        })} UTC • Estimated`;
+                    const now = new Date();
+                    const hours = now.getUTCHours();
+                    const nextHour = Math.ceil((hours + 1) / 8) * 8;
+                    const next = new Date(now);
+                    next.setUTCHours(nextHour, 0, 0, 0);
+                    
+                    if (next <= now) {
+                        next.setUTCDate(next.getUTCDate() + 1);
                     }
+                    
+                    const diff = next - now;
+                    const hoursLeft = Math.floor(diff / (1000 * 60 * 60));
+                    const minutesLeft = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    
+                    this.nextFundingTime = `${hoursLeft}h ${minutesLeft}m`;
+                    this.nextFundingDetails = `Next funding at ${next.getUTCHours()}:00 UTC`;
                 },
 
-                getTrendBadgeClass(val) {
-                    if (val > 0.0001) return 'text-bg-success';
-                    if (val < -0.0001) return 'text-bg-danger';
+                getBiasColorClass() {
+                    if (this.biasDirection === 'long') return 'text-success';
+                    if (this.biasDirection === 'short') return 'text-danger';
+                    return 'text-secondary';
+                },
+
+                getStrengthBadgeClass() {
+                    const label = this.biasStrengthLabel.toLowerCase();
+                    if (label === 'strong') return 'text-bg-danger';
+                    if (label === 'moderate') return 'text-bg-warning';
+                    if (label === 'weak') return 'text-bg-info';
                     return 'text-bg-secondary';
                 },
 
-                getTrendText(val) {
-                    if (val > 0.0001) return 'Bullish';
-                    if (val < -0.0001) return 'Bearish';
-                    return 'Neutral';
+                getVolatilityBadgeClass() {
+                    const vol = this.volatility.toLowerCase();
+                    if (vol === 'high') return 'text-bg-danger';
+                    if (vol === 'moderate') return 'text-bg-warning';
+                    return 'text-bg-success';
+                },
+
+                getTrendDirectionBadgeClass() {
+                    const dir = this.trendDirection.toLowerCase();
+                    if (dir === 'increasing') return 'text-bg-success';
+                    if (dir === 'decreasing') return 'text-bg-danger';
+                    return 'text-bg-secondary';
+                },
+
+                getBiasExplanation() {
+                    if (this.biasDirection === 'long') {
+                        return 'Longs paying shorts • Bullish positioning';
+                    }
+                    if (this.biasDirection === 'short') {
+                        return 'Shorts paying longs • Bearish positioning';
+                    }
+                    return 'Balanced market conditions';
                 },
 
                 getTrendClass(val) {
                     if (val > 0) return 'text-success';
                     if (val < 0) return 'text-danger';
                     return 'text-secondary';
-                },
-
-                getInsightAlertClass() {
-                    if (!this.biasData) return 'alert-info';
-
-                    const bias = (this.biasData.bias || '').toLowerCase();
-                    const strength = this.biasData.strength || 0;
-
-                    if (strength > 70) return 'alert-danger';
-                    if (strength > 40) return 'alert-warning';
-                    if (bias.includes('long') || bias.includes('short')) return 'alert-info';
-                    return 'alert-secondary';
-                },
-
-                getInsightIcon() {
-                    if (!this.biasData) return '💡';
-
-                    const bias = (this.biasData.bias || '').toLowerCase();
-                    const strength = this.biasData.strength || 0;
-
-                    if (strength > 70) return '🚨';
-                    if (bias.includes('long')) return '📈';
-                    if (bias.includes('short')) return '📉';
-                    return '💡';
-                },
-
-                getInsightTitle() {
-                    if (!this.biasData) return 'Market Analysis';
-
-                    const bias = (this.biasData.bias || '').toLowerCase();
-                    const strength = this.biasData.strength || 0;
-
-                    if (strength > 70) return 'High Risk Alert';
-                    if (bias.includes('long')) return 'Long Dominance';
-                    if (bias.includes('short')) return 'Short Pressure';
-                    return 'Balanced Market';
-                },
-
-                getInsightMessage() {
-                    if (!this.biasData) return 'Loading market analysis...';
-
-                    const bias = (this.biasData.bias || '').toLowerCase();
-                    const strength = this.biasData.strength || 0;
-                    const avgFunding = this.biasData.avg_funding_close || 0;
-
-                    if (strength > 70 && bias.includes('long')) {
-                        return `Extreme long positioning detected (${strength.toFixed(0)}% strength). Funding rate at ${this.formatRate(avgFunding)}. High risk of long squeeze - consider taking profits.`;
-                    }
-
-                    if (strength > 70 && bias.includes('short')) {
-                        return `Heavy short accumulation (${strength.toFixed(0)}% strength). Negative funding at ${this.formatRate(avgFunding)}. Watch for short squeeze on positive catalysts.`;
-                    }
-
-                    if (bias.includes('long')) {
-                        return `Long positions building up with positive funding (${this.formatRate(avgFunding)}). Monitor for funding rate spikes as potential squeeze indicator.`;
-                    }
-
-                    if (bias.includes('short')) {
-                        return `Short interest increasing with negative funding (${this.formatRate(avgFunding)}). Potential short squeeze setup if price bounces.`;
-                    }
-
-                    return `Market showing neutral bias with funding rate at ${this.formatRate(avgFunding)}. No extreme positioning detected - normal trading conditions.`;
                 },
 
                 formatRate(value) {

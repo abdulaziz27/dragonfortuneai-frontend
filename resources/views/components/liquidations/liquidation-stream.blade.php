@@ -15,10 +15,7 @@
         </div>
         <div class="d-flex gap-2 align-items-center">
             <span x-show="isStreaming" class="pulse-dot pulse-danger"></span>
-            <button class="btn btn-sm btn-outline-primary" @click="loadData()" :disabled="loading">
-                <span x-show="!loading">🔄 Refresh</span>
-                <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-            </button>
+            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
         </div>
     </div>
 

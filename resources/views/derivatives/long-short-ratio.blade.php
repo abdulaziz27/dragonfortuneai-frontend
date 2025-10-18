@@ -34,11 +34,11 @@
                         <option value="SOL">Solana</option>
                         <option value="BNB">BNB</option>
                         <option value="XRP">XRP</option>
-                        <option value="ADA">Cardano</option>
+                        <!-- <option value="ADA">Cardano</option>
                         <option value="DOGE">Dogecoin</option>
                         <option value="MATIC">Polygon</option>
                         <option value="DOT">Polkadot</option>
-                        <option value="AVAX">Avalanche</option>
+                        <option value="AVAX">Avalanche</option> -->
                     </select>
 
                     <select class="form-select" style="width: 140px;" x-model="globalRatioType" @change="updateRatioType()">
@@ -46,14 +46,14 @@
                         <option value="positions">Positions</option>
                     </select>
 
-                    <select class="form-select" style="width: 140px;" x-model="globalExchange" @change="updateExchange()">
+                    <!-- <select class="form-select" style="width: 140px;" x-model="globalExchange" @change="updateExchange()">
                         <option value="">All Exchanges</option>
                         <option value="Binance">Binance</option>
                         <option value="Bybit">Bybit</option>
                         <option value="OKX">OKX</option>
                         <option value="Bitget">Bitget</option>
                         <option value="Gate.io">Gate.io</option>
-                    </select>
+                    </select> -->
 
                     <select class="form-select" style="width: 120px;" x-model="globalInterval" @change="updateInterval()">
                         <option value="15m">15 Minutes</option>
@@ -322,93 +322,7 @@
         </div>
 
 
-        <!-- Exchange Comparison Table -->
-        <div class="row g-3">
-            <div class="col-12">
-                <div class="df-panel p-3" x-data="exchangeComparisonTable()" x-init="init()">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <div>
-                            <h5 class="mb-0">🏦 Exchange Comparison</h5>
-                            <small class="text-secondary">Multi-exchange positioning analysis</small>
-                        </div>
-                        <div class="d-flex gap-2 align-items-center">
-                            <!-- Exchange Comparison Filters -->
-                            <div class="d-flex gap-2 align-items-center">
-                                <select class="form-select form-select-sm" style="width: 120px;" x-model="comparisonSymbol" @change="updateComparisonSymbol()">
-                                    <option value="BTC">BTC</option>
-                                    <option value="ETH">ETH</option>
-                                    <option value="SOL">SOL</option>
-                                    <option value="BNB">BNB</option>
-                                    <option value="XRP">XRP</option>
-                                </select>
 
-                                <select class="form-select form-select-sm" style="width: 140px;" x-model="comparisonRatioType" @change="updateComparisonRatioType()">
-                                    <option value="accounts">Accounts</option>
-                                    <option value="positions">Positions</option>
-                                </select>
-
-                                <select class="form-select form-select-sm" style="width: 120px;" x-model="comparisonInterval" @change="updateComparisonInterval()">
-                                    <option value="15m">15m</option>
-                                    <option value="30m">30m</option>
-                                    <option value="1h">1h</option>
-                                    <option value="4h">4h</option>
-                                    <option value="1d">1d</option>
-                                </select>
-
-                                <button class="btn btn-sm btn-primary" @click="loadComparisonData()" :disabled="loading">
-                                    <span x-show="!loading">🔄 Load</span>
-                                    <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-                                </button>
-                            </div>
-
-                            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
-                        </div>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Exchange</th>
-                                    <th>Pair</th>
-                                    <th class="text-end">Ratio</th>
-                                    <th class="text-end">Long %</th>
-                                    <th class="text-end">Short %</th>
-                                    <th>Sentiment</th>
-                                    <th>Last Update</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="(data, exchangeName) in exchangeData" :key="'exchange-' + exchangeName">
-                                    <tr>
-                                        <td class="fw-semibold" x-text="exchangeName">--</td>
-                                        <td x-text="data?.pair || '-'">--</td>
-                                        <td class="text-end fw-bold"
-                                            :class="parseFloat(data?.ratio) > 1 ? 'text-success' : parseFloat(data?.ratio) < 1 ? 'text-danger' : 'text-muted'"
-                                            x-text="data?.ratio ? formatRatio(data.ratio) : '-'">--</td>
-                                        <td class="text-end" x-text="data?.longPct ? formatPercentage(data.longPct) : '-'">--</td>
-                                        <td class="text-end" x-text="data?.shortPct ? formatPercentage(data.shortPct) : '-'">--</td>
-                                        <td>
-                                            <span class="badge"
-                                                  :class="parseFloat(data?.ratio) > 1.1 ? 'bg-success' : parseFloat(data?.ratio) < 0.9 ? 'bg-danger' : 'bg-secondary'">
-                                                <span x-text="parseFloat(data?.ratio) > 1.1 ? 'Bullish' : parseFloat(data?.ratio) < 0.9 ? 'Bearish' : 'Neutral'">--</span>
-                                            </span>
-                                        </td>
-                                        <td class="small text-secondary" x-text="data?.timestamp ? formatTimestamp(data.timestamp) : '-'">--</td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- No Data State -->
-                    <div x-show="!loading && Object.keys(exchangeData).length === 0" class="text-center py-4">
-                        <div class="text-secondary mb-2" style="font-size: 3rem;">🏦</div>
-                        <div class="text-secondary">No exchange data available</div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 @endsection
 
@@ -477,6 +391,9 @@
                     this.loadOverview().catch((e) =>
                         console.warn("Initial overview load failed:", e)
                     );
+
+                    // Setup auto-refresh every 5 seconds
+                    this.setupAutoRefresh();
 
                     // Log dashboard ready
                     setTimeout(() => {
@@ -716,10 +633,19 @@
                     );
                 },
 
+                // Setup auto-refresh every 5 seconds
+                setupAutoRefresh() {
+                    console.log("🔄 Setting up auto-refresh every 5 seconds");
+                    
+                    setInterval(() => {
+                        this.refreshAll();
+                    }, 5000); // 5 seconds
+                },
+
                 // Refresh all components
                 refreshAll() {
                     this.globalLoading = true;
-                    console.log("🔄 Refreshing all components...");
+                    console.log("🔄 Auto-refreshing all components...");
 
                     // Dispatch refresh event
                     window.dispatchEvent(
@@ -736,8 +662,14 @@
 
                     // Reload overview
                     this.loadOverview().catch((e) =>
-                        console.warn("Refresh failed:", e)
+                        console.warn("Auto-refresh failed:", e)
                     );
+
+                    // Reset loading state after delay
+                    setTimeout(() => {
+                        this.globalLoading = false;
+                        console.log("✅ All components auto-refreshed");
+                    }, 2000);
                 },
 
                 // API Helper: Fetch with error handling

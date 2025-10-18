@@ -13,15 +13,15 @@
             <h5 class="mb-1">Basis History</h5>
             <small class="text-secondary">Historical basis movement over time</small>
         </div>
-        <button class="btn btn-sm btn-outline-secondary" @click="refresh()" :disabled="loading">
-            <span x-show="!loading">🔄</span>
-            <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-        </button>
+        <div class="d-flex align-items-center gap-2">
+            <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
+            <small class="text-secondary" x-show="historyData.length > 0" x-text="historyData.length + ' points'">Loading...</small>
+        </div>
     </div>
 
     <!-- Chart Canvas -->
-    <div class="flex-grow-1" style="min-height: 400px; position: relative;">
-        <canvas :id="chartId" style="display: block; box-sizing: border-box; height: 100%; width: 100%;"></canvas>
+    <div class="flex-grow-1" style="height: 400px; max-height: 400px; position: relative;">
+        <canvas :id="chartId" style="display: block; box-sizing: border-box; height: 400px; width: 100%;"></canvas>
     </div>
 </div>
 
@@ -61,6 +61,11 @@ function basisHistoryChart(initialSymbol = 'BTC') {
                 this.loadData();
             });
             window.addEventListener('refresh-all', () => this.loadData());
+            
+            // Listen for auto refresh events
+            window.addEventListener('auto-refresh-tick', () => {
+                if (!this.loading) this.loadData();
+            });
         },
 
         async loadData() {
@@ -131,8 +136,15 @@ function basisHistoryChart(initialSymbol = 'BTC') {
                 return;
             }
 
-            // Prepare data
-            const labels = this.historyData.map((item, index) => index);
+            // Prepare data with proper timestamps (oldest to newest)
+            const labels = this.historyData.map(item => {
+                const date = new Date(item.ts);
+                return date.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: false 
+                });
+            });
             const basisValues = this.historyData.map(item => parseFloat(item.basis_abs));
             const zeroLine = new Array(this.historyData.length).fill(0);
 
@@ -209,10 +221,6 @@ function basisHistoryChart(initialSymbol = 'BTC') {
                     }
                 }
             });
-        },
-
-        refresh() {
-            this.loadData();
         }
     };
 }

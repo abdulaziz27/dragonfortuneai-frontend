@@ -24,12 +24,22 @@ function perpQuarterlySpreadController() {
     return {
         // Global state
         globalSymbol: "BTC",
-        globalQuote: "USDT",
+        globalQuote: "USDT", 
         globalExchange: "Binance",
         globalInterval: "5m",
         globalPerpSymbol: "", // Optional override, auto-generated if empty
-        globalLimit: "2000", // Data limit for API calls
+        globalLimit: "100", // Data limit for API calls
         globalLoading: false,
+        
+        // Auto-refresh functionality
+        autoRefreshEnabled: true,
+        autoRefreshInterval: null,
+        autoRefreshDelay: 5000, // 5 seconds
+        lastUpdated: null,
+        
+        // Debouncing
+        filterDebounceTimer: null,
+        filterDebounceDelay: 300,
 
         // Component references
         components: {
@@ -60,6 +70,20 @@ function perpQuarterlySpreadController() {
             
             // Setup global error handlers
             this.setupGlobalErrorHandlers();
+            
+            // Setup auto-refresh
+            this.setupAutoRefresh();
+
+            // Add visibility API integration
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log('👁️ Tab hidden, pausing auto-refresh');
+                    this.pauseAutoRefresh();
+                } else {
+                    console.log('👁️ Tab visible, resuming auto-refresh');
+                    this.resumeAutoRefresh();
+                }
+            });
 
             this.globalLoading = true;
 
@@ -158,145 +182,25 @@ function perpQuarterlySpreadController() {
             });
         },
 
-        // Update symbol globally
-        updateSymbol() {
-            console.log("🔄 Updating base symbol to:", this.globalSymbol);
+        // Debounced filter change handler
+        handleFilterChange() {
+            console.log('🔄 Filter changed');
 
-            window.dispatchEvent(
-                new CustomEvent("symbol-changed", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        quote: this.globalQuote,
-                        exchange: this.globalExchange,
-                        interval: this.globalInterval,
-                        perpSymbol: this.globalPerpSymbol,
-                        limit: this.globalLimit,
-                    },
-                })
-            );
+            // Clear existing timer
+            if (this.filterDebounceTimer) {
+                clearTimeout(this.filterDebounceTimer);
+            }
 
-            this.updateURL();
-            this.loadOverview().catch((e) =>
-                console.warn("Overview reload failed:", e)
-            );
+            // Set new timer with debouncing
+            this.filterDebounceTimer = setTimeout(() => {
+                console.log('⏰ Debounced filter change executing...');
+                this.refreshAll();
+            }, this.filterDebounceDelay);
         },
 
-        // Update quote globally
-        updateQuote() {
-            console.log("🔄 Updating quote to:", this.globalQuote);
-
-            window.dispatchEvent(
-                new CustomEvent("quote-changed", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        quote: this.globalQuote,
-                        exchange: this.globalExchange,
-                        interval: this.globalInterval,
-                        perpSymbol: this.globalPerpSymbol,
-                        limit: this.globalLimit,
-                    },
-                })
-            );
-
-            this.updateURL();
-            this.loadOverview().catch((e) =>
-                console.warn("Overview reload failed:", e)
-            );
-        },
-
-        // Update exchange globally
-        updateExchange() {
-            console.log("🔄 Updating exchange to:", this.globalExchange);
-
-            window.dispatchEvent(
-                new CustomEvent("exchange-changed", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        quote: this.globalQuote,
-                        exchange: this.globalExchange,
-                        interval: this.globalInterval,
-                        perpSymbol: this.globalPerpSymbol,
-                        limit: this.globalLimit,
-                    },
-                })
-            );
-
-            this.updateURL();
-            this.loadOverview().catch((e) =>
-                console.warn("Overview reload failed:", e)
-            );
-        },
-
-        // Update interval globally
-        updateInterval() {
-            console.log("🔄 Updating interval to:", this.globalInterval);
-
-            window.dispatchEvent(
-                new CustomEvent("interval-changed", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        quote: this.globalQuote,
-                        exchange: this.globalExchange,
-                        interval: this.globalInterval,
-                        perpSymbol: this.globalPerpSymbol,
-                        limit: this.globalLimit,
-                    },
-                })
-            );
-
-            this.updateURL();
-            this.loadOverview().catch((e) =>
-                console.warn("Overview reload failed:", e)
-            );
-        },
-
-        // Update perp symbol override
-        updatePerpSymbol() {
-            console.log(
-                "🔄 Updating perp symbol override to:",
-                this.globalPerpSymbol || "auto-generated"
-            );
-
-            window.dispatchEvent(
-                new CustomEvent("perp-symbol-changed", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        quote: this.globalQuote,
-                        exchange: this.globalExchange,
-                        interval: this.globalInterval,
-                        perpSymbol: this.globalPerpSymbol,
-                        limit: this.globalLimit,
-                    },
-                })
-            );
-
-            this.updateURL();
-            this.loadOverview().catch((e) =>
-                console.warn("Overview reload failed:", e)
-            );
-        },
-
-        // Update data limit
-        updateLimit() {
-            console.log("🔄 Updating data limit to:", this.globalLimit);
-
-            window.dispatchEvent(
-                new CustomEvent("limit-changed", {
-                    detail: {
-                        symbol: this.globalSymbol,
-                        quote: this.globalQuote,
-                        exchange: this.globalExchange,
-                        interval: this.globalInterval,
-                        perpSymbol: this.globalPerpSymbol,
-                        limit: this.globalLimit,
-                    },
-                })
-            );
-
-            this.updateURL();
-            this.loadOverview().catch((e) =>
-                console.warn("Overview reload failed:", e)
-            );
+        // Update last updated timestamp
+        updateLastUpdated() {
+            this.lastUpdated = new Date().toLocaleTimeString();
         },
 
         // Load overview with fallback data and retry mechanism
@@ -444,14 +348,20 @@ function perpQuarterlySpreadController() {
                     new CustomEvent("refresh-all", {
                         detail: {
                             symbol: this.globalSymbol,
+                            quote: this.globalQuote,
                             exchange: this.globalExchange,
                             interval: this.globalInterval,
+                            perpSymbol: this.globalPerpSymbol,
+                            limit: this.globalLimit,
                         },
                     })
                 );
 
                 // Reload overview data
                 await this.loadOverview();
+
+                // Update timestamp on successful load
+                this.updateLastUpdated();
 
                 console.log("✅ All components refreshed");
             } catch (error) {
@@ -596,6 +506,53 @@ function perpQuarterlySpreadController() {
         async fetchAPI(endpoint, params = {}) {
             return this.fetchAPIWithRetry(endpoint, params, 1);
         },
+
+        // Auto-refresh functionality
+        setupAutoRefresh() {
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            }
+        },
+
+        startAutoRefresh() {
+            if (this.autoRefreshInterval) {
+                clearInterval(this.autoRefreshInterval);
+            }
+            
+            console.log('🔄 Starting auto-refresh with', this.autoRefreshDelay, 'ms interval');
+            this.autoRefreshInterval = setInterval(() => {
+                if (this.autoRefreshEnabled && !document.hidden && !this.globalLoading) {
+                    console.log('⏰ Auto-refresh triggered');
+                    this.refreshAll();
+                }
+            }, this.autoRefreshDelay);
+        },
+
+        pauseAutoRefresh() {
+            console.log('⏸️ Pausing auto-refresh');
+            if (this.autoRefreshInterval) {
+                clearInterval(this.autoRefreshInterval);
+                this.autoRefreshInterval = null;
+            }
+        },
+
+        resumeAutoRefresh() {
+            if (this.autoRefreshEnabled) {
+                console.log('▶️ Resuming auto-refresh');
+                this.startAutoRefresh();
+            }
+        },
+
+        toggleAutoRefresh() {
+            this.autoRefreshEnabled = !this.autoRefreshEnabled;
+            console.log('🔄 Auto-refresh toggled:', this.autoRefreshEnabled ? 'ON' : 'OFF');
+
+            if (this.autoRefreshEnabled) {
+                this.startAutoRefresh();
+            } else {
+                this.pauseAutoRefresh();
+            }
+        },
     };
 }
 
@@ -734,6 +691,6 @@ window.PerpQuarterlyUtils = {
 };
 
 // Export function for Alpine.js
-window.perpQuarterlySpreadController = () => perpQuarterlySpreadController;
+window.perpQuarterlySpreadController = perpQuarterlySpreadController;
 
-console.log("✅ Perp-Quarterly Spread Controller loaded");
+console.log("✅ Perp-Quarterly Spread Controller loaded and exported to window");

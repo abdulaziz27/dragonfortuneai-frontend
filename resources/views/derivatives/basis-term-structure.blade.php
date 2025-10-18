@@ -28,50 +28,48 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <!-- Base Asset -->
                     <select class="form-select" style="width: 120px;" x-model="globalSymbol" @change="updateSymbol()">
-                        <option value="BTC">Bitcoin</option>
-                        <option value="ETH">Ethereum</option>
-                        <option value="SOL">Solana</option>
-                        <option value="BNB">BNB</option>
-                        <option value="XRP">XRP</option>
-                        <option value="ADA">Cardano</option>
-                        <option value="DOGE">Dogecoin</option>
-                        <option value="MATIC">Polygon</option>
-                        <option value="DOT">Polkadot</option>
-                        <option value="AVAX">Avalanche</option>
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
                     </select>
 
-                    <select class="form-select" style="width: 140px;" x-model="globalExchange" @change="updateExchange()">
+                    <!-- Exchange Filter -->
+                    <!-- <select class="form-select" style="width: 130px;" x-model="globalExchange" @change="updateExchange()">
                         <option value="Binance">Binance</option>
-                        <option value="Bybit">Bybit</option>
-                        <option value="OKX">OKX</option>
-                        <option value="Bitget">Bitget</option>
-                        <option value="Gate.io">Gate.io</option>
-                        <option value="Deribit">Deribit</option>
-                    </select>
+                    </select> -->
 
-                    <select class="form-select" style="width: 120px;" x-model="globalInterval" @change="updateInterval()">
+                    <!-- Interval Filter -->
+                    <select class="form-select" style="width: 130px;" x-model="globalInterval" @change="updateInterval()">
                         <option value="5m">5 Minutes</option>
-                        <option value="15m">15 Minutes</option>
-                        <option value="1h">1 Hour</option>
-                        <option value="4h">4 Hours</option>
-                        <option value="1d">1 Day</option>
                     </select>
 
                     <!-- Data Limit -->
-                    <select class="form-select" style="width: 120px;" x-model="globalLimit" @change="updateLimit()">
-                        <option value="100">100</option>
-                        <option value="500">500</option>
-                        <option value="1000">1,000</option>
-                        <option value="2000">2,000</option>
-                        <option value="5000">5,000</option>
-                        <option value="10000">10,000</option>
+                    <select class="form-select" style="width: 140px;" x-model="globalLimit" @change="updateLimit()">
+                        <option value="100">100 Records</option>
+                        <option value="500">500 Records</option>
+                        <option value="1000">1,000 Records</option>
+                        <option value="2000">2,000 Records</option>
+                        <option value="5000">5,000 Records</option>
                     </select>
 
+                    <!-- Manual Refresh Button -->
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
-                        <span x-show="!globalLoading">🔄 Refresh All</span>
+                        <span x-show="!globalLoading">Refresh All</span>
                         <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Auto-refresh Toggle -->
+                    <button class="btn" @click="toggleAutoRefresh()" 
+                            :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'">
+                        <span x-text="autoRefreshEnabled ? 'Auto-refresh: ON' : '⏸️ Auto-refresh: OFF'"></span>
+                    </button>
+
+                    <!-- Last Updated -->
+                    <div class="d-flex align-items-center gap-1 text-muted small" x-show="lastUpdated">
+                        <span>Last updated:</span>
+                        <span x-text="lastUpdated" class="fw-bold"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -305,6 +303,86 @@
     </div>
 @endsection
 
+@section('styles')
+<style>
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    animation: pulse 2s infinite;
+}
+
+.pulse-success {
+    background-color: #22c55e;
+}
+
+.pulse-info {
+    background-color: #3b82f6;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+    }
+}
+
+/* Card hover effects */
+.df-panel {
+    transition: all 0.2s ease;
+}
+
+.df-panel:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .derivatives-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .form-select {
+        width: 100% !important;
+    }
+}
+
+/* Code styling */
+code {
+    background: rgba(var(--bs-dark-rgb), 0.05);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.875em;
+    color: #e83e8c;
+}
+
+/* List styling */
+ul {
+    line-height: 1.6;
+}
+
+/* Badge styling */
+.badge {
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+/* Refresh button styling */
+.btn-primary:disabled {
+    opacity: 0.7;
+}
+
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+    color: white;
+}
+</style>
+@endsection
+
 @section('scripts')
     <!-- Chart.js - Load BEFORE Alpine components -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -411,12 +489,18 @@
                         const pair = `${symbol}USDT`;
                         const futuresSymbol = `${symbol}USDT`; // Use same symbol for futures
 
+                        // Calculate expiry timestamp (3 months from now for quarterly)
+                        const now = new Date();
+                        const expiryDate = new Date(now.getFullYear(), now.getMonth() + 3, 0); // End of quarter
+                        const expiryTs = expiryDate.getTime();
+
                         const params = new URLSearchParams({
                             exchange: exchange,
                             spot_pair: pair,
                             futures_symbol: futuresSymbol,
                             interval: '5m', // Use 5m interval that works
-                            limit: this.limit
+                            limit: this.limit,
+                            expiry_ts: expiryTs // Add expiry for annualized calculation
                         });
 
                         const response = await fetch(
@@ -445,8 +529,22 @@
                         this.basisRange = basisAbs.range || 0;
                         this.basisVolatility = basisAbs.std_dev || 0;
 
-                        // Calculate annualized basis if available
-                        this.annualizedBasis = this.analyticsData.basis_annualized?.current || 0;
+                        // Calculate annualized basis if available, otherwise calculate manually
+                        if (this.analyticsData.basis_annualized?.current) {
+                            this.annualizedBasis = this.analyticsData.basis_annualized.current;
+                        } else {
+                            // Manual calculation: (basis / spot_price) * (365 * 24 * 60 * 60 * 1000) / time_to_expiry
+                            const currentBasis = basisAbs.current || 0;
+                            const spotPrice = 100000; // Approximate BTC price for calculation
+                            const msPerYear = 365 * 24 * 60 * 60 * 1000;
+                            const timeToExpiry = 90 * 24 * 60 * 60 * 1000; // 90 days in ms
+                            
+                            if (currentBasis !== 0 && spotPrice > 0) {
+                                this.annualizedBasis = (currentBasis / spotPrice) * (msPerYear / timeToExpiry);
+                            } else {
+                                this.annualizedBasis = 0;
+                            }
+                        }
                     }
                 },
 

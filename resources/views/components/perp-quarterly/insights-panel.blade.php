@@ -204,7 +204,14 @@ function spreadInsightsPanel(initialSymbol = 'BTC', initialExchange = 'Binance')
                 this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
-            window.addEventListener('refresh-all', () => {
+            window.addEventListener('refresh-all', (e) => {
+                // Update parameters from global filter
+                this.symbol = e.detail?.symbol || this.symbol;
+                this.quote = e.detail?.quote || this.quote;
+                this.exchange = e.detail?.exchange || this.exchange;
+                this.interval = e.detail?.interval || this.interval;
+                this.perpSymbol = e.detail?.perpSymbol || this.perpSymbol;
+                this.limit = e.detail?.limit || this.limit;
                 this.loadData();
             });
 

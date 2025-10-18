@@ -138,24 +138,26 @@ function fundingBiasCard(initialSymbol = 'BTC') {
         async loadBiasData() {
             this.loading = true;
             try {
-                // API membutuhkan pasangan simbol penuh (contoh: BTCUSDT)
-                const pair = `${this.symbol}USDT`;
+                // Use analytics endpoint for consistent data
+                const pair = `${this.symbol}USDT`.toLowerCase();
                 const baseMeta = document.querySelector('meta[name="api-base-url"]');
                 const configuredBase = (baseMeta?.content || '').trim();
                 const base = configuredBase ? (configuredBase.endsWith('/') ? configuredBase.slice(0, -1) : configuredBase) : '';
-                const url = base ? `${base}/api/funding-rate/bias?symbol=${pair}&limit=1000&with_price=true` : `/api/funding-rate/bias?symbol=${pair}&limit=1000&with_price=true`;
+                const url = base ? `${base}/api/funding-rate/analytics?symbol=${pair}&exchange=binance&interval=1h&limit=2000` : `/api/funding-rate/analytics?symbol=${pair}&exchange=binance&interval=1h&limit=2000`;
+                
                 const response = await fetch(url);
                 const data = await response.json();
 
-                this.bias = data.bias || 'neutral';
-                this.strength = Math.abs(data.strength || 0);
-                this.avgFundingClose = parseFloat(data.avg_funding_close || 0);
-                this.sampleSize = data.n || 0;
+                // Use bias data from analytics endpoint
+                this.bias = data.bias?.direction || 'neutral';
+                this.strength = Math.abs((data.bias?.strength || 0) * 100); // Convert to percentage
+                this.avgFundingClose = parseFloat(data.summary?.average || 0);
+                this.sampleSize = data.data_points || 0;
                 this.lastUpdate = new Date().toLocaleTimeString();
 
-                console.log('✅ Bias data loaded:', data);
+                console.log('✅ Analytics data loaded:', data);
             } catch (error) {
-                console.error('❌ Error loading bias:', error);
+                console.error('❌ Error loading analytics:', error);
                 this.bias = null;
                 this.strength = 0;
                 this.avgFundingClose = 0;

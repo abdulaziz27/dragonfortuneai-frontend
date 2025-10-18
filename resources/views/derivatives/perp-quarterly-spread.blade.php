@@ -16,7 +16,7 @@
         2. /api/perp-quarterly/history - Historical spread timeseries
     --}}
 
-    <div class="d-flex flex-column h-100 gap-3" x-data="perpQuarterlySpreadController()">
+    <div class="d-flex flex-column h-100 gap-3" x-data="perpQuarterlySpreadController()" x-init="init()">
         <!-- Page Header -->
         <div class="derivatives-header">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
@@ -33,7 +33,7 @@
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                     <!-- Base Asset -->
-                    <select class="form-select" style="width: 120px;" x-model="globalSymbol" @change="updateSymbol()">
+                    <select class="form-select" style="width: 120px;" x-model="globalSymbol" @change="handleFilterChange()">
                         <option value="BTC">BTC</option>
                         <option value="ETH">ETH</option>
                         <option value="SOL">SOL</option>
@@ -46,25 +46,25 @@
                         <option value="AVAX">AVAX</option>
                     </select>
 
-                    <!-- Quote Asset -->
-                    <select class="form-select" style="width: 100px;" x-model="globalQuote" @change="updateQuote()">
+                    <!-- Quote Currency -->
+                    <select class="form-select" style="width: 100px;" x-model="globalQuote" @change="handleFilterChange()">
                         <option value="USDT">USDT</option>
                         <option value="USD">USD</option>
                         <option value="BUSD">BUSD</option>
                     </select>
 
-                    <!-- Exchange -->
-                    <select class="form-select" style="width: 140px;" x-model="globalExchange" @change="updateExchange()">
+                    <!-- Exchange Filter -->
+                    <!-- <select class="form-select" style="width: 130px;" x-model="globalExchange" @change="handleFilterChange()">
                         <option value="Binance">Binance</option>
-                        <option value="Bybit">Bybit</option>
                         <option value="OKX">OKX</option>
-                        <option value="Bitget">Bitget</option>
+                        <option value="Bybit">Bybit</option>
                         <option value="Gate.io">Gate.io</option>
+                        <option value="Bitget">Bitget</option>
                         <option value="Deribit">Deribit</option>
-                    </select>
+                    </select> -->
 
-                    <!-- Interval -->
-                    <select class="form-select" style="width: 120px;" x-model="globalInterval" @change="updateInterval()">
+                    <!-- Interval Filter -->
+                    <select class="form-select" style="width: 130px;" x-model="globalInterval" @change="handleFilterChange()">
                         <option value="5m">5 Minutes</option>
                         <option value="15m">15 Minutes</option>
                         <option value="1h">1 Hour</option>
@@ -72,33 +72,32 @@
                         <option value="1d">1 Day</option>
                     </select>
 
-                    <!-- Perp Symbol Override (Optional) -->
-                    <input type="text"
-                           class="form-control"
-                           style="width: 140px;"
-                           x-model="globalPerpSymbol"
-                           @input="updatePerpSymbol()"
-                           placeholder="BTCUSDT (auto)"
-                           title="Override perp symbol (optional)">
-
                     <!-- Data Limit -->
-                    <select class="form-select" style="width: 120px;" x-model="globalLimit" @change="updateLimit()">
-                        <option value="100">100</option>
-                        <option value="500">500</option>
-                        <option value="1000">1,000</option>
-                        <option value="2000">2,000</option>
-                        <option value="5000">5,000</option>
-                        <option value="10000">10,000</option>
+                    <select class="form-select" style="width: 140px;" x-model="globalLimit" @change="handleFilterChange()">
+                        <option value="100">100 Records</option>
+                        <option value="500">500 Records</option>
+                        <option value="1000">1,000 Records</option>
+                        <option value="2000">2,000 Records</option>
+                        <option value="5000">5,000 Records</option>
                     </select>
 
-                    <button class="btn btn-primary" style="min-width: 120px; height: 38px; color: white;" @click="refreshAll()" :disabled="globalLoading">
-                        <template x-if="!globalLoading">
-                            <span>🔄 Refresh All</span>
-                        </template>
-                        <template x-if="globalLoading">
-                            <span class="spinner-border spinner-border-sm"></span>
-                        </template>
+                    <!-- Manual Refresh Button -->
+                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
+                        <span x-show="!globalLoading">Refresh All</span>
+                        <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
                     </button>
+
+                    <!-- Auto-refresh Toggle -->
+                    <button class="btn" @click="toggleAutoRefresh()" 
+                            :class="autoRefreshEnabled ? 'btn-success' : 'btn-outline-secondary'">
+                        <span x-text="autoRefreshEnabled ? 'Auto-refresh: ON' : '⏸️ Auto-refresh: OFF'"></span>
+                    </button>
+
+                    <!-- Last Updated -->
+                    <div class="d-flex align-items-center gap-1 text-muted small" x-show="lastUpdated">
+                        <span>Last updated:</span>
+                        <span x-text="lastUpdated" class="fw-bold"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -106,7 +105,7 @@
         <!-- Analytics Card (Full Width) -->
         <div class="row g-3">
             <div class="col-12">
-                @include('components.perp-quarterly.analytics-card', ['symbol' => 'BTC', 'exchange' => 'Binance'])
+                @include('components.perp-quarterly.analytics-card', ['symbol' => 'BTC', 'exchange' => 'Binance', 'quote' => 'USDT'])
             </div>
         </div>
 
@@ -114,19 +113,19 @@
         <div class="row g-3">
             <!-- Spread History Chart -->
             <div class="col-lg-8">
-                @include('components.perp-quarterly.spread-history-chart', ['symbol' => 'BTC', 'exchange' => 'Binance', 'height' => '400px'])
+                @include('components.perp-quarterly.spread-history-chart', ['symbol' => 'BTC', 'exchange' => 'Binance', 'quote' => 'USDT', 'height' => '400px'])
             </div>
 
             <!-- Trading Insights Panel -->
             <div class="col-lg-4">
-                @include('components.perp-quarterly.insights-panel', ['symbol' => 'BTC', 'exchange' => 'Binance'])
+                @include('components.perp-quarterly.insights-panel', ['symbol' => 'BTC', 'exchange' => 'Binance', 'quote' => 'USDT'])
             </div>
         </div>
 
         <!-- Spread Data Table (Full Width) -->
         <div class="row g-3">
             <div class="col-12">
-                @include('components.perp-quarterly.spread-table', ['symbol' => 'BTC', 'exchange' => 'Binance', 'limit' => 20])
+                @include('components.perp-quarterly.spread-table', ['symbol' => 'BTC', 'exchange' => 'Binance', 'quote' => 'USDT', 'limit' => 20])
             </div>
         </div>
 
@@ -217,6 +216,9 @@
 @endsection
 
 @section('scripts')
+    <!-- Load perp-quarterly controller BEFORE Alpine processes x-data -->
+    <script src="{{ asset('js/perp-quarterly-controller.js') }}"></script>
+    
     <!-- Chart.js - Load BEFORE Alpine components -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
@@ -232,8 +234,7 @@
         });
     </script>
 
-    <!-- Load perp-quarterly controller BEFORE Alpine processes x-data -->
-    <script src="{{ asset('js/perp-quarterly-controller.js') }}"></script>
+
 
     <style>
         /* Pulse animation for live indicator */
