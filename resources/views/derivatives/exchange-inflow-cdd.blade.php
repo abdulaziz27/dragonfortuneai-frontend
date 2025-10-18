@@ -28,6 +28,18 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <!-- Exchange Selector -->
+                    <select class="form-select" style="width: 160px;" x-model="selectedExchange" @change="updateExchange()">
+                        <option value="binance">Binance</option>
+                        <option value="coinbase">Coinbase</option>
+                        <option value="kraken">Kraken</option>
+                        <option value="bitfinex">Bitfinex</option>
+                        <option value="bitstamp">Bitstamp</option>
+                        <option value="gemini">Gemini</option>
+                        <option value="huobi">Huobi</option>
+                        <option value="okex">OKEx</option>
+                    </select>
+
                     <select class="form-select" style="width: 140px;" x-model="globalPeriod" @change="updatePeriod()">
                         <option value="7d">7 Days</option>
                         <option value="30d" selected>30 Days</option>
@@ -46,8 +58,22 @@
 
         <!-- Summary Cards Row -->
         <div class="row g-3">
+            <!-- Bitcoin Price -->
+            <div class="col-md-2">
+                <div class="df-panel p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary">₿ BTC Price</span>
+                        <span class="badge text-bg-warning">Live</span>
+                    </div>
+                    <div class="h3 mb-1 text-warning" x-text="formatPrice(currentPrice)">--</div>
+                    <div class="small" :class="getPriceTrendClass(priceChange)">
+                        <span x-text="formatChange(priceChange)">--</span> 24h
+                    </div>
+                </div>
+            </div>
+
             <!-- Current CDD -->
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Current CDD</span>
@@ -55,27 +81,27 @@
                     </div>
                     <div class="h3 mb-1" x-text="formatCDD(currentCDD)">--</div>
                     <div class="small" :class="getTrendClass(cddChange)">
-                        <span x-text="formatChange(cddChange)">--</span> vs 24h ago
+                        <span x-text="formatChange(cddChange)">--</span> 24h
                     </div>
                 </div>
             </div>
 
             <!-- Average CDD -->
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Period Average</span>
+                        <span class="small text-secondary">Period Avg</span>
                         <span class="badge text-bg-info">Avg</span>
                     </div>
                     <div class="h3 mb-1" x-text="formatCDD(avgCDD)">--</div>
                     <div class="small text-secondary">
-                        Median: <span x-text="formatCDD(medianCDD)">--</span>
+                        Med: <span x-text="formatCDD(medianCDD)">--</span>
                     </div>
                 </div>
             </div>
 
             <!-- Peak CDD -->
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Peak CDD</span>
@@ -87,7 +113,7 @@
             </div>
 
             <!-- Market Signal -->
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Market Signal</span>

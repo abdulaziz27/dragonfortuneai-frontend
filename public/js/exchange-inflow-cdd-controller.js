@@ -20,9 +20,11 @@ function exchangeInflowCDDController() {
         // Global state
         globalPeriod: '30d',
         globalLoading: false,
+        selectedExchange: 'binance',
         
         // Data
         rawData: [],
+        priceData: [], // Bitcoin price data for overlay
         
         // Summary metrics
         currentCDD: 0,
@@ -31,6 +33,10 @@ function exchangeInflowCDDController() {
         medianCDD: 0,
         maxCDD: 0,
         peakDate: '--',
+        
+        // Price metrics
+        currentPrice: 0,
+        priceChange: 0,
         
         // Analysis metrics
         ma7: 0,
@@ -66,6 +72,12 @@ function exchangeInflowCDDController() {
             this.loadData();
         },
         
+        // Update exchange
+        updateExchange() {
+            console.log('🔄 Updating exchange to:', this.selectedExchange);
+            this.loadData();
+        },
+        
         // Refresh all data
         refreshAll() {
             this.globalLoading = true;
@@ -82,8 +94,8 @@ function exchangeInflowCDDController() {
                 // Calculate date range based on period
                 const { startDate, endDate } = this.getDateRange();
                 
-                // Fetch via Laravel backend proxy (to avoid CORS)
-                const url = `/api/cryptoquant/exchange-inflow-cdd?start_date=${startDate}&end_date=${endDate}`;
+                // Fetch CDD data via Laravel backend proxy (to avoid CORS)
+                const url = `/api/cryptoquant/exchange-inflow-cdd?start_date=${startDate}&end_date=${endDate}&exchange=${this.selectedExchange}`;
                 
                 const response = await fetch(url);
                 
@@ -98,7 +110,10 @@ function exchangeInflowCDDController() {
                 }
                 
                 this.rawData = data.data;
-                console.log(`✅ Loaded ${this.rawData.length} data points`);
+                console.log(`✅ Loaded ${this.rawData.length} CDD data points`);
+                
+                // Fetch Bitcoin price data for overlay
+                await this.loadPriceData(startDate, endDate);
                 
                 // Calculate metrics
                 this.calculateMetrics();
@@ -111,6 +126,50 @@ function exchangeInflowCDDController() {
             } catch (error) {
                 console.error('❌ Error loading CDD data:', error);
                 this.showError(error.message);
+            }
+        },
+        
+        // Load Bitcoin price data
+        async loadPriceData(startDate, endDate) {
+            try {
+                // Use CoinGecko API for BTC price (free, no API key needed)
+                const start = Math.floor(new Date(startDate).getTime() / 1000);
+                const end = Math.floor(new Date(endDate).getTime() / 1000);
+                
+                const url = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=usd&from=${start}&to=${end}`;
+                
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    console.warn('⚠️ Failed to fetch price data, chart will show CDD only');
+                    this.priceData = [];
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                if (data.prices && Array.isArray(data.prices)) {
+                    // Transform to our format
+                    this.priceData = data.prices.map(([timestamp, price]) => ({
+                        date: new Date(timestamp).toISOString().split('T')[0],
+                        price: price
+                    }));
+                    
+                    console.log(`✅ Loaded ${this.priceData.length} price data points`);
+                    
+                    // Calculate current price and change
+                    if (this.priceData.length > 0) {
+                        this.currentPrice = this.priceData[this.priceData.length - 1].price;
+                        const yesterdayPrice = this.priceData[this.priceData.length - 2]?.price || this.currentPrice;
+                        this.priceChange = ((this.currentPrice - yesterdayPrice) / yesterdayPrice) * 100;
+                    }
+                } else {
+                    this.priceData = [];
+                }
+                
+            } catch (error) {
+                console.warn('⚠️ Error loading price data:', error);
+                this.priceData = [];
             }
         },
         
@@ -186,7 +245,7 @@ function exchangeInflowCDDController() {
             }
         },
         
-        // Render main chart (TradingView style)
+        // Render main chart (CryptoQuant style with price overlay)
         renderChart() {
             const canvas = document.getElementById('cddMainChart');
             if (!canvas) return;
@@ -198,7 +257,7 @@ function exchangeInflowCDDController() {
                 this.mainChart.destroy();
             }
             
-            // Prepare data
+            // Prepare CDD data
             const sorted = [...this.rawData].sort((a, b) => 
                 new Date(a.date) - new Date(b.date)
             );
@@ -209,32 +268,79 @@ function exchangeInflowCDDController() {
             // Calculate threshold for coloring (above/below average)
             const avgValue = this.avgCDD;
             
-            // Create gradient
-            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
-            gradient.addColorStop(1, 'rgba(59, 130, 246, 0.05)');
+            // Prepare price data (align with CDD dates)
+            const priceMap = new Map(this.priceData.map(p => [p.date, p.price]));
+            const alignedPrices = labels.map(date => priceMap.get(date) || null);
             
-            // Create chart with TradingView-like styling
+            // Determine bar colors (green if below avg, red if above avg - like CryptoQuant)
+            const barColors = values.map(v => 
+                v > avgValue ? 'rgba(239, 68, 68, 0.7)' : 'rgba(34, 197, 94, 0.7)'
+            );
+            
+            // Build datasets
+            const datasets = [];
+            
+            // Dataset 1: CDD bars
+            if (this.chartType === 'bar') {
+                datasets.push({
+                    label: 'Exchange Inflow CDD',
+                    data: values,
+                    backgroundColor: barColors,
+                    borderColor: barColors.map(c => c.replace('0.7', '1')),
+                    borderWidth: 1,
+                    yAxisID: 'y',
+                    order: 2
+                });
+            } else {
+                // Line chart with area fill
+                const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                gradient.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
+                gradient.addColorStop(1, 'rgba(59, 130, 246, 0.05)');
+                
+                datasets.push({
+                    label: 'Exchange Inflow CDD',
+                    data: values,
+                    borderColor: '#3b82f6',
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.1,
+                    pointRadius: 0,
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#3b82f6',
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 2,
+                    yAxisID: 'y',
+                    order: 2
+                });
+            }
+            
+            // Dataset 2: Bitcoin Price overlay (if available)
+            if (this.priceData.length > 0) {
+                datasets.push({
+                    label: 'BTC Price',
+                    data: alignedPrices,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    type: 'line',
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    pointHoverBackgroundColor: '#f59e0b',
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 2,
+                    yAxisID: 'y1',
+                    order: 1
+                });
+            }
+            
+            // Create chart with dual Y-axis (CryptoQuant style)
             this.mainChart = new Chart(ctx, {
                 type: this.chartType,
                 data: {
                     labels: labels,
-                    datasets: [{
-                        label: 'Exchange Inflow CDD',
-                        data: values,
-                        borderColor: '#3b82f6',
-                        backgroundColor: this.chartType === 'bar' 
-                            ? values.map(v => v > avgValue ? 'rgba(239, 68, 68, 0.6)' : 'rgba(34, 197, 94, 0.6)')
-                            : gradient,
-                        borderWidth: 2,
-                        fill: this.chartType === 'line',
-                        tension: 0.1,
-                        pointRadius: 0,
-                        pointHoverRadius: 6,
-                        pointHoverBackgroundColor: '#3b82f6',
-                        pointHoverBorderColor: '#fff',
-                        pointHoverBorderWidth: 2
-                    }]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
@@ -244,7 +350,19 @@ function exchangeInflowCDDController() {
                         intersect: false
                     },
                     plugins: {
-                        legend: { display: false },
+                        legend: {
+                            display: this.priceData.length > 0,
+                            position: 'top',
+                            align: 'end',
+                            labels: {
+                                color: '#64748b',
+                                font: { size: 11, weight: '500' },
+                                boxWidth: 12,
+                                boxHeight: 12,
+                                padding: 10,
+                                usePointStyle: true
+                            }
+                        },
                         tooltip: {
                             backgroundColor: 'rgba(17, 24, 39, 0.95)',
                             titleColor: '#f3f4f6',
@@ -252,23 +370,33 @@ function exchangeInflowCDDController() {
                             borderColor: 'rgba(59, 130, 246, 0.5)',
                             borderWidth: 1,
                             padding: 12,
-                            displayColors: false,
+                            displayColors: true,
+                            boxWidth: 8,
+                            boxHeight: 8,
                             callbacks: {
                                 title: (items) => {
                                     const date = new Date(items[0].label);
                                     return date.toLocaleDateString('en-US', { 
+                                        weekday: 'short',
                                         year: 'numeric', 
                                         month: 'short', 
                                         day: 'numeric' 
                                     });
                                 },
                                 label: (context) => {
+                                    const datasetLabel = context.dataset.label;
                                     const value = context.parsed.y;
-                                    const vsAvg = ((value - avgValue) / avgValue * 100).toFixed(1);
-                                    return [
-                                        `CDD: ${this.formatCDD(value)}`,
-                                        `vs Avg: ${vsAvg > 0 ? '+' : ''}${vsAvg}%`
-                                    ];
+                                    
+                                    if (datasetLabel === 'BTC Price') {
+                                        return `  ${datasetLabel}: $${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+                                    } else {
+                                        const vsAvg = ((value - avgValue) / avgValue * 100).toFixed(1);
+                                        const trend = value > avgValue ? '🔴 Above Avg' : '🟢 Below Avg';
+                                        return [
+                                            `  ${datasetLabel}: ${this.formatCDD(value)}`,
+                                            `  ${trend} (${vsAvg > 0 ? '+' : ''}${vsAvg}%)`
+                                        ];
+                                    }
                                 }
                             }
                         }
@@ -278,12 +406,12 @@ function exchangeInflowCDDController() {
                             ticks: { 
                                 color: '#94a3b8',
                                 font: { size: 11 },
-                                maxRotation: 45,
-                                minRotation: 45,
+                                maxRotation: 0,
+                                minRotation: 0,
                                 callback: function(value, index) {
                                     // Show every Nth label to avoid crowding
                                     const totalLabels = this.chart.data.labels.length;
-                                    const showEvery = Math.ceil(totalLabels / 10);
+                                    const showEvery = Math.max(1, Math.ceil(totalLabels / 12));
                                     if (index % showEvery === 0) {
                                         const date = this.chart.data.labels[index];
                                         return new Date(date).toLocaleDateString('en-US', { 
@@ -296,19 +424,46 @@ function exchangeInflowCDDController() {
                             },
                             grid: { 
                                 display: true,
-                                color: 'rgba(148, 163, 184, 0.05)',
+                                color: 'rgba(148, 163, 184, 0.08)',
                                 drawBorder: false
                             }
                         },
                         y: {
-                            position: 'right',
+                            type: 'linear',
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'CDD',
+                                color: '#3b82f6',
+                                font: { size: 11, weight: '600' }
+                            },
                             ticks: {
-                                color: '#94a3b8',
+                                color: '#3b82f6',
                                 font: { size: 11 },
                                 callback: (value) => this.formatCDD(value)
                             },
                             grid: { 
                                 color: 'rgba(148, 163, 184, 0.08)',
+                                drawBorder: false
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            display: this.priceData.length > 0,
+                            title: {
+                                display: true,
+                                text: 'BTC Price (USD)',
+                                color: '#f59e0b',
+                                font: { size: 11, weight: '600' }
+                            },
+                            ticks: {
+                                color: '#f59e0b',
+                                font: { size: 11 },
+                                callback: (value) => '$' + value.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                            },
+                            grid: { 
+                                display: false,
                                 drawBorder: false
                             }
                         }
@@ -579,6 +734,16 @@ function exchangeInflowCDDController() {
             return num.toFixed(2);
         },
         
+        // Utility: Format price
+        formatPrice(value) {
+            if (value === null || value === undefined || isNaN(value)) return 'N/A';
+            const num = parseFloat(value);
+            return '$' + num.toLocaleString('en-US', { 
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0 
+            });
+        },
+        
         // Utility: Format change percentage
         formatChange(value) {
             if (value === null || value === undefined || isNaN(value)) return 'N/A';
@@ -596,10 +761,17 @@ function exchangeInflowCDDController() {
             });
         },
         
-        // Utility: Get trend class
+        // Utility: Get trend class (for CDD - higher is bearish)
         getTrendClass(value) {
             if (value > 0) return 'text-danger';
             if (value < 0) return 'text-success';
+            return 'text-secondary';
+        },
+        
+        // Utility: Get price trend class (for price - higher is bullish)
+        getPriceTrendClass(value) {
+            if (value > 0) return 'text-success';
+            if (value < 0) return 'text-danger';
             return 'text-secondary';
         },
         
