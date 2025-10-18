@@ -94,8 +94,8 @@ function exchangeInflowCDDController() {
                 // Calculate date range based on period
                 const { startDate, endDate } = this.getDateRange();
                 
-                // Fetch CDD data DIRECTLY from Laravel (bypass Flask)
-                const url = `${window.location.origin}/api/cryptoquant/exchange-inflow-cdd?start_date=${startDate}&end_date=${endDate}&exchange=${this.selectedExchange}`;
+                // Fetch CDD data DIRECTLY from Laravel (using /cryptoquant-api to bypass Flask proxy)
+                const url = `${window.location.origin}/cryptoquant-api/exchange-inflow-cdd?start_date=${startDate}&end_date=${endDate}&exchange=${this.selectedExchange}`;
                 
                 const response = await fetch(url);
                 
