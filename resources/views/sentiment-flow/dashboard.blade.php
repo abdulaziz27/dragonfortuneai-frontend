@@ -19,7 +19,7 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <h1 class="mb-0">Sentiment & Flow Analysis</h1>
+                        <h1 class="mb-0">Sentiment & Flow Analysis BTC</h1>
                         <span class="pulse-dot pulse-info"></span>
                     </div>
                     <p class="mb-0 text-secondary">
@@ -29,7 +29,7 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <select class="form-select" style="width: 120px;" x-model="selectedAsset" @change="refreshAll()">
+                    <!-- <select class="form-select" style="width: 120px;" x-model="selectedAsset" @change="refreshAll()">
                         <option value="BTC">Bitcoin</option>
                         <option value="ETH">Ethereum</option>
                         <option value="CRYPTO">All Crypto</option>
@@ -38,7 +38,7 @@
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
                         <span x-show="!loading">Refresh All</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-                    </button>
+                    </button> -->
                 </div>
             </div>
         </div>
