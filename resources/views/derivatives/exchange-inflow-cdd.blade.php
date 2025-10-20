@@ -40,13 +40,7 @@
                         <option value="okex">OKEx</option>
                     </select>
 
-                    <select class="form-select" style="width: 140px;" x-model="globalPeriod" @change="updatePeriod()">
-                        <option value="7d">7 Days</option>
-                        <option value="30d" selected>30 Days</option>
-                        <option value="90d">90 Days</option>
-                        <option value="180d">6 Months</option>
-                        <option value="1y">1 Year</option>
-                    </select>
+
 
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
                         <span x-show="!globalLoading">🔄 Refresh</span>
@@ -58,14 +52,14 @@
 
         <!-- Summary Cards Row -->
         <div class="row g-3">
-            <!-- Bitcoin Price -->
+            <!-- Bitcoin Price USD -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">₿ BTC Price</span>
+                        <span class="small text-secondary">₿ BTC/USD</span>
                         <span class="badge text-bg-warning">Live</span>
                     </div>
-                    <div class="h3 mb-1 text-warning" x-text="formatPrice(currentPrice)">--</div>
+                    <div class="h3 mb-1 text-warning" x-text="formatPriceUSD(currentPrice)">--</div>
                     <div class="small" :class="getPriceTrendClass(priceChange)">
                         <span x-text="formatChange(priceChange)">--</span> 24h
                     </div>
@@ -138,7 +132,20 @@
                             </div>
                         </div>
                         <div class="chart-controls">
-                            <div class="btn-group btn-group-sm" role="group">
+                            <!-- Time Range Buttons -->
+                            <div class="time-range-selector me-3">
+                                <template x-for="range in timeRanges" :key="range.value">
+                                    <button type="button" 
+                                            class="btn btn-sm time-range-btn"
+                                            :class="globalPeriod === range.value ? 'btn-primary' : 'btn-outline-secondary'"
+                                            @click="setTimeRange(range.value)"
+                                            x-text="range.label">
+                                    </button>
+                                </template>
+                            </div>
+
+                            <!-- Chart Type Toggle -->
+                            <div class="btn-group btn-group-sm me-3" role="group">
                                 <button type="button" class="btn" :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" @click="chartType = 'line'; renderChart()">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                         <path d="M2 12l3-3 3 3 6-6"/>
@@ -152,6 +159,93 @@
                                     </svg>
                                 </button>
                             </div>
+
+                            <!-- Interval Dropdown -->
+                            <div class="dropdown me-3">
+                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle interval-dropdown-btn" 
+                                        type="button" 
+                                        data-bs-toggle="dropdown" 
+                                        :title="'Chart Interval: ' + (chartIntervals.find(i => i.value === selectedInterval)?.label || '1D')">
+                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1">
+                                        <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
+                                        <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
+                                    </svg>
+                                    <span x-text="chartIntervals.find(i => i.value === selectedInterval)?.label || '1D'"></span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-dark">
+                                    <template x-for="interval in chartIntervals" :key="interval.value">
+                                        <li>
+                                            <a class="dropdown-item" 
+                                               href="#" 
+                                               @click.prevent="setChartInterval(interval.value)"
+                                               :class="selectedInterval === interval.value ? 'active' : ''"
+                                               x-text="interval.label">
+                                            </a>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </div>
+
+                            <!-- Scale Toggle -->
+                            <div class="btn-group btn-group-sm me-3" role="group">
+                                <button type="button" 
+                                        class="btn scale-toggle-btn"
+                                        :class="scaleType === 'linear' ? 'btn-primary' : 'btn-outline-secondary'"
+                                        @click="toggleScale('linear')"
+                                        title="Linear Scale - Equal intervals, good for absolute changes">
+                                    Linear
+                                </button>
+                                <button type="button" 
+                                        class="btn scale-toggle-btn"
+                                        :class="scaleType === 'logarithmic' ? 'btn-primary' : 'btn-outline-secondary'"
+                                        @click="toggleScale('logarithmic')"
+                                        title="Logarithmic Scale - Exponential intervals, good for percentage changes">
+                                    Log
+                                </button>
+                            </div>
+
+                            <!-- Chart Tools -->
+                            <div class="btn-group btn-group-sm chart-tools" role="group">
+                                <button type="button" class="btn btn-outline-secondary chart-tool-btn" @click="resetZoom()" title="Reset Zoom">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                                        <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                                    </svg>
+                                </button>
+                                
+                                <!-- Export Dropdown -->
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn btn-outline-secondary dropdown-toggle chart-tool-btn" data-bs-toggle="dropdown" title="Export Chart">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                            <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                                        </svg>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-dark">
+                                        <li><a class="dropdown-item" href="#" @click.prevent="exportChart('png')">
+                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-2">
+                                                <path d="M4.502 9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM4 10.5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0z"/>
+                                                <path d="M14 2H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zM2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2H2z"/>
+                                                <path d="M10.648 7.646a.5.5 0 0 1 .577-.093L15.002 9.5V13h-14v-1l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71z"/>
+                                            </svg>
+                                            Export as PNG
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" @click.prevent="exportChart('svg')">
+                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-2">
+                                                <path d="M8.5 2a.5.5 0 0 0-1 0v5.793L5.354 5.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 7.793V2z"/>
+                                                <path d="M3 9.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5z"/>
+                                            </svg>
+                                            Export as SVG
+                                        </a></li>
+                                    </ul>
+                                </div>
+                                
+                                <button type="button" class="btn btn-outline-secondary chart-tool-btn" @click="shareChart()" title="Share Chart">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.499 2.499 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5z"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div class="chart-body">
@@ -159,7 +253,7 @@
                     </div>
                     <div class="chart-footer">
                         <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">
+                            <small class="chart-footer-text">
                                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="margin-right: 4px;">
                                     <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1"/>
                                     <path d="M6 3v3l2 2" stroke="currentColor" stroke-width="1" fill="none"/>
@@ -283,9 +377,10 @@
 @endsection
 
 @section('scripts')
-    <!-- Chart.js with Date Adapter -->
+    <!-- Chart.js with Date Adapter and Plugins -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 
     <!-- Wait for Chart.js to load -->
     <script>
@@ -438,6 +533,371 @@
             border-color: rgba(59, 130, 246, 0.3);
         }
 
+        /* Professional Time Range Controls */
+        .time-range-selector {
+            display: flex;
+            gap: 0.125rem;
+            background: linear-gradient(135deg, 
+                rgba(30, 41, 59, 0.8) 0%, 
+                rgba(51, 65, 85, 0.8) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 8px;
+            padding: 0.25rem;
+            box-shadow: 
+                0 4px 12px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .time-range-btn {
+            padding: 0.5rem 0.875rem !important;
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
+            border: none !important;
+            border-radius: 6px !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            min-width: 44px;
+            position: relative;
+            overflow: hidden;
+            color: #94a3b8 !important;
+            background: transparent !important;
+        }
+
+        .time-range-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, 
+                rgba(59, 130, 246, 0.1) 0%, 
+                rgba(139, 92, 246, 0.1) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .time-range-btn:hover {
+            color: #e2e8f0 !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.2) !important;
+        }
+
+        .time-range-btn:hover::before {
+            opacity: 1;
+        }
+
+        .time-range-btn.btn-primary {
+            background: linear-gradient(135deg, 
+                #3b82f6 0%, 
+                #2563eb 100%) !important;
+            color: white !important;
+            box-shadow: 
+                0 4px 12px rgba(59, 130, 246, 0.4),
+                0 2px 4px rgba(59, 130, 246, 0.3) !important;
+            transform: translateY(-1px);
+        }
+
+        .time-range-btn.btn-primary::before {
+            background: linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.1) 0%, 
+                rgba(255, 255, 255, 0.05) 100%);
+            opacity: 1;
+        }
+
+        .time-range-btn.btn-primary:hover {
+            box-shadow: 
+                0 6px 16px rgba(59, 130, 246, 0.5),
+                0 3px 6px rgba(59, 130, 246, 0.4) !important;
+            transform: translateY(-2px);
+        }
+
+        .scale-toggle-btn {
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
+            padding: 0.375rem 0.75rem !important;
+            min-width: 50px;
+        }
+
+        .chart-controls {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .chart-controls .btn-group {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            padding: 2px;
+        }
+
+        .chart-controls .btn-outline-secondary {
+            border-color: rgba(148, 163, 184, 0.3) !important;
+            color: #94a3b8 !important;
+        }
+
+        .chart-controls .btn-outline-secondary:hover {
+            background: rgba(59, 130, 246, 0.1) !important;
+            border-color: rgba(59, 130, 246, 0.4) !important;
+            color: #3b82f6 !important;
+        }
+
+        /* Enhanced Chart Tools */
+        .chart-tools {
+            background: linear-gradient(135deg, 
+                rgba(30, 41, 59, 0.6) 0%, 
+                rgba(51, 65, 85, 0.6) 100%);
+            border-radius: 8px;
+            padding: 0.25rem;
+            border: 1px solid rgba(59, 130, 246, 0.15);
+        }
+
+        .chart-tool-btn {
+            border: none !important;
+            background: transparent !important;
+            color: #94a3b8 !important;
+            padding: 0.5rem 0.75rem !important;
+            border-radius: 6px !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-tool-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, 
+                rgba(59, 130, 246, 0.1) 0%, 
+                rgba(139, 92, 246, 0.1) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .chart-tool-btn:hover {
+            color: #e2e8f0 !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.2) !important;
+        }
+
+        .chart-tool-btn:hover::before {
+            opacity: 1;
+        }
+
+        .chart-tool-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
+        }
+
+        /* Dropdown Menu Styling */
+        .dropdown-menu-dark {
+            background: linear-gradient(135deg, 
+                rgba(15, 23, 42, 0.95) 0%, 
+                rgba(30, 41, 59, 0.95) 100%) !important;
+            border: 1px solid rgba(59, 130, 246, 0.2) !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+            backdrop-filter: blur(12px);
+        }
+
+        .dropdown-menu-dark .dropdown-item {
+            color: #e2e8f0 !important;
+            transition: all 0.2s ease !important;
+            border-radius: 4px !important;
+            margin: 0.125rem !important;
+        }
+
+        .dropdown-menu-dark .dropdown-item:hover {
+            background: rgba(59, 130, 246, 0.15) !important;
+            color: #60a5fa !important;
+        }
+
+        /* Professional Chart Container - CryptoQuant Level */
+        .tradingview-chart-container {
+            background: linear-gradient(135deg, 
+                rgba(15, 23, 42, 0.98) 0%, 
+                rgba(30, 41, 59, 0.98) 50%,
+                rgba(15, 23, 42, 0.98) 100%);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            box-shadow: 
+                0 10px 40px rgba(0, 0, 0, 0.4),
+                0 4px 16px rgba(59, 130, 246, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tradingview-chart-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(59, 130, 246, 0.5) 50%, 
+                transparent 100%);
+            z-index: 1;
+        }
+
+        .tradingview-chart-container:hover {
+            box-shadow: 
+                0 16px 48px rgba(0, 0, 0, 0.5),
+                0 6px 20px rgba(59, 130, 246, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            border-color: rgba(59, 130, 246, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .chart-header {
+            background: linear-gradient(135deg, 
+                rgba(59, 130, 246, 0.08) 0%, 
+                rgba(139, 92, 246, 0.06) 100%);
+            border-bottom: 1px solid rgba(59, 130, 246, 0.25);
+            position: relative;
+            z-index: 2;
+        }
+
+        .chart-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(59, 130, 246, 0.3) 50%, 
+                transparent 100%);
+        }
+
+        .chart-header h5 {
+            color: #f1f5f9;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+            font-weight: 600;
+            letter-spacing: 0.025em;
+        }
+
+        .current-value {
+            color: #60a5fa;
+            text-shadow: 0 0 12px rgba(96, 165, 250, 0.4);
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        .chart-body {
+            background: linear-gradient(135deg, 
+                rgba(15, 23, 42, 0.9) 0%, 
+                rgba(30, 41, 59, 0.85) 50%,
+                rgba(15, 23, 42, 0.9) 100%);
+            position: relative;
+        }
+
+        .chart-body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 50% 50%, 
+                rgba(59, 130, 246, 0.03) 0%, 
+                transparent 70%);
+            pointer-events: none;
+        }
+
+        .chart-footer {
+            background: linear-gradient(135deg, 
+                rgba(59, 130, 246, 0.04) 0%, 
+                rgba(139, 92, 246, 0.03) 100%);
+            border-top: 1px solid rgba(59, 130, 246, 0.2);
+            position: relative;
+        }
+
+        .chart-footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(59, 130, 246, 0.2) 50%, 
+                transparent 100%);
+        }
+
+        /* Professional Animations */
+        @keyframes chartLoad {
+            0% {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+            }
+        }
+
+        .tradingview-chart-container {
+            animation: chartLoad 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .pulse-dot.pulse-success {
+            animation: pulse 2s ease-in-out infinite, pulseGlow 2s ease-in-out infinite;
+        }
+
+        /* Loading States */
+        .chart-loading {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(59, 130, 246, 0.1) 50%, 
+                transparent 100%);
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        /* Enhanced Hover Effects */
+        .df-panel {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .df-panel:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 
+                0 12px 32px rgba(59, 130, 246, 0.2),
+                0 4px 16px rgba(59, 130, 246, 0.1);
+        }
+
         /* Responsive adjustments */
         @media (max-width: 768px) {
             .derivatives-header h1 {
@@ -457,6 +917,173 @@
             
             .current-value {
                 font-size: 16px;
+            }
+
+            .chart-controls {
+                flex-direction: column;
+                align-items: stretch;
+                width: 100%;
+                gap: 0.75rem;
+            }
+
+            .time-range-selector {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+
+            .time-range-btn {
+                flex: 1;
+                min-width: 35px;
+            }
+
+            .chart-tools {
+                justify-content: center;
+            }
+
+            .df-panel:hover {
+                transform: translateY(-2px) scale(1.01);
+            }
+        }
+
+        /* Light Mode Support */
+        .chart-footer-text {
+            color: var(--bs-body-color, #6c757d);
+            transition: color 0.3s ease;
+        }
+
+        /* Light mode chart styling */
+        @media (prefers-color-scheme: light) {
+            .tradingview-chart-container {
+                background: linear-gradient(135deg, 
+                    rgba(248, 250, 252, 0.98) 0%, 
+                    rgba(241, 245, 249, 0.98) 50%,
+                    rgba(248, 250, 252, 0.98) 100%);
+                border: 1px solid rgba(59, 130, 246, 0.2);
+                box-shadow: 
+                    0 10px 40px rgba(0, 0, 0, 0.1),
+                    0 4px 16px rgba(59, 130, 246, 0.05),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            }
+
+            .chart-header {
+                background: linear-gradient(135deg, 
+                    rgba(59, 130, 246, 0.05) 0%, 
+                    rgba(139, 92, 246, 0.03) 100%);
+                border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+            }
+
+            .chart-header h5 {
+                color: #1e293b;
+                text-shadow: none;
+            }
+
+            .current-value {
+                color: #2563eb;
+                text-shadow: none;
+            }
+
+            .chart-body {
+                background: linear-gradient(135deg, 
+                    rgba(248, 250, 252, 0.9) 0%, 
+                    rgba(241, 245, 249, 0.85) 50%,
+                    rgba(248, 250, 252, 0.9) 100%);
+            }
+
+            .chart-footer {
+                background: linear-gradient(135deg, 
+                    rgba(59, 130, 246, 0.03) 0%, 
+                    rgba(139, 92, 246, 0.02) 100%);
+                border-top: 1px solid rgba(59, 130, 246, 0.15);
+            }
+
+            .chart-footer-text {
+                color: #64748b !important;
+            }
+
+            .time-range-selector {
+                background: linear-gradient(135deg, 
+                    rgba(241, 245, 249, 0.8) 0%, 
+                    rgba(226, 232, 240, 0.8) 100%);
+                border: 1px solid rgba(59, 130, 246, 0.15);
+            }
+
+            .time-range-btn {
+                color: #64748b !important;
+            }
+
+            .time-range-btn:hover {
+                color: #1e293b !important;
+            }
+
+            .chart-tools {
+                background: linear-gradient(135deg, 
+                    rgba(241, 245, 249, 0.6) 0%, 
+                    rgba(226, 232, 240, 0.6) 100%);
+                border: 1px solid rgba(59, 130, 246, 0.1);
+            }
+
+            .chart-tool-btn {
+                color: #64748b !important;
+            }
+
+            .chart-tool-btn:hover {
+                color: #1e293b !important;
+            }
+        }
+
+        /* Dark mode enhancements */
+        @media (prefers-color-scheme: dark) {
+            .tradingview-chart-container {
+                box-shadow: 
+                    0 12px 48px rgba(0, 0, 0, 0.6),
+                    0 4px 16px rgba(59, 130, 246, 0.1),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            }
+
+            .chart-footer-text {
+                color: #94a3b8 !important;
+            }
+        }
+
+        /* Interval Dropdown Styling */
+        .interval-dropdown-btn {
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
+            padding: 0.5rem 0.75rem !important;
+            min-width: 70px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            border: 1px solid rgba(59, 130, 246, 0.2) !important;
+            background: linear-gradient(135deg, 
+                rgba(30, 41, 59, 0.6) 0%, 
+                rgba(51, 65, 85, 0.6) 100%) !important;
+            color: #94a3b8 !important;
+        }
+
+        .interval-dropdown-btn:hover {
+            color: #e2e8f0 !important;
+            border-color: rgba(59, 130, 246, 0.4) !important;
+            background: linear-gradient(135deg, 
+                rgba(59, 130, 246, 0.1) 0%, 
+                rgba(139, 92, 246, 0.1) 100%) !important;
+        }
+
+        .interval-dropdown-btn:focus {
+            box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25) !important;
+        }
+
+        /* Light mode interval dropdown */
+        @media (prefers-color-scheme: light) {
+            .interval-dropdown-btn {
+                background: linear-gradient(135deg, 
+                    rgba(241, 245, 249, 0.8) 0%, 
+                    rgba(226, 232, 240, 0.8) 100%) !important;
+                border: 1px solid rgba(59, 130, 246, 0.15) !important;
+                color: #64748b !important;
+            }
+
+            .interval-dropdown-btn:hover {
+                color: #1e293b !important;
+                border-color: rgba(59, 130, 246, 0.3) !important;
             }
         }
     </style>

@@ -12,6 +12,146 @@ class CryptoQuantController extends Controller
     private $baseUrl = 'https://api.cryptoquant.com/v1';
 
     /**
+     * Get Bitcoin Market Price from CryptoQuant API
+     */
+    public function getBitcoinPrice(Request $request)
+    {
+        try {
+            $startDate = $request->input('start_date', now()->subDays(30)->format('Y-m-d'));
+            $endDate = $request->input('end_date', now()->format('Y-m-d'));
+            
+            // Add buffer to get more recent data (extend end date by 1 day)
+            $endDateWithBuffer = \Carbon\Carbon::parse($endDate)->addDay()->format('Y-m-d');
+            
+            // Convert date format from YYYY-MM-DD to YYYYMMDD for CryptoQuant API
+            $fromDate = str_replace('-', '', $startDate);
+            $toDate = str_replace('-', '', $endDateWithBuffer);
+            
+            // Calculate limit based on date range with buffer
+            $start = \Carbon\Carbon::parse($startDate);
+            $end = \Carbon\Carbon::parse($endDateWithBuffer);
+            $daysDiff = $start->diffInDays($end) + 1;
+            $limit = max($daysDiff + 5, 100); // Add 5 extra days buffer
+            
+            // Try multiple CryptoQuant price endpoints
+            $endpoints = [
+                // Market price USD
+                [
+                    'url' => "{$this->baseUrl}/btc/market-data/price-ohlcv",
+                    'params' => [
+                        'window' => 'day',
+                        'market' => 'spot',
+                        'exchange' => 'all_exchange',
+                        'symbol' => 'btc_usd',
+                        'from' => $fromDate,
+                        'to' => $toDate,
+                        'limit' => $limit
+                    ]
+                ],
+                // Alternative: realized price
+                [
+                    'url' => "{$this->baseUrl}/btc/market-indicator/realized-price",
+                    'params' => [
+                        'window' => 'day',
+                        'from' => $fromDate,
+                        'to' => $toDate,
+                        'limit' => $limit
+                    ]
+                ]
+            ];
+            
+            foreach ($endpoints as $endpoint) {
+                Log::info('Trying CryptoQuant Bitcoin Price', [
+                    'url' => $endpoint['url'],
+                    'params' => $endpoint['params']
+                ]);
+                
+                $response = Http::timeout(30)->withHeaders([
+                    'Authorization' => "Bearer {$this->apiKey}",
+                    'Accept' => 'application/json',
+                ])->get($endpoint['url'], $endpoint['params']);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    
+                    Log::info('CryptoQuant Bitcoin Price Success', [
+                        'endpoint' => $endpoint['url'],
+                        'data_count' => isset($data['result']['data']) ? count($data['result']['data']) : 0
+                    ]);
+                    
+                    $transformedData = [];
+                    if (isset($data['result']['data']) && is_array($data['result']['data'])) {
+                        $startTimestamp = strtotime($startDate);
+                        $endTimestamp = strtotime($endDate);
+                        
+                        foreach ($data['result']['data'] as $item) {
+                            $itemDate = $item['date'] ?? null;
+                            if ($itemDate) {
+                                $itemTimestamp = strtotime($itemDate);
+                                if ($itemTimestamp >= $startTimestamp && $itemTimestamp <= $endTimestamp) {
+                                    // Handle different data structures
+                                    $price = $item['close'] ?? $item['value'] ?? $item['price'] ?? 0;
+                                    
+                                    $transformedData[] = [
+                                        'date' => $itemDate,
+                                        'value' => $price,
+                                        'close' => $item['close'] ?? $price,
+                                        'open' => $item['open'] ?? $price,
+                                        'high' => $item['high'] ?? $price,
+                                        'low' => $item['low'] ?? $price,
+                                        'volume' => $item['volume'] ?? 0
+                                    ];
+                                }
+                            }
+                        }
+                        
+                        // Sort by date ascending
+                        usort($transformedData, function($a, $b) {
+                            return strtotime($a['date']) - strtotime($b['date']);
+                        });
+                    }
+                    
+                    if (!empty($transformedData)) {
+                        return response()->json([
+                            'success' => true,
+                            'data' => $transformedData,
+                            'meta' => [
+                                'start_date' => $startDate,
+                                'end_date' => $endDate,
+                                'count' => count($transformedData),
+                                'source' => 'CryptoQuant Bitcoin Price',
+                                'endpoint' => $endpoint['url']
+                            ]
+                        ]);
+                    }
+                }
+                
+                Log::warning('CryptoQuant Bitcoin Price endpoint failed', [
+                    'url' => $endpoint['url'],
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
+            }
+            
+            // All endpoints failed
+            return response()->json([
+                'success' => false,
+                'error' => 'All CryptoQuant Bitcoin price endpoints failed',
+                'message' => 'Unable to fetch Bitcoin price data'
+            ], 503);
+
+        } catch (\Exception $e) {
+            Log::error('CryptoQuant Bitcoin Price Exception: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'error' => 'Internal server error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Get Exchange Inflow CDD data from CryptoQuant API
      */
     public function getExchangeInflowCDD(Request $request)
@@ -20,23 +160,29 @@ class CryptoQuantController extends Controller
             $startDate = $request->input('start_date', now()->subDays(30)->format('Y-m-d'));
             $endDate = $request->input('end_date', now()->format('Y-m-d'));
             
+            // Add buffer to get more recent data (extend end date by 1 day)
+            $endDateWithBuffer = \Carbon\Carbon::parse($endDate)->addDay()->format('Y-m-d');
+            
             // Convert date format from YYYY-MM-DD to YYYYMMDD for CryptoQuant API
             $fromDate = str_replace('-', '', $startDate);
+            $toDate = str_replace('-', '', $endDateWithBuffer);
             
-            // Calculate limit based on date range (days between start and end)
+            // Calculate limit based on date range with buffer
             $start = \Carbon\Carbon::parse($startDate);
-            $end = \Carbon\Carbon::parse($endDate);
+            $end = \Carbon\Carbon::parse($endDateWithBuffer);
             $daysDiff = $start->diffInDays($end) + 1;
-            $limit = max($daysDiff, 100); // At least 100, or the number of days
+            $limit = max($daysDiff + 5, 100); // Add 5 extra days buffer
             
             $url = "{$this->baseUrl}/btc/flow-indicator/exchange-inflow-cdd";
             
-            Log::info('CryptoQuant Request', [
+            Log::info('CryptoQuant CDD Request', [
                 'url' => $url,
                 'from' => $fromDate,
+                'to' => $toDate,
                 'limit' => $limit,
                 'original_start' => $startDate,
-                'original_end' => $endDate
+                'original_end' => $endDate,
+                'buffer_added' => true
             ]);
             
             // Get exchange parameter from request, default to 'binance'
@@ -49,6 +195,7 @@ class CryptoQuantController extends Controller
                 'exchange' => $exchange,
                 'window' => 'day',
                 'from' => $fromDate,
+                'to' => $toDate,
                 'limit' => $limit
             ]);
 
@@ -92,8 +239,12 @@ class CryptoQuantController extends Controller
                     'meta' => [
                         'start_date' => $startDate,
                         'end_date' => $endDate,
+                        'requested_end' => $endDate,
+                        'buffer_end' => $endDateWithBuffer,
                         'count' => count($transformedData),
-                        'source' => 'CryptoQuant API'
+                        'source' => 'CryptoQuant API',
+                        'latest_data_date' => !empty($transformedData) ? end($transformedData)['date'] : null,
+                        'data_freshness' => 'Enhanced with buffer for latest data'
                     ]
                 ]);
             }
