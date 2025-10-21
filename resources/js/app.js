@@ -5,10 +5,40 @@ import jQuery from "jquery";
 window.$ = window.jQuery = jQuery;
 
 import Alpine from "alpinejs";
-import { Chart, registerables } from "chart.js";
+import { 
+    Chart, 
+    CategoryScale,
+    LinearScale,
+    LogarithmicScale,
+    PointElement,
+    LineElement,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler,
+    registerables 
+} from "chart.js";
 import { MatrixController, MatrixElement } from "chartjs-chart-matrix";
 
-Chart.register(...registerables, MatrixController, MatrixElement);
+// Register Chart.js components
+Chart.register(
+    ...registerables, 
+    MatrixController, 
+    MatrixElement,
+    CategoryScale,
+    LinearScale,
+    LogarithmicScale,
+    PointElement,
+    LineElement,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+);
+
+// Make Chart.js available globally
 window.Chart = Chart;
 window.Alpine = Alpine;
 

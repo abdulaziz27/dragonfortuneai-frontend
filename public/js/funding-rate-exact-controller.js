@@ -1,13 +1,13 @@
 /**
- * Exchange Inflow CDD Controller
+ * Funding Rate Controller (Exact Copy from CDD)
  * 
- * Manages Bitcoin Exchange Inflow CDD (Coin Days Destroyed) dashboard
+ * Manages Bitcoin Funding Rate dashboard
  * Data source: CryptoQuant API
  * 
  * Think like a trader:
- * - CDD measures the "age" of coins moving
- * - High CDD = old coins (long-term holders) moving to exchanges
- * - Spike in CDD often precedes selling pressure
+ * - Funding Rate measures perpetual futures premium/discount
+ * - Positive funding = longs pay shorts (bullish sentiment)
+ * - Negative funding = shorts pay longs (bearish sentiment)
  * 
  * Build like an engineer:
  * - Clean data fetching with error handling
@@ -15,7 +15,7 @@
  * - Statistical analysis (MA, std dev, outliers)
  */
 
-function exchangeInflowCDDController() {
+function fundingRateController() {
     return {
         // Global state
         globalPeriod: '1m', // Changed from '30d' to match new time ranges
@@ -47,23 +47,24 @@ function exchangeInflowCDDController() {
         rawData: [],
         priceData: [], // Bitcoin price data for overlay
 
-        // Summary metrics
-        currentCDD: 0,
-        cddChange: 0,
-        avgCDD: 0,
-        medianCDD: 0,
-        maxCDD: 0,
+        // Summary metrics (changed from CDD to Funding Rate)
+        currentFundingRate: 0,
+        fundingChange: 0,
+        avgFundingRate: 0,
+        medianFundingRate: 0,
+        maxFundingRate: 0,
+        minFundingRate: 0,
         peakDate: '--',
 
         // Price metrics
         currentPrice: 0,
         priceChange: 0,
 
-        // Analysis metrics
+        // Analysis metrics (adapted for funding rates)
         ma7: 0,
         ma30: 0,
-        highCDDEvents: 0,
-        extremeCDDEvents: 0,
+        highFundingEvents: 0,
+        extremeFundingEvents: 0,
 
         // Market signal
         marketSignal: 'Neutral',
@@ -78,7 +79,13 @@ function exchangeInflowCDDController() {
 
         // Initialize
         init() {
-            console.log('🚀 Exchange Inflow CDD Dashboard initialized');
+            console.log('🚀 Funding Rate Dashboard initialized');
+            console.log('📊 Controller properties:', {
+                chartType: this.chartType,
+                scaleType: this.scaleType,
+                chartIntervals: this.chartIntervals,
+                selectedInterval: this.selectedInterval
+            });
 
             // Initialize time ranges (removed 3M and 6M)
             this.timeRanges = [
@@ -87,7 +94,7 @@ function exchangeInflowCDDController() {
                 { label: '1M', value: '1m', days: 30 },
                 { label: 'YTD', value: 'ytd', days: this.getYTDDays() },
                 { label: '1Y', value: '1y', days: 365 },
-                { label: 'ALL', value: 'all', days: 365 } // 1 year
+                { label: 'ALL', value: 'all', days: 365 } // 3 years
             ];
 
             // Register Chart.js zoom plugin
@@ -126,6 +133,12 @@ function exchangeInflowCDDController() {
             this.loadData();
         },
 
+        // Update interval
+        updateInterval() {
+            console.log('🔄 Updating interval to:', this.selectedInterval);
+            this.loadData();
+        },
+
         // Refresh all data
         refreshAll() {
             this.globalLoading = true;
@@ -152,13 +165,31 @@ function exchangeInflowCDDController() {
             this.loadData(); // Reload data with new interval
         },
 
-        // Toggle scale type
+        // Set chart interval (renamed to avoid conflict with native setInterval)
+        setChartInterval(interval) {
+            if (this.selectedInterval === interval) return;
+
+            console.log('🔄 Setting chart interval to:', interval);
+            this.selectedInterval = interval;
+            this.loadData(); // Reload data with new interval
+        },
+
+        // Toggle scale type (linear/logarithmic)
         toggleScale(type) {
             if (this.scaleType === type) return;
 
             console.log('🔄 Toggling scale to:', type);
             this.scaleType = type;
             this.renderChart(); // Re-render with new scale
+        },
+
+        // Toggle chart type (line/bar)
+        toggleChartType(type) {
+            if (this.chartType === type) return;
+
+            console.log('🔄 Toggling chart type to:', type);
+            this.chartType = type;
+            this.renderChart(); // Re-render with new type
         },
 
         // Reset chart zoom
@@ -180,7 +211,7 @@ function exchangeInflowCDDController() {
                 console.log(`📸 Exporting chart as ${format.toUpperCase()}`);
 
                 const timestamp = new Date().toISOString().split('T')[0];
-                const filename = `CDD_Chart_${this.selectedExchange}_${timestamp}`;
+                const filename = `Funding_Rate_Chart_${this.selectedExchange}_${timestamp}`;
 
                 if (format === 'png') {
                     const link = document.createElement('a');
@@ -214,8 +245,8 @@ function exchangeInflowCDDController() {
 
                 // Create shareable content
                 const shareData = {
-                    title: `Bitcoin Exchange Inflow CDD - ${this.selectedExchange}`,
-                    text: `Current CDD: ${this.formatCDD(this.currentCDD)} | Signal: ${this.marketSignal}`,
+                    title: `Bitcoin Funding Rate - ${this.selectedExchange}`,
+                    text: `Current Funding Rate: ${this.formatFundingRate(this.currentFundingRate)} | Signal: ${this.marketSignal}`,
                     url: window.location.href
                 };
 
@@ -251,34 +282,36 @@ function exchangeInflowCDDController() {
         async loadData() {
             try {
                 this.globalLoading = true;
-                console.log('📡 Fetching Exchange Inflow CDD data...');
+                console.log('📡 Fetching Funding Rate data...');
 
                 // Calculate date range based on period
                 const { startDate, endDate } = this.getDateRange();
                 console.log(`📅 Date range: ${startDate} to ${endDate}`);
 
-                // Fetch CDD data and price data in parallel for better performance
-                const [cddData, priceData] = await Promise.allSettled([
-                    this.fetchCDDData(startDate, endDate),
+                // Fetch Funding Rate data and price data in parallel for better performance
+                const [fundingData, priceData] = await Promise.allSettled([
+                    this.fetchFundingRateData(startDate, endDate),
                     this.loadPriceData(startDate, endDate)
                 ]);
 
-                // Handle CDD data
-                if (cddData.status === 'fulfilled') {
-                    this.rawData = cddData.value;
-                    console.log(`✅ Loaded ${this.rawData.length} CDD data points`);
+                // Handle Funding Rate data
+                if (fundingData.status === 'fulfilled') {
+                    this.rawData = fundingData.value;
+                    console.log(`✅ Loaded ${this.rawData.length} Funding Rate data points`);
                 } else {
-                    console.error('❌ Error loading CDD data:', cddData.reason);
-                    throw cddData.reason;
+                    console.error('❌ Error loading Funding Rate data:', fundingData.reason);
+                    throw fundingData.reason;
                 }
 
                 // Calculate metrics
                 this.calculateMetrics();
 
-                // Render charts
-                this.renderChart();
-                this.renderDistributionChart();
-                this.renderMAChart();
+                // Render charts with small delay to ensure DOM is ready
+                setTimeout(() => {
+                    this.renderChart();
+                    this.renderDistributionChart();
+                    this.renderMAChart();
+                }, 100);
 
             } catch (error) {
                 console.error('❌ Error loading data:', error);
@@ -288,9 +321,9 @@ function exchangeInflowCDDController() {
             }
         },
 
-        // Separate CDD data fetching for better error handling
-        async fetchCDDData(startDate, endDate) {
-            const url = `${window.location.origin}/api/cryptoquant/exchange-inflow-cdd?start_date=${startDate}&end_date=${endDate}&exchange=${this.selectedExchange}&interval=${this.selectedInterval}`;
+        // Separate Funding Rate data fetching for better error handling
+        async fetchFundingRateData(startDate, endDate) {
+            const url = `${window.location.origin}/api/cryptoquant/funding-rate?start_date=${startDate}&end_date=${endDate}&exchange=${this.selectedExchange}&interval=${this.selectedInterval}`;
 
             const response = await fetch(url);
 
@@ -306,7 +339,6 @@ function exchangeInflowCDDController() {
 
             return data.data;
         },
-
         // Load Bitcoin price data from CryptoQuant API only (NO DUMMY DATA)
         async loadPriceData(startDate, endDate) {
             try {
@@ -315,7 +347,7 @@ function exchangeInflowCDDController() {
 
                 // Verify we have valid price data
                 if (this.currentPrice > 0 && this.priceData.length > 0) {
-                    console.log(`✅ CryptoQuant Bitcoin price loaded successfully: $${this.currentPrice.toLocaleString()}`);
+                    console.log(`✅ CryptoQuant Bitcoin price loaded successfully: ${this.currentPrice.toLocaleString()}`);
                     console.log(`📊 Price data points: ${this.priceData.length}, 24h change: ${this.priceChange.toFixed(2)}%`);
                 } else {
                     throw new Error('No valid CryptoQuant price data received');
@@ -362,7 +394,7 @@ function exchangeInflowCDDController() {
                         this.priceChange = previous ? ((latest.price - previous.price) / previous.price) * 100 : 0;
 
                         console.log(`✅ Loaded ${this.priceData.length} REAL Bitcoin price points from CryptoQuant`);
-                        console.log(`📊 Current BTC Price: $${this.currentPrice.toLocaleString()}, Change: ${this.priceChange.toFixed(2)}%`);
+                        console.log(`📊 Current BTC Price: ${this.currentPrice.toLocaleString()}, Change: ${this.priceChange.toFixed(2)}%`);
                         return;
                     } else {
                         console.warn('⚠️ CryptoQuant returned empty or invalid data:', data);
@@ -379,8 +411,6 @@ function exchangeInflowCDDController() {
             throw new Error('No CryptoQuant Bitcoin price data available');
         },
 
-
-
         // Calculate price metrics
         calculatePriceMetrics() {
             if (this.priceData.length > 0) {
@@ -390,15 +420,13 @@ function exchangeInflowCDDController() {
             }
         },
 
-
-
         // Get date range in days
         getDateRangeDays() {
             const selectedRange = this.timeRanges.find(r => r.value === this.globalPeriod);
             return selectedRange ? selectedRange.days : 30;
         },
 
-        // Calculate all metrics (with safety checks for small datasets)
+        // Calculate all metrics (with safety checks for small datasets) - ADAPTED FOR FUNDING RATES
         calculateMetrics() {
             if (this.rawData.length === 0) {
                 console.warn('⚠️ No data available for metrics calculation');
@@ -410,151 +438,176 @@ function exchangeInflowCDDController() {
                 new Date(a.date) - new Date(b.date)
             );
 
-            // Extract CDD values
-            const cddValues = sorted.map(d => parseFloat(d.value));
+            // Extract Funding Rate values
+            const fundingValues = sorted.map(d => parseFloat(d.value));
 
             // Current metrics
-            this.currentCDD = cddValues[cddValues.length - 1] || 0;
-            const yesterdayCDD = cddValues[cddValues.length - 2] || this.currentCDD;
-            this.cddChange = yesterdayCDD !== 0 ? ((this.currentCDD - yesterdayCDD) / yesterdayCDD) * 100 : 0;
+            this.currentFundingRate = fundingValues[fundingValues.length - 1] || 0;
+            const previousFundingRate = fundingValues[fundingValues.length - 2] || this.currentFundingRate;
+
+            // Calculate percentage change for funding rate
+            this.fundingChange = previousFundingRate !== 0 ?
+                ((this.currentFundingRate - previousFundingRate) / Math.abs(previousFundingRate)) * 100 :
+                0;
 
             // Statistical metrics
-            this.avgCDD = cddValues.length > 0 ? cddValues.reduce((a, b) => a + b, 0) / cddValues.length : 0;
-            this.medianCDD = cddValues.length > 0 ? this.calculateMedian(cddValues) : 0;
-            this.maxCDD = cddValues.length > 0 ? Math.max(...cddValues) : 0;
+            this.avgFundingRate = fundingValues.length > 0 ? fundingValues.reduce((a, b) => a + b, 0) / fundingValues.length : 0;
+            this.medianFundingRate = fundingValues.length > 0 ? this.calculateMedian(fundingValues) : 0;
+            this.maxFundingRate = fundingValues.length > 0 ? Math.max(...fundingValues) : 0;
+            this.minFundingRate = fundingValues.length > 0 ? Math.min(...fundingValues) : 0;
 
             // Peak date (with safety check)
-            if (cddValues.length > 0) {
-                const peakIndex = cddValues.indexOf(this.maxCDD);
+            if (fundingValues.length > 0) {
+                const peakIndex = fundingValues.indexOf(this.maxFundingRate);
                 this.peakDate = this.formatDate(sorted[peakIndex]?.date || sorted[0].date);
             } else {
                 this.peakDate = '--';
             }
 
             // Moving averages (flexible - use available data)
-            this.ma7 = this.calculateMA(cddValues, 7);
-            this.ma30 = this.calculateMA(cddValues, 30);
+            this.ma7 = this.calculateMA(fundingValues, 7);
+            this.ma30 = this.calculateMA(fundingValues, 30);
 
-            // Outlier detection (flexible approach)
-            if (cddValues.length >= 2) {
-                const stdDev = this.calculateStdDev(cddValues);
-                const threshold2Sigma = this.avgCDD + (2 * stdDev);
-                const threshold3Sigma = this.avgCDD + (3 * stdDev);
+            // Outlier detection (flexible approach) - ADAPTED FOR FUNDING RATES
+            if (fundingValues.length >= 2) {
+                const stdDev = this.calculateStdDev(fundingValues);
+                const threshold2Sigma = this.avgFundingRate + (2 * stdDev);
+                const threshold3Sigma = this.avgFundingRate + (3 * stdDev);
 
-                this.highCDDEvents = cddValues.filter(v => v > threshold2Sigma).length;
-                this.extremeCDDEvents = cddValues.filter(v => v > threshold3Sigma).length;
+                this.highFundingEvents = fundingValues.filter(v => Math.abs(v) > Math.abs(threshold2Sigma)).length;
+                this.extremeFundingEvents = fundingValues.filter(v => Math.abs(v) > Math.abs(threshold3Sigma)).length;
 
                 // Market signal
                 this.calculateMarketSignal(stdDev);
-            } else if (cddValues.length === 1) {
+            } else if (fundingValues.length === 1) {
                 // Single data point
-                this.highCDDEvents = 0;
-                this.extremeCDDEvents = 0;
+                this.highFundingEvents = 0;
+                this.extremeFundingEvents = 0;
                 this.marketSignal = 'Single Data Point';
                 this.signalStrength = 'Normal';
-                this.signalDescription = 'Current CDD value: ' + this.formatCDD(this.currentCDD);
+                this.signalDescription = 'Current Funding Rate: ' + this.formatFundingRate(this.currentFundingRate);
             } else {
                 // Not enough data for statistical analysis
-                this.highCDDEvents = 0;
-                this.extremeCDDEvents = 0;
+                this.highFundingEvents = 0;
+                this.extremeFundingEvents = 0;
                 this.marketSignal = 'Insufficient Data';
                 this.signalStrength = 'N/A';
                 this.signalDescription = 'Need more data points for analysis';
             }
 
             console.log('📊 Metrics calculated:', {
-                current: this.currentCDD,
-                avg: this.avgCDD,
-                max: this.maxCDD,
+                current: this.currentFundingRate,
+                avg: this.avgFundingRate,
+                max: this.maxFundingRate,
                 signal: this.marketSignal
             });
         },
 
-        // Calculate market signal
+        // Calculate market signal - ADAPTED FOR FUNDING RATES
         calculateMarketSignal(stdDev) {
-            const zScore = (this.currentCDD - this.avgCDD) / stdDev;
+            const zScore = (this.currentFundingRate - this.avgFundingRate) / stdDev;
 
             if (zScore > 2) {
-                this.marketSignal = 'Distribution';
+                this.marketSignal = 'Extreme Bullish';
                 this.signalStrength = 'Strong';
-                this.signalDescription = 'Old coins moving to exchanges';
+                this.signalDescription = 'Very high funding rate - longs paying shorts';
             } else if (zScore > 1) {
-                this.marketSignal = 'Caution';
+                this.marketSignal = 'Bullish';
                 this.signalStrength = 'Moderate';
-                this.signalDescription = 'Elevated CDD levels detected';
+                this.signalDescription = 'Elevated funding rate detected';
+            } else if (zScore < -2) {
+                this.marketSignal = 'Extreme Bearish';
+                this.signalStrength = 'Strong';
+                this.signalDescription = 'Very negative funding rate - shorts paying longs';
             } else if (zScore < -1) {
-                this.marketSignal = 'Accumulation';
-                this.signalStrength = 'Weak';
-                this.signalDescription = 'Low distribution activity';
+                this.marketSignal = 'Bearish';
+                this.signalStrength = 'Moderate';
+                this.signalDescription = 'Negative funding rate detected';
             } else {
                 this.marketSignal = 'Neutral';
                 this.signalStrength = 'Normal';
-                this.signalDescription = 'Normal market conditions';
+                this.signalDescription = 'Normal funding rate conditions';
             }
         },
 
-        // Render main chart (CryptoQuant style with price overlay)
+        // Render main chart (CryptoQuant style with price overlay) - ADAPTED FOR FUNDING RATES
         renderChart() {
-            const canvas = document.getElementById('cddMainChart');
-            if (!canvas) return;
-
-            const ctx = canvas.getContext('2d');
-
-            // Destroy existing chart
-            if (this.mainChart) {
-                this.mainChart.destroy();
+            const canvas = document.getElementById('fundingRateMainChart');
+            if (!canvas) {
+                console.warn('⚠️ Canvas element not found: fundingRateMainChart');
+                return;
             }
 
-            // Prepare CDD data
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.warn('⚠️ Cannot get 2D context from canvas');
+                return;
+            }
+
+            // Destroy existing chart safely
+            if (this.mainChart) {
+                try {
+                    this.mainChart.destroy();
+                } catch (error) {
+                    console.warn('⚠️ Error destroying chart:', error);
+                }
+                this.mainChart = null;
+            }
+
+            // Check if we have data
+            if (!this.rawData || this.rawData.length === 0) {
+                console.warn('⚠️ No data available for chart rendering');
+                return;
+            }
+
+            // Prepare Funding Rate data
             const sorted = [...this.rawData].sort((a, b) =>
                 new Date(a.date) - new Date(b.date)
             );
 
             const labels = sorted.map(d => d.date);
-            const values = sorted.map(d => parseFloat(d.value));
+            const fundingValues = sorted.map(d => parseFloat(d.value));
 
-            // Calculate threshold for coloring (above/below average)
-            const avgValue = this.avgCDD;
-
-            // Prepare price data (align with CDD dates)
+            // Prepare price data (align with funding rate dates)
             const priceMap = new Map(this.priceData.map(p => [p.date, p.price]));
             const alignedPrices = labels.map(date => priceMap.get(date) || null);
 
-            // Determine bar colors (green if below avg, red if above avg - like CryptoQuant)
-            const barColors = values.map(v =>
-                v > avgValue ? 'rgba(239, 68, 68, 0.7)' : 'rgba(34, 197, 94, 0.7)'
-            );
+            // Create gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
+            gradient.addColorStop(1, 'rgba(59, 130, 246, 0.05)');
 
             // Build datasets
             const datasets = [];
 
-            // Dataset 1: CDD bars
+            // Dataset 1: Funding Rate (main data)
             if (this.chartType === 'bar') {
+                // Bar chart for Funding Rate with color coding (positive = green, negative = red)
                 datasets.push({
-                    label: 'Exchange Inflow CDD',
-                    data: values,
-                    backgroundColor: barColors,
-                    borderColor: barColors.map(c => c.replace('0.7', '1')),
+                    label: 'Funding Rate',
+                    data: fundingValues,
+                    backgroundColor: fundingValues.map(value => {
+                        return value >= 0 ? 'rgba(34, 197, 94, 0.7)' : 'rgba(239, 68, 68, 0.7)';
+                    }),
+                    borderColor: fundingValues.map(value => {
+                        return value >= 0 ? '#22c55e' : '#ef4444';
+                    }),
                     borderWidth: 1,
                     yAxisID: 'y',
                     order: 2
                 });
             } else {
-                // Line chart with area fill
-                const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-                gradient.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
-                gradient.addColorStop(1, 'rgba(59, 130, 246, 0.05)');
-
+                // Line chart for Funding Rate
                 datasets.push({
-                    label: 'Exchange Inflow CDD',
-                    data: values,
+                    label: 'Funding Rate',
+                    data: fundingValues,
                     borderColor: '#3b82f6',
                     backgroundColor: gradient,
                     borderWidth: 2,
                     fill: true,
-                    tension: 0.1,
+                    tension: 0.4,
                     pointRadius: 0,
-                    pointHoverRadius: 6,
+                    pointHoverRadius: 5,
                     pointHoverBackgroundColor: '#3b82f6',
                     pointHoverBorderColor: '#fff',
                     pointHoverBorderWidth: 2,
@@ -584,177 +637,181 @@ function exchangeInflowCDDController() {
             }
 
             // Create chart with dual Y-axis (CryptoQuant style)
-            this.mainChart = new Chart(ctx, {
-                type: this.chartType,
-                data: {
-                    labels: labels,
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
+            try {
+                this.mainChart = new Chart(ctx, {
+                    type: this.chartType,
+                    data: {
+                        labels: labels,
+                        datasets: datasets
                     },
-                    // Enhanced plugins with zoom and pan
-                    plugins: {
-                        zoom: {
-                            enabled: true,
-                            mode: 'xy',
-                            limits: {
-                                x: { min: 'original', max: 'original' },
-                                y: { min: 'original', max: 'original' },
-                                y1: { min: 'original', max: 'original' }
-                            },
-                            pan: {
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        // Enhanced plugins with zoom and pan
+                        plugins: {
+                            zoom: {
                                 enabled: true,
                                 mode: 'xy',
-                                threshold: 10,
-                                modifierKey: null
-                            },
-                            zoom: {
-                                wheel: {
+                                limits: {
+                                    x: { min: 'original', max: 'original' },
+                                    y: { min: 'original', max: 'original' },
+                                    y1: { min: 'original', max: 'original' }
+                                },
+                                pan: {
                                     enabled: true,
-                                    speed: 0.1
+                                    mode: 'xy',
+                                    threshold: 10,
+                                    modifierKey: null
                                 },
-                                pinch: {
-                                    enabled: true
-                                },
-                                mode: 'xy',
-                                drag: {
-                                    enabled: true,
-                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                    borderColor: 'rgba(59, 130, 246, 0.5)',
-                                    borderWidth: 1
-                                }
-                            }
-                        },
-                        legend: {
-                            display: this.priceData.length > 0,
-                            position: 'top',
-                            align: 'end',
-                            labels: {
-                                color: '#64748b',
-                                font: { size: 11, weight: '500' },
-                                boxWidth: 12,
-                                boxHeight: 12,
-                                padding: 10,
-                                usePointStyle: true
-                            }
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(17, 24, 39, 0.95)',
-                            titleColor: '#f3f4f6',
-                            bodyColor: '#f3f4f6',
-                            borderColor: 'rgba(59, 130, 246, 0.5)',
-                            borderWidth: 1,
-                            padding: 12,
-                            displayColors: true,
-                            boxWidth: 8,
-                            boxHeight: 8,
-                            callbacks: {
-                                title: (items) => {
-                                    const date = new Date(items[0].label);
-                                    return date.toLocaleDateString('en-US', {
-                                        weekday: 'short',
-                                        year: 'numeric',
-                                        month: 'short',
-                                        day: 'numeric'
-                                    });
-                                },
-                                label: (context) => {
-                                    const datasetLabel = context.dataset.label;
-                                    const value = context.parsed.y;
-
-                                    if (datasetLabel === 'BTC Price') {
-                                        return `  ${datasetLabel}: $${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-                                    } else {
-                                        const vsAvg = ((value - avgValue) / avgValue * 100).toFixed(1);
-                                        const trend = value > avgValue ? '🔴 Above Avg' : '🟢 Below Avg';
-                                        return [
-                                            `  ${datasetLabel}: ${this.formatCDD(value)}`,
-                                            `  ${trend} (${vsAvg > 0 ? '+' : ''}${vsAvg}%)`
-                                        ];
+                                zoom: {
+                                    wheel: {
+                                        enabled: true,
+                                        speed: 0.1
+                                    },
+                                    pinch: {
+                                        enabled: true
+                                    },
+                                    mode: 'xy',
+                                    drag: {
+                                        enabled: true,
+                                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                        borderColor: 'rgba(59, 130, 246, 0.5)',
+                                        borderWidth: 1
                                     }
                                 }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            ticks: {
-                                color: '#94a3b8',
-                                font: { size: 11 },
-                                maxRotation: 0,
-                                minRotation: 0,
-                                callback: function (value, index) {
-                                    // Show every Nth label to avoid crowding
-                                    const totalLabels = this.chart.data.labels.length;
-                                    const showEvery = Math.max(1, Math.ceil(totalLabels / 12));
-                                    if (index % showEvery === 0) {
-                                        const date = this.chart.data.labels[index];
-                                        return new Date(date).toLocaleDateString('en-US', {
+                            },
+                            legend: {
+                                display: this.priceData.length > 0,
+                                position: 'top',
+                                align: 'end',
+                                labels: {
+                                    color: '#64748b',
+                                    font: { size: 11, weight: '500' },
+                                    boxWidth: 12,
+                                    boxHeight: 12,
+                                    padding: 10,
+                                    usePointStyle: true
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                                titleColor: '#f3f4f6',
+                                bodyColor: '#f3f4f6',
+                                borderColor: 'rgba(59, 130, 246, 0.5)',
+                                borderWidth: 1,
+                                padding: 12,
+                                displayColors: true,
+                                boxWidth: 8,
+                                boxHeight: 8,
+                                callbacks: {
+                                    title: (items) => {
+                                        const date = new Date(items[0].label);
+                                        return date.toLocaleDateString('en-US', {
+                                            weekday: 'short',
+                                            year: 'numeric',
                                             month: 'short',
                                             day: 'numeric'
                                         });
+                                    },
+                                    label: (context) => {
+                                        const datasetLabel = context.dataset.label;
+                                        const value = context.parsed.y;
+
+                                        if (datasetLabel === 'BTC Price') {
+                                            return `  ${datasetLabel}: $${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+                                        } else {
+                                            const sentiment = value >= 0 ? '🟢 Bullish' : '🔴 Bearish';
+                                            return [
+                                                `  ${datasetLabel}: ${this.formatFundingRate(value)}`,
+                                                `  ${sentiment} Sentiment`
+                                            ];
+                                        }
                                     }
-                                    return '';
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: '#94a3b8',
+                                    font: { size: 11 },
+                                    maxRotation: 0,
+                                    minRotation: 0,
+                                    callback: function (value, index) {
+                                        // Show every Nth label to avoid crowding
+                                        const totalLabels = this.chart.data.labels.length;
+                                        const showEvery = Math.max(1, Math.ceil(totalLabels / 12));
+                                        if (index % showEvery === 0) {
+                                            const date = this.chart.data.labels[index];
+                                            return new Date(date).toLocaleDateString('en-US', {
+                                                month: 'short',
+                                                day: 'numeric'
+                                            });
+                                        }
+                                        return '';
+                                    }
+                                },
+                                grid: {
+                                    display: true,
+                                    color: 'rgba(148, 163, 184, 0.08)',
+                                    drawBorder: false
                                 }
                             },
-                            grid: {
-                                display: true,
-                                color: 'rgba(148, 163, 184, 0.08)',
-                                drawBorder: false
-                            }
-                        },
-                        y: {
-                            type: 'linear',
-                            position: 'left',
-                            title: {
-                                display: true,
-                                text: 'CDD',
-                                color: '#3b82f6',
-                                font: { size: 11, weight: '600' }
+                            y: {
+                                type: 'linear',
+                                position: 'left',
+                                title: {
+                                    display: true,
+                                    text: 'Funding Rate (%)',
+                                    color: '#3b82f6',
+                                    font: { size: 11, weight: '600' }
+                                },
+                                ticks: {
+                                    color: '#3b82f6',
+                                    font: { size: 11 },
+                                    callback: (value) => this.formatFundingRate(value)
+                                },
+                                grid: {
+                                    color: 'rgba(148, 163, 184, 0.08)',
+                                    drawBorder: false
+                                }
                             },
-                            ticks: {
-                                color: '#3b82f6',
-                                font: { size: 11 },
-                                callback: (value) => this.formatCDD(value)
-                            },
-                            grid: {
-                                color: 'rgba(148, 163, 184, 0.08)',
-                                drawBorder: false
-                            }
-                        },
-                        y1: {
-                            type: this.scaleType, // Dynamic scale type
-                            position: 'right',
-                            display: this.priceData.length > 0,
-                            title: {
-                                display: true,
-                                text: 'BTC Price (USD)',
-                                color: '#f59e0b',
-                                font: { size: 11, weight: '600' }
-                            },
-                            ticks: {
-                                color: '#f59e0b',
-                                font: { size: 11 },
-                                callback: (value) => '$' + value.toLocaleString('en-US', { maximumFractionDigits: 0 })
-                            },
-                            grid: {
-                                display: false,
-                                drawBorder: false
+                            y1: {
+                                type: this.scaleType, // Dynamic scale type
+                                position: 'right',
+                                display: this.priceData.length > 0,
+                                title: {
+                                    display: true,
+                                    text: 'BTC Price (USD)',
+                                    color: '#f59e0b',
+                                    font: { size: 11, weight: '600' }
+                                },
+                                ticks: {
+                                    color: '#f59e0b',
+                                    font: { size: 11 },
+                                    callback: (value) => '$' + value.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                                },
+                                grid: {
+                                    display: false,
+                                    drawBorder: false
+                                }
                             }
                         }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.error('❌ Error creating chart:', error);
+                this.mainChart = null;
+            }
         },
 
-        // Render distribution chart (histogram)
+        // Render distribution chart (histogram) - ADAPTED FOR FUNDING RATES
         renderDistributionChart() {
-            const canvas = document.getElementById('cddDistributionChart');
+            const canvas = document.getElementById('fundingRateDistributionChart');
             if (!canvas) return;
 
             const ctx = canvas.getContext('2d');
@@ -805,9 +862,9 @@ function exchangeInflowCDDController() {
             });
         },
 
-        // Render moving average chart
+        // Render moving average chart - ADAPTED FOR FUNDING RATES
         renderMAChart() {
-            const canvas = document.getElementById('cddMAChart');
+            const canvas = document.getElementById('fundingRateMAChart');
             if (!canvas) return;
 
             const ctx = canvas.getContext('2d');
@@ -835,7 +892,7 @@ function exchangeInflowCDDController() {
                     labels: labels,
                     datasets: [
                         {
-                            label: 'CDD',
+                            label: 'Funding Rate',
                             data: values,
                             borderColor: '#94a3b8',
                             backgroundColor: 'transparent',
@@ -900,7 +957,7 @@ function exchangeInflowCDDController() {
             });
         },
 
-        // Utility: Get date range based on period (fixed for API compatibility)
+        // Utility: Get date range based on period (exact copy from CDD)
         getDateRange() {
             const endDate = new Date();
             const startDate = new Date();
@@ -909,6 +966,9 @@ function exchangeInflowCDDController() {
             if (this.globalPeriod === 'ytd') {
                 // Year to date
                 startDate.setMonth(0, 1); // January 1st of current year
+            } else if (this.globalPeriod === 'all') {
+                // All available data (1 year max for API stability)
+                startDate.setDate(endDate.getDate() - 365);
             } else {
                 // Find the selected time range
                 const selectedRange = this.timeRanges.find(r => r.value === this.globalPeriod);
@@ -924,7 +984,7 @@ function exchangeInflowCDDController() {
             }
 
             // Ensure we don't go too far back (API limits)
-            const maxDaysBack = 1095; // 3 years
+            const maxDaysBack = 365; // 1 year max for stability
             const minStartDate = new Date();
             minStartDate.setDate(endDate.getDate() - maxDaysBack);
 
@@ -1023,7 +1083,7 @@ function exchangeInflowCDDController() {
                     min: min,
                     max: max,
                     count: values.length,
-                    label: this.formatCDD(min)
+                    label: this.formatFundingRate(min)
                 }];
             }
 
@@ -1036,7 +1096,7 @@ function exchangeInflowCDDController() {
                     min: min,
                     max: max,
                     count: values.length,
-                    label: this.formatCDD(min)
+                    label: this.formatFundingRate(min)
                 }];
             }
 
@@ -1059,7 +1119,7 @@ function exchangeInflowCDDController() {
 
             bins.forEach(bin => {
                 if (bin) {
-                    bin.label = this.formatCDD(bin.min);
+                    bin.label = this.formatFundingRate(bin.min);
                 }
             });
 
@@ -1074,14 +1134,12 @@ function exchangeInflowCDDController() {
             return gradient;
         },
 
-        // Utility: Format CDD value
-        formatCDD(value) {
+        // Utility: Format Funding Rate value (ADAPTED FOR FUNDING RATES)
+        formatFundingRate(value) {
             if (value === null || value === undefined || isNaN(value)) return 'N/A';
             const num = parseFloat(value);
-            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
-            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
-            if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
-            return num.toFixed(2);
+            // Convert to percentage and format
+            return (num * 100).toFixed(4) + '%';
         },
 
         // Utility: Format price
@@ -1121,10 +1179,10 @@ function exchangeInflowCDDController() {
             });
         },
 
-        // Utility: Get trend class (for CDD - higher is bearish)
+        // Utility: Get trend class (for Funding Rate - higher positive is bullish, negative is bearish)
         getTrendClass(value) {
-            if (value > 0) return 'text-danger';
-            if (value < 0) return 'text-success';
+            if (value > 0) return 'text-success'; // Positive funding = bullish
+            if (value < 0) return 'text-danger';  // Negative funding = bearish
             return 'text-secondary';
         },
 
@@ -1149,9 +1207,10 @@ function exchangeInflowCDDController() {
         // Utility: Get signal color class
         getSignalColorClass() {
             const colorMap = {
-                'Distribution': 'text-danger',
-                'Caution': 'text-warning',
-                'Accumulation': 'text-success',
+                'Extreme Bullish': 'text-success',
+                'Bullish': 'text-success',
+                'Extreme Bearish': 'text-danger',
+                'Bearish': 'text-danger',
                 'Neutral': 'text-secondary'
             };
             return colorMap[this.marketSignal] || 'text-secondary';
@@ -1165,15 +1224,15 @@ function exchangeInflowCDDController() {
     };
 }
 
-console.log('✅ Exchange Inflow CDD Controller loaded');
+console.log('✅ Funding Rate Controller loaded');
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function () {
     // Make sure Alpine.js can access the controller
     if (typeof window.Alpine !== 'undefined') {
-        console.log('🔗 Registering CDD controller with Alpine.js');
+        console.log('🔗 Registering Funding Rate controller with Alpine.js');
     }
 });
 
 // Make controller available globally for Alpine.js
-window.exchangeInflowCDDController = exchangeInflowCDDController;
+window.fundingRateController = fundingRateController;

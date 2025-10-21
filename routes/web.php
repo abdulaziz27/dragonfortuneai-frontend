@@ -13,7 +13,7 @@ Route::post('/logout', function () {
 })->name('logout');
 
 // Derivatives Core Routes
-Route::view('/derivatives/funding-rate', 'derivatives.funding-rate')->name('derivatives.funding-rate');
+Route::view('/derivatives/funding-rate', 'derivatives.funding-rate-exact')->name('derivatives.funding-rate');
 Route::view('/derivatives/open-interest', 'derivatives.open-interest')->name('derivatives.open-interest');
 Route::view('/derivatives/long-short-ratio', 'derivatives.long-short-ratio')->name('derivatives.long-short-ratio');
 Route::view('/derivatives/liquidations', 'derivatives.liquidations')->name('derivatives.liquidations');
@@ -62,5 +62,32 @@ Route::view('/sentiment-flow/dashboard', 'sentiment-flow.dashboard')->name('sent
 // CryptoQuant API Proxy Routes
 Route::get('/api/cryptoquant/exchange-inflow-cdd', [App\Http\Controllers\CryptoQuantController::class, 'getExchangeInflowCDD'])->name('api.cryptoquant.exchange-inflow-cdd');
 Route::get('/api/cryptoquant/btc-market-price', [App\Http\Controllers\CryptoQuantController::class, 'getBitcoinPrice'])->name('api.cryptoquant.btc-market-price');
+Route::get('/api/cryptoquant/funding-rate', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRates'])->name('api.cryptoquant.funding-rate');
+Route::get('/api/cryptoquant/funding-rates', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRates'])->name('api.cryptoquant.funding-rates');
+Route::get('/api/cryptoquant/funding-rates-comparison', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRatesComparison'])->name('api.cryptoquant.funding-rates-comparison');
+
+// Chart Components Demo
+Route::view('/examples/chart-components', 'examples.chart-components-demo')->name('examples.chart-components');
+
+// Test Funding Rates API
+Route::get('/test/funding-rates-debug', function() {
+    try {
+        $controller = new App\Http\Controllers\CryptoQuantController();
+        $request = new Illuminate\Http\Request([
+            'start_date' => now()->subDays(7)->format('Y-m-d'),
+            'end_date' => now()->format('Y-m-d'),
+            'exchange' => 'binance'
+        ]);
+        
+        return $controller->getFundingRates($request);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => 'Test failed',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+})->name('test.funding-rates-debug');
 
 // API consumption happens directly from frontend using meta api-base-url

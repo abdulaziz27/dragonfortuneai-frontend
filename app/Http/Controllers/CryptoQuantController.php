@@ -272,4 +272,259 @@ class CryptoQuantController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get Funding Rates data from CryptoQuant
+     */
+    public function getFundingRates(Request $request)
+    {
+        try {
+            $startDate = $request->input('start_date', now()->subDays(30)->format('Y-m-d'));
+            $endDate = $request->input('end_date', now()->format('Y-m-d'));
+            $exchange = $request->input('exchange', 'binance');
+            
+            // Add buffer to get more recent data
+            $endDateWithBuffer = \Carbon\Carbon::parse($endDate)->addDay()->format('Y-m-d');
+            
+            // Convert date format from YYYY-MM-DD to YYYYMMDD for CryptoQuant API
+            $fromDate = str_replace('-', '', $startDate);
+            $toDate = str_replace('-', '', $endDateWithBuffer);
+            
+            // Calculate limit based on date range with buffer
+            $start = \Carbon\Carbon::parse($startDate);
+            $end = \Carbon\Carbon::parse($endDateWithBuffer);
+            $daysDiff = $start->diffInDays($end) + 1;
+            $limit = max($daysDiff + 5, 100);
+            
+            $url = "{$this->baseUrl}/btc/market-data/funding-rates";
+            
+            Log::info('CryptoQuant Funding Rates Request', [
+                'url' => $url,
+                'exchange' => $exchange,
+                'from' => $fromDate,
+                'to' => $toDate,
+                'limit' => $limit
+            ]);
+            
+            // Prepare API parameters
+            $params = [
+                'window' => 'day',
+                'from' => $fromDate,
+                'to' => $toDate,
+                'limit' => $limit
+            ];
+            
+            // Only add exchange parameter if it's not 'all_exchange'
+            if ($exchange !== 'all_exchange') {
+                $params['exchange'] = $exchange;
+            }
+            
+            $response = Http::timeout(30)->withHeaders([
+                'Authorization' => "Bearer {$this->apiKey}",
+                'Accept' => 'application/json',
+            ])->get($url, $params);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                Log::info('CryptoQuant Funding Rates Success', [
+                    'exchange' => $exchange,
+                    'data_count' => isset($data['result']['data']) ? count($data['result']['data']) : 0
+                ]);
+                
+                $transformedData = [];
+                if (isset($data['result']['data']) && is_array($data['result']['data'])) {
+                    $startTimestamp = strtotime($startDate);
+                    $endTimestamp = strtotime($endDate);
+                    
+                    foreach ($data['result']['data'] as $item) {
+                        $itemDate = $item['date'] ?? null;
+                        if ($itemDate) {
+                            $itemTimestamp = strtotime($itemDate);
+                            if ($itemTimestamp >= $startTimestamp && $itemTimestamp <= $endTimestamp) {
+                                $fundingRate = $item['funding_rates'] ?? null;
+                                
+                                // Convert to percentage and handle null values
+                                if ($fundingRate !== null) {
+                                    $fundingRatePercent = $fundingRate * 100; // Convert to percentage
+                                } else {
+                                    $fundingRatePercent = null;
+                                }
+                                
+                                $transformedData[] = [
+                                    'date' => $itemDate,
+                                    'value' => $fundingRatePercent,
+                                    'funding_rate' => $fundingRate,
+                                    'exchange' => $exchange
+                                ];
+                            }
+                        }
+                    }
+                    
+                    // Sort by date ascending
+                    usort($transformedData, function($a, $b) {
+                        return strtotime($a['date']) - strtotime($b['date']);
+                    });
+                }
+                
+                return response()->json([
+                    'success' => true,
+                    'data' => $transformedData,
+                    'meta' => [
+                        'start_date' => $startDate,
+                        'end_date' => $endDate,
+                        'exchange' => $exchange,
+                        'count' => count($transformedData),
+                        'source' => 'CryptoQuant Funding Rates',
+                        'latest_data_date' => !empty($transformedData) ? end($transformedData)['date'] : null
+                    ]
+                ]);
+            }
+
+            Log::error('CryptoQuant Funding Rates API Failed', [
+                'exchange' => $exchange,
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to fetch funding rates from CryptoQuant API',
+                'status' => $response->status(),
+                'message' => $response->body()
+            ], $response->status());
+
+        } catch (\Exception $e) {
+            Log::error('CryptoQuant Funding Rates Exception: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'error' => 'Internal server error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get multiple exchanges funding rates for comparison
+     */
+    public function getFundingRatesComparison(Request $request)
+    {
+        try {
+            $startDate = $request->input('start_date', now()->subDays(30)->format('Y-m-d'));
+            $endDate = $request->input('end_date', now()->format('Y-m-d'));
+            $exchanges = $request->input('exchanges', ['binance', 'bybit', 'bitmex', 'okx']);
+            
+            if (is_string($exchanges)) {
+                $exchanges = explode(',', $exchanges);
+            }
+            
+            // Add buffer to get more recent data
+            $endDateWithBuffer = \Carbon\Carbon::parse($endDate)->addDay()->format('Y-m-d');
+            
+            // Convert date format
+            $fromDate = str_replace('-', '', $startDate);
+            $toDate = str_replace('-', '', $endDateWithBuffer);
+            
+            $start = \Carbon\Carbon::parse($startDate);
+            $end = \Carbon\Carbon::parse($endDateWithBuffer);
+            $daysDiff = $start->diffInDays($end) + 1;
+            $limit = max($daysDiff + 5, 100);
+            
+            $allData = [];
+            $errors = [];
+            
+            // Fetch data for each exchange
+            foreach ($exchanges as $exchange) {
+                try {
+                    $url = "{$this->baseUrl}/btc/market-data/funding-rates";
+                    
+                    $response = Http::timeout(15)->withHeaders([
+                        'Authorization' => "Bearer {$this->apiKey}",
+                        'Accept' => 'application/json',
+                    ])->get($url, [
+                        'exchange' => $exchange,
+                        'window' => 'day',
+                        'from' => $fromDate,
+                        'to' => $toDate,
+                        'limit' => $limit
+                    ]);
+                    
+                    if ($response->successful()) {
+                        $data = $response->json();
+                        if (isset($data['result']['data'])) {
+                            $transformedData = [];
+                            $startTimestamp = strtotime($startDate);
+                            $endTimestamp = strtotime($endDate);
+                            
+                            foreach ($data['result']['data'] as $item) {
+                                $itemDate = $item['date'] ?? null;
+                                if ($itemDate) {
+                                    $itemTimestamp = strtotime($itemDate);
+                                    if ($itemTimestamp >= $startTimestamp && $itemTimestamp <= $endTimestamp) {
+                                        $fundingRate = $item['funding_rates'] ?? null;
+                                        
+                                        if ($fundingRate !== null) {
+                                            $fundingRatePercent = $fundingRate * 100;
+                                        } else {
+                                            $fundingRatePercent = null;
+                                        }
+                                        
+                                        $transformedData[] = [
+                                            'date' => $itemDate,
+                                            'value' => $fundingRatePercent,
+                                            'funding_rate' => $fundingRate,
+                                            'exchange' => $exchange
+                                        ];
+                                    }
+                                }
+                            }
+                            
+                            // Sort by date
+                            usort($transformedData, function($a, $b) {
+                                return strtotime($a['date']) - strtotime($b['date']);
+                            });
+                            
+                            $allData[$exchange] = $transformedData;
+                        }
+                    } else {
+                        $errors[$exchange] = 'API request failed: ' . $response->status();
+                    }
+                } catch (\Exception $e) {
+                    $errors[$exchange] = $e->getMessage();
+                }
+            }
+            
+            if (empty($allData)) {
+                throw new \Exception('No data available from any exchange');
+            }
+            
+            Log::info('CryptoQuant Funding Rates Comparison Success', [
+                'exchanges_success' => array_keys($allData),
+                'exchanges_failed' => array_keys($errors)
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'data' => $allData,
+                'meta' => [
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'exchanges_success' => array_keys($allData),
+                    'exchanges_failed' => array_keys($errors),
+                    'source' => 'CryptoQuant Funding Rates Comparison',
+                    'errors' => $errors
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('CryptoQuant Funding Rates Comparison Exception: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to fetch funding rates comparison data',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
