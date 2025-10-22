@@ -288,6 +288,11 @@
                         <canvas id="fundingRateDistributionChart"></canvas>
                     </div>
                     <div class="mt-3">
+                        <!-- Z-Score Display -->
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="small text-secondary">Z-Score Saat Ini</span>
+                            <span class="badge" :class="getZScoreBadgeClass(currentZScore)" x-text="formatZScore(currentZScore)">--</span>
+                        </div>
                         <div class="d-flex justify-content-between mb-2">
                             <span class="small text-secondary">Event Funding Tinggi (>2σ)</span>
                             <span class="badge text-bg-warning" x-text="highFundingEvents">0</span>

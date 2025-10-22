@@ -125,6 +125,11 @@
                     </div>
                     <div class="h4 mb-1" :class="getSignalColorClass()" x-text="marketSignal">--</div>
                     <div class="small text-secondary" x-text="signalDescription">--</div>
+                    <!-- Z-Score Display -->
+                    <div class="mt-2 d-flex justify-content-between">
+                        <span class="small text-secondary">Z-Score:</span>
+                        <span class="badge" :class="getZScoreBadgeClass(currentZScore)" x-text="formatZScore(currentZScore)">--</span>
+                    </div>
                 </div>
             </div>
         </div>

@@ -542,11 +542,15 @@ function openInterestHybridController() {
                 this.signalDescription = 'Perlu lebih banyak data untuk analisis';
             }
 
+            // Calculate Z-Score
+            this.calculateCurrentZScore();
+
             console.log('📊 Metrics calculated:', {
                 current: this.currentOI,
                 avg: this.avgOI,
                 max: this.maxOI,
-                signal: this.marketSignal
+                signal: this.marketSignal,
+                zScore: this.currentZScore
             });
         },
 
@@ -1241,6 +1245,47 @@ function openInterestHybridController() {
                 'Data Tidak Cukup': 'text-secondary'
             };
             return colorMap[this.marketSignal] || 'text-secondary';
+        },
+
+        // Z-Score calculation and display
+        currentZScore: 0,
+
+        // Calculate current Z-Score
+        calculateCurrentZScore() {
+            if (this.rawData.length < 2) {
+                this.currentZScore = 0;
+                return;
+            }
+
+            const values = this.rawData.map(d => parseFloat(d.value));
+            const mean = values.reduce((a, b) => a + b, 0) / values.length;
+            const stdDev = this.calculateStdDev(values);
+            
+            if (stdDev === 0) {
+                this.currentZScore = 0;
+                return;
+            }
+
+            this.currentZScore = (this.currentOI - mean) / stdDev;
+        },
+
+        // Format Z-Score for display
+        formatZScore(value) {
+            if (value === null || value === undefined || isNaN(value)) return 'N/A';
+            const num = parseFloat(value);
+            const sign = num >= 0 ? '+' : '';
+            return `${sign}${num.toFixed(2)}σ`;
+        },
+
+        // Get Z-Score badge class based on value
+        getZScoreBadgeClass(value) {
+            if (value === null || value === undefined || isNaN(value)) return 'text-bg-secondary';
+            
+            const absValue = Math.abs(value);
+            if (absValue >= 3) return 'text-bg-danger';      // Extreme (>3σ)
+            if (absValue >= 2) return 'text-bg-warning';     // High (>2σ)
+            if (absValue >= 1) return 'text-bg-info';        // Moderate (>1σ)
+            return 'text-bg-success';                         // Normal (<1σ)
         },
 
 
