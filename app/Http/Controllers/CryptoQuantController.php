@@ -344,9 +344,9 @@ class CryptoQuantController extends Controller
                             if ($itemTimestamp >= $startTimestamp && $itemTimestamp <= $endTimestamp) {
                                 $fundingRate = $item['funding_rates'] ?? null;
                                 
-                                // Convert to percentage and handle null values
+                                // Handle null values (keep data in decimal format)
                                 if ($fundingRate !== null) {
-                                    $fundingRatePercent = $fundingRate * 100; // Convert to percentage
+                                    $fundingRatePercent = $fundingRate; // Keep as decimal
                                 } else {
                                     $fundingRatePercent = null;
                                 }

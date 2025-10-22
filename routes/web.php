@@ -92,4 +92,25 @@ Route::get('/test/funding-rates-debug', function() {
     }
 })->name('test.funding-rates-debug');
 
+// Test Open Interest API
+Route::get('/test/open-interest-debug', function() {
+    try {
+        $controller = new App\Http\Controllers\CryptoQuantController();
+        $request = new Illuminate\Http\Request([
+            'start_date' => now()->subDays(7)->format('Y-m-d'),
+            'end_date' => now()->format('Y-m-d'),
+            'exchange' => 'binance'
+        ]);
+        
+        return $controller->getOpenInterest($request);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => 'Test failed',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+})->name('test.open-interest-debug');
+
 // API consumption happens directly from frontend using meta api-base-url

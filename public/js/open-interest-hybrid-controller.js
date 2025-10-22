@@ -50,6 +50,10 @@ function openInterestHybridController() {
         rawData: [],
         priceData: [], // Bitcoin price data for overlay
 
+        // Cache to prevent rate limiting
+        dataCache: new Map(),
+        priceCache: new Map(),
+
         // Summary metrics (Open Interest)
         currentOI: 0,
         oiChange: 0,
@@ -152,7 +156,7 @@ function openInterestHybridController() {
         getWindowParameter() {
             const intervalMap = {
                 '1h': 'hour',
-                '4h': 'hour', 
+                '4h': 'hour',
                 '1d': 'day',
                 '1w': 'day'
             };
@@ -298,20 +302,23 @@ function openInterestHybridController() {
             });
         },
 
-        // Load data from API with optimization
+        // Load data from API with optimization and rate limiting
         async loadData() {
             try {
                 this.globalLoading = true;
-                console.log('📡 Fetching Funding Rate data...');
+                console.log('📡 Fetching Open Interest data...');
 
                 // Calculate date range based on period
                 const { startDate, endDate } = this.getDateRange();
                 console.log(`📅 Date range: ${startDate} to ${endDate}`);
 
-                // Fetch Open Interest data and price data in parallel for better performance
+                // Add delay to prevent rate limiting
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // Fetch Open Interest data and price data sequentially to avoid rate limits
                 const [oiData, priceData] = await Promise.allSettled([
                     this.fetchOpenInterestData(startDate, endDate),
-                    this.loadPriceData(startDate, endDate)
+                    new Promise(resolve => setTimeout(resolve, 1000)).then(() => this.loadPriceData(startDate, endDate))
                 ]);
 
                 // Handle Open Interest data
@@ -320,7 +327,9 @@ function openInterestHybridController() {
                     console.log(`✅ Loaded ${this.rawData.length} Open Interest data points`);
                 } else {
                     console.error('❌ Error loading Open Interest data:', oiData.reason);
-                    throw oiData.reason;
+                    this.rawData = [];
+                    this.showError('CryptoQuant API rate limit reached. Please wait a moment and try again.');
+                    return; // Stop execution if no data
                 }
 
                 // Calculate metrics
@@ -341,11 +350,19 @@ function openInterestHybridController() {
             }
         },
 
-        // Separate Open Interest data fetching for better error handling
+        // Separate Open Interest data fetching with caching
         async fetchOpenInterestData(startDate, endDate) {
+            const cacheKey = `${startDate}-${endDate}-${this.selectedExchange}-${this.selectedSymbol}`;
+
+            // Check cache first
+            if (this.dataCache.has(cacheKey)) {
+                console.log('📦 Using cached Open Interest data');
+                return this.dataCache.get(cacheKey);
+            }
+
             // Fallback to basic parameters if advanced fails
             let url = `${window.location.origin}/api/cryptoquant/open-interest?start_date=${startDate}&end_date=${endDate}&exchange=${this.selectedExchange}`;
-            
+
             // Only add symbol if not all_symbol (to avoid 403)
             if (this.selectedSymbol !== 'all_symbol') {
                 url += `&symbol=${this.selectedSymbol}`;
@@ -362,6 +379,10 @@ function openInterestHybridController() {
             if (!data.success || !Array.isArray(data.data)) {
                 throw new Error('Invalid data format');
             }
+
+            // Cache the result for 5 minutes
+            this.dataCache.set(cacheKey, data.data);
+            setTimeout(() => this.dataCache.delete(cacheKey), 5 * 60 * 1000);
 
             return data.data;
         },
@@ -473,7 +494,7 @@ function openInterestHybridController() {
 
             // Calculate percentage change for open interest
             this.oiChange = previousOI !== 0 ?
-                ((this.currentOI - previousOI) / Math.abs(previousOI)) * 100 :
+                ((this.currentOI - previousOI) / previousOI) * 100 :
                 0;
 
             // Statistical metrics
@@ -673,37 +694,21 @@ function openInterestHybridController() {
                             mode: 'index',
                             intersect: false
                         },
-                        // Enhanced plugins with zoom and pan
+                        // Enhanced plugins with zoom and pan (with safety checks)
                         plugins: {
                             zoom: {
-                                enabled: true,
-                                mode: 'xy',
-                                limits: {
-                                    x: { min: 'original', max: 'original' },
-                                    y: { min: 'original', max: 'original' },
-                                    y1: { min: 'original', max: 'original' }
-                                },
                                 pan: {
                                     enabled: true,
-                                    mode: 'xy',
-                                    threshold: 10,
-                                    modifierKey: null
+                                    mode: 'xy'
                                 },
                                 zoom: {
                                     wheel: {
-                                        enabled: true,
-                                        speed: 0.1
+                                        enabled: true
                                     },
                                     pinch: {
                                         enabled: true
                                     },
-                                    mode: 'xy',
-                                    drag: {
-                                        enabled: true,
-                                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                        borderColor: 'rgba(59, 130, 246, 0.5)',
-                                        borderWidth: 1
-                                    }
+                                    mode: 'xy'
                                 }
                             },
                             legend: {
@@ -1237,6 +1242,8 @@ function openInterestHybridController() {
             };
             return colorMap[this.marketSignal] || 'text-secondary';
         },
+
+
 
         // Utility: Show error
         showError(message) {

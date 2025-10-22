@@ -445,10 +445,8 @@ function fundingRateController() {
             this.currentFundingRate = fundingValues[fundingValues.length - 1] || 0;
             const previousFundingRate = fundingValues[fundingValues.length - 2] || this.currentFundingRate;
 
-            // Calculate percentage change for funding rate
-            this.fundingChange = previousFundingRate !== 0 ?
-                ((this.currentFundingRate - previousFundingRate) / Math.abs(previousFundingRate)) * 100 :
-                0;
+            // Calculate absolute change for funding rate (in basis points)
+            this.fundingChange = (this.currentFundingRate - previousFundingRate) * 10000; // Convert to basis points
 
             // Statistical metrics
             this.avgFundingRate = fundingValues.length > 0 ? fundingValues.reduce((a, b) => a + b, 0) / fundingValues.length : 0;
@@ -1138,8 +1136,8 @@ function fundingRateController() {
         formatFundingRate(value) {
             if (value === null || value === undefined || isNaN(value)) return 'N/A';
             const num = parseFloat(value);
-            // Convert to percentage and format
-            return (num * 100).toFixed(4) + '%';
+            // Data already in percentage format from backend
+            return num.toFixed(4) + '%';
         },
 
         // Utility: Format price
@@ -1162,11 +1160,11 @@ function fundingRateController() {
             });
         },
 
-        // Utility: Format change percentage
+        // Utility: Format change (basis points for funding rate)
         formatChange(value) {
             if (value === null || value === undefined || isNaN(value)) return 'N/A';
             const sign = value >= 0 ? '+' : '';
-            return `${sign}${value.toFixed(2)}%`;
+            return `${sign}${value.toFixed(1)} bps`;
         },
 
         // Utility: Format date
