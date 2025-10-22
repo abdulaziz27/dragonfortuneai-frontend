@@ -15,6 +15,7 @@ Route::post('/logout', function () {
 // Derivatives Core Routes
 Route::view('/derivatives/funding-rate', 'derivatives.funding-rate-exact')->name('derivatives.funding-rate');
 Route::view('/derivatives/open-interest', 'derivatives.open-interest')->name('derivatives.open-interest');
+Route::view('/derivatives/open-interest-old', 'derivatives.open-interest-old')->name('derivatives.open-interest-old');
 Route::view('/derivatives/long-short-ratio', 'derivatives.long-short-ratio')->name('derivatives.long-short-ratio');
 Route::view('/derivatives/liquidations', 'derivatives.liquidations')->name('derivatives.liquidations');
 Route::view('/derivatives/basis-term-structure', 'derivatives.basis-term-structure')->name('derivatives.basis-term-structure');
@@ -64,6 +65,7 @@ Route::get('/api/cryptoquant/exchange-inflow-cdd', [App\Http\Controllers\CryptoQ
 Route::get('/api/cryptoquant/btc-market-price', [App\Http\Controllers\CryptoQuantController::class, 'getBitcoinPrice'])->name('api.cryptoquant.btc-market-price');
 Route::get('/api/cryptoquant/funding-rate', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRates'])->name('api.cryptoquant.funding-rate');
 Route::get('/api/cryptoquant/funding-rates', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRates'])->name('api.cryptoquant.funding-rates');
+Route::get('/api/cryptoquant/open-interest', [App\Http\Controllers\CryptoQuantController::class, 'getOpenInterest'])->name('api.cryptoquant.open-interest');
 Route::get('/api/cryptoquant/funding-rates-comparison', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRatesComparison'])->name('api.cryptoquant.funding-rates-comparison');
 
 // Chart Components Demo

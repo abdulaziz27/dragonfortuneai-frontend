@@ -22,7 +22,7 @@
                         <span class="pulse-dot pulse-success"></span>
                     </div>
                     <p class="mb-0 text-secondary">
-                        Monitor perpetual futures funding rates to gauge market sentiment and identify potential reversal points
+                        Pantau funding rate dari kontrak perpetual (perpetual futures) untuk melihat arah sentimen pasar dan mengidentifikasi potensi pembalikan tren.
                     </p>
                 </div>
 
@@ -262,7 +262,7 @@
                                     <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1"/>
                                     <path d="M6 3v3l2 2" stroke="currentColor" stroke-width="1" fill="none"/>
                                 </svg>
-                                Positive funding rates indicate bullish sentiment (longs pay shorts)
+                                Positive funding rates menandakan sentimen bullish (longs pay shorts)
                             </small>
                             <small class="text-muted" x-data="{ source: 'Loading...' }" x-init="
                                 fetch('/api/cryptoquant/funding-rate?start_date=' + new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0] + '&end_date=' + new Date().toISOString().split('T')[0])
@@ -283,17 +283,17 @@
             <!-- Distribution Analysis -->
             <div class="col-lg-6">
                 <div class="df-panel p-3 h-100">
-                    <h5 class="mb-3">📈 Distribution Analysis</h5>
+                    <h5 class="mb-3">📈 Analisis Distribusi</h5>
                     <div style="height: 300px; position: relative;">
                         <canvas id="fundingRateDistributionChart"></canvas>
                     </div>
                     <div class="mt-3">
                         <div class="d-flex justify-content-between mb-2">
-                            <span class="small text-secondary">High Funding Events (>2σ)</span>
+                            <span class="small text-secondary">Event Funding Tinggi (>2σ)</span>
                             <span class="badge text-bg-warning" x-text="highFundingEvents">0</span>
                         </div>
                         <div class="d-flex justify-content-between">
-                            <span class="small text-secondary">Extreme Events (>3σ)</span>
+                            <span class="small text-secondary">Event Ekstrem (>3σ)</span>
                             <span class="badge text-bg-danger" x-text="extremeFundingEvents">0</span>
                         </div>
                     </div>
@@ -303,17 +303,17 @@
             <!-- Moving Averages -->
             <div class="col-lg-6">
                 <div class="df-panel p-3 h-100">
-                    <h5 class="mb-3">📉 Moving Averages</h5>
+                    <h5 class="mb-3">📉 Rata-rata Bergerak (Moving Averages)</h5>
                     <div style="height: 300px; position: relative;">
                         <canvas id="fundingRateMAChart"></canvas>
                     </div>
                     <div class="mt-3">
                         <div class="d-flex justify-content-between mb-2">
-                            <span class="small">7-Day MA:</span>
+                            <span class="small">Rata-rata 7 Hari:</span>
                             <span class="fw-bold" x-text="formatFundingRate(ma7)">--</span>
                         </div>
                         <div class="d-flex justify-content-between">
-                            <span class="small">30-Day MA:</span>
+                            <span class="small">Rata-rata 30 Hari:</span>
                             <span class="fw-bold" x-text="formatFundingRate(ma30)">--</span>
                         </div>
                     </div>
@@ -325,7 +325,7 @@
         <div class="row g-3">
             <div class="col-12">
                 <div class="df-panel p-4">
-                    <h5 class="mb-3">📚 Understanding Funding Rates</h5>
+                    <h5 class="mb-3">📚 Memahami Funding Rate</h5>
 
                     <div class="row g-3">
                         <div class="col-md-4">
@@ -334,9 +334,9 @@
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
                                         <li>Longs pay shorts (bullish sentiment)</li>
-                                        <li>Perpetual futures trading at premium</li>
-                                        <li>High demand for long positions</li>
-                                        <li>Strategy: Watch for overheated conditions</li>
+                                        <li>Perpetual futures diperdagangkan di harga premium</li>
+                                        <li>Demand tinggi untuk posisi long</li>
+                                        <li>Strategi: Waspadai kondisi pasar yang overheated</li>
                                     </ul>
                                 </div>
                             </div>
@@ -348,9 +348,9 @@
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
                                         <li>Shorts pay longs (bearish sentiment)</li>
-                                        <li>Perpetual futures trading at discount</li>
-                                        <li>High demand for short positions</li>
-                                        <li>Strategy: Look for oversold bounce opportunities</li>
+                                        <li>Perpetual futures diperdagangkan di bawah harga spot</li>
+                                        <li>Demand tinggi untuk posisi short</li>
+                                        <li>Strategi: Cari peluang pantulan saat kondisi oversold</li>
                                     </ul>
                                 </div>
                             </div>
@@ -361,10 +361,10 @@
                                 <div class="fw-bold mb-2 text-primary">⚡ Extreme Funding</div>
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
-                                        <li>Very high positive/negative rates</li>
-                                        <li>Often signals market tops/bottoms</li>
-                                        <li>Contrarian indicator for reversals</li>
-                                        <li>Strategy: Prepare for potential trend change</li>
+                                        <li>Funding rate sangat tinggi atau sangat rendah</li>
+                                        <li>Sering kali menandakan tops/bottoms pasar</li>
+                                        <li>Indikator kontrarian untuk potensi pembalikan arah</li>
+                                        <li>Strategi: Bersiap untuk perubahan tren</li>
                                     </ul>
                                 </div>
                             </div>
@@ -372,7 +372,7 @@
                     </div>
 
                     <div class="alert alert-info mt-3 mb-0">
-                        <strong>💡 Pro Tip:</strong> Extreme funding rates (>0.1% or <-0.1%) often coincide with market tops and bottoms. Use as a contrarian indicator combined with price action analysis.
+                        <strong>💡 Pro Tip:</strong> Funding rate ekstrem (>0.1% atau <-0.1%) sering bertepatan dengan puncak atau dasar pasar. Gunakan sebagai indikator kontrarian bersama analisis pergerakan harga.
                     </div>
                 </div>
             </div>

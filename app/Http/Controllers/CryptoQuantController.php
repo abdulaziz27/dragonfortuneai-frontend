@@ -406,6 +406,141 @@ class CryptoQuantController extends Controller
     }
 
     /**
+     * Get Open Interest data from CryptoQuant API
+     */
+    public function getOpenInterest(Request $request)
+    {
+        try {
+            $startDate = $request->input('start_date', now()->subDays(30)->format('Y-m-d'));
+            $endDate = $request->input('end_date', now()->format('Y-m-d'));
+            $exchange = $request->input('exchange', 'binance');
+            $symbol = $request->input('symbol', 'btc_usdt');
+            $window = $request->input('window', 'day');
+            
+            // Add buffer to get more recent data
+            $endDateWithBuffer = \Carbon\Carbon::parse($endDate)->addDay()->format('Y-m-d');
+            
+            // Convert date format from YYYY-MM-DD to YYYYMMDD for CryptoQuant API
+            $fromDate = str_replace('-', '', $startDate);
+            $toDate = str_replace('-', '', $endDateWithBuffer);
+            
+            // Calculate limit based on date range with buffer
+            $start = \Carbon\Carbon::parse($startDate);
+            $end = \Carbon\Carbon::parse($endDateWithBuffer);
+            $daysDiff = $start->diffInDays($end) + 1;
+            $limit = max($daysDiff + 5, 100);
+            
+            $url = "{$this->baseUrl}/btc/market-data/open-interest";
+            
+            Log::info('CryptoQuant Open Interest Request', [
+                'url' => $url,
+                'exchange' => $exchange,
+                'symbol' => $symbol,
+                'window' => $window,
+                'from' => $fromDate,
+                'to' => $toDate,
+                'limit' => $limit
+            ]);
+            
+            // Prepare API parameters
+            $params = [
+                'window' => $window,
+                'from' => $fromDate,
+                'to' => $toDate,
+                'limit' => $limit
+            ];
+            
+            // Only add exchange parameter if it's not 'all_exchange'
+            if ($exchange !== 'all_exchange') {
+                $params['exchange'] = $exchange;
+            }
+            
+            // Only add symbol parameter if it's not 'all_symbol' and exchange supports it
+            if ($symbol !== 'all_symbol' && in_array($exchange, ['binance', 'bybit'])) {
+                $params['symbol'] = $symbol;
+            }
+            
+            $response = Http::timeout(30)->withHeaders([
+                'Authorization' => "Bearer {$this->apiKey}",
+                'Accept' => 'application/json',
+            ])->get($url, $params);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                Log::info('CryptoQuant Open Interest Success', [
+                    'exchange' => $exchange,
+                    'data_count' => isset($data['result']['data']) ? count($data['result']['data']) : 0
+                ]);
+                
+                $transformedData = [];
+                if (isset($data['result']['data']) && is_array($data['result']['data'])) {
+                    $startTimestamp = strtotime($startDate);
+                    $endTimestamp = strtotime($endDate);
+                    
+                    foreach ($data['result']['data'] as $item) {
+                        $itemDate = $item['date'] ?? null;
+                        if ($itemDate) {
+                            $itemTimestamp = strtotime($itemDate);
+                            if ($itemTimestamp >= $startTimestamp && $itemTimestamp <= $endTimestamp) {
+                                $openInterest = $item['open_interest'] ?? null;
+                                
+                                $transformedData[] = [
+                                    'date' => $itemDate,
+                                    'value' => $openInterest,
+                                    'open_interest' => $openInterest,
+                                    'exchange' => $exchange
+                                ];
+                            }
+                        }
+                    }
+                    
+                    // Sort by date ascending
+                    usort($transformedData, function($a, $b) {
+                        return strtotime($a['date']) - strtotime($b['date']);
+                    });
+                }
+                
+                return response()->json([
+                    'success' => true,
+                    'data' => $transformedData,
+                    'meta' => [
+                        'start_date' => $startDate,
+                        'end_date' => $endDate,
+                        'exchange' => $exchange,
+                        'symbol' => $symbol,
+                        'count' => count($transformedData),
+                        'source' => 'CryptoQuant Open Interest',
+                        'latest_data_date' => !empty($transformedData) ? end($transformedData)['date'] : null
+                    ]
+                ]);
+            }
+
+            Log::error('CryptoQuant Open Interest API Failed', [
+                'exchange' => $exchange,
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to fetch open interest from CryptoQuant API',
+                'status' => $response->status(),
+                'message' => $response->body()
+            ], $response->status());
+
+        } catch (\Exception $e) {
+            Log::error('CryptoQuant Open Interest Exception: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'error' => 'Internal server error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Get multiple exchanges funding rates for comparison
      */
     public function getFundingRatesComparison(Request $request)
