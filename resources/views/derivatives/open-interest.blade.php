@@ -495,7 +495,7 @@
             </div>
         </div>
 
-        <!-- INTERNAL API DATA SECTION -->
+        {{-- INTERNAL API DATA SECTION - TEMPORARILY HIDDEN
         <div class="row g-3">
             <div class="col-12">
                 <div class="df-panel p-3">
@@ -682,6 +682,7 @@
                 </div>
             </div>
         </div>
+        --}}
 
         <!-- Trading Interpretation -->
         <div class="row g-3">
