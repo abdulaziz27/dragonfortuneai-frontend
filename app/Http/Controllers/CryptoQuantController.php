@@ -153,114 +153,86 @@ class CryptoQuantController extends Controller
 
     /**
      * Get Exchange Inflow CDD data from CryptoQuant API
+     * Note: CryptoQuant free tier has limited historical data access
      */
     public function getExchangeInflowCDD(Request $request)
     {
         try {
-            $startDate = $request->input('start_date', now()->subDays(30)->format('Y-m-d'));
-            $endDate = $request->input('end_date', now()->format('Y-m-d'));
+            $startDate = $request->input('start_date', now()->subDays(7)->format('Y-m-d'));
+            $endDate = $request->input('end_date', now()->subDay()->format('Y-m-d')); // Yesterday as end date
             
-            // Add buffer to get more recent data (extend end date by 1 day)
-            $endDateWithBuffer = \Carbon\Carbon::parse($endDate)->addDay()->format('Y-m-d');
+            // Enforce API limitations - CryptoQuant free tier only allows recent data
+            $maxDaysBack = 30;
+            $minAllowedDate = now()->subDays($maxDaysBack)->format('Y-m-d');
+            $maxAllowedDate = now()->subDay()->format('Y-m-d'); // Yesterday
+            
+            // Adjust dates if they're outside allowed range
+            if ($startDate < $minAllowedDate) {
+                $startDate = $minAllowedDate;
+                Log::info('Adjusted start date due to CryptoQuant API limitations', [
+                    'requested' => $request->input('start_date'),
+                    'adjusted' => $startDate
+                ]);
+            }
+            
+            if ($endDate > $maxAllowedDate) {
+                $endDate = $maxAllowedDate;
+                Log::info('Adjusted end date due to CryptoQuant API limitations', [
+                    'requested' => $request->input('end_date'),
+                    'adjusted' => $endDate
+                ]);
+            }
             
             // Convert date format from YYYY-MM-DD to YYYYMMDD for CryptoQuant API
             $fromDate = str_replace('-', '', $startDate);
-            $toDate = str_replace('-', '', $endDateWithBuffer);
+            $toDate = str_replace('-', '', $endDate);
             
-            // Calculate limit based on date range with buffer
+            // Calculate limit based on date range
             $start = \Carbon\Carbon::parse($startDate);
-            $end = \Carbon\Carbon::parse($endDateWithBuffer);
+            $end = \Carbon\Carbon::parse($endDate);
             $daysDiff = $start->diffInDays($end) + 1;
-            $limit = max($daysDiff + 5, 100); // Add 5 extra days buffer
+            $limit = max($daysDiff, 30); // Minimum 30 for better data coverage
+            
+            // Get exchange parameter from request
+            $requestedExchange = $request->input('exchange', 'binance');
             
             $url = "{$this->baseUrl}/btc/flow-indicator/exchange-inflow-cdd";
             
+            // Use CryptoQuant native all_exchange endpoint or single exchange
             Log::info('CryptoQuant CDD Request', [
                 'url' => $url,
+                'exchange' => $requestedExchange,
                 'from' => $fromDate,
                 'to' => $toDate,
                 'limit' => $limit,
-                'original_start' => $startDate,
-                'original_end' => $endDate,
-                'buffer_added' => true
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'note' => $requestedExchange === 'all_exchange' 
+                    ? 'Using CryptoQuant native all_exchange endpoint' 
+                    : 'Single exchange data'
             ]);
             
-            // Get exchange parameter from request, default to 'binance'
-            $exchange = $request->input('exchange', 'binance');
-            
-            $response = Http::timeout(30)->withHeaders([
-                'Authorization' => "Bearer {$this->apiKey}",
-                'Accept' => 'application/json',
-            ])->get($url, [
-                'exchange' => $exchange,
-                'window' => 'day',
-                'from' => $fromDate,
-                'to' => $toDate,
-                'limit' => $limit
-            ]);
-
-            if ($response->successful()) {
-                $data = $response->json();
+            $transformedData = $this->fetchSingleExchangeCDD($url, $requestedExchange, $fromDate, $toDate, $limit, $startDate, $endDate);
+            $actualExchange = $requestedExchange;
                 
-                Log::info('CryptoQuant Response Success', [
-                    'data_count' => isset($data['result']['data']) ? count($data['result']['data']) : 0,
-                    'sample_data' => isset($data['result']['data'][0]) ? $data['result']['data'][0] : null
-                ]);
-                
-                $transformedData = [];
-                if (isset($data['result']['data']) && is_array($data['result']['data'])) {
-                    // Filter data to only include dates within the requested range
-                    $startTimestamp = strtotime($startDate);
-                    $endTimestamp = strtotime($endDate);
-                    
-                    foreach ($data['result']['data'] as $item) {
-                        $itemDate = $item['date'] ?? null;
-                        if ($itemDate) {
-                            $itemTimestamp = strtotime($itemDate);
-                            // Only include if within range
-                            if ($itemTimestamp >= $startTimestamp && $itemTimestamp <= $endTimestamp) {
-                                $transformedData[] = [
-                                    'date' => $itemDate,
-                                    'value' => $item['inflow_cdd'] ?? 0
-                                ];
-                            }
-                        }
-                    }
-                    
-                    // Sort by date ascending
-                    usort($transformedData, function($a, $b) {
-                        return strtotime($a['date']) - strtotime($b['date']);
-                    });
-                }
-                
-                return response()->json([
-                    'success' => true,
-                    'data' => $transformedData,
-                    'meta' => [
-                        'start_date' => $startDate,
-                        'end_date' => $endDate,
-                        'requested_end' => $endDate,
-                        'buffer_end' => $endDateWithBuffer,
-                        'count' => count($transformedData),
-                        'source' => 'CryptoQuant API',
-                        'latest_data_date' => !empty($transformedData) ? end($transformedData)['date'] : null,
-                        'data_freshness' => 'Enhanced with buffer for latest data'
-                    ]
-                ]);
-            }
-
-            // API failed - return error
-            Log::error('CryptoQuant API Failed', [
-                'status' => $response->status(),
-                'body' => $response->body()
-            ]);
-            
             return response()->json([
-                'success' => false,
-                'error' => 'Failed to fetch data from CryptoQuant API',
-                'status' => $response->status(),
-                'message' => $response->body()
-            ], $response->status());
+                'success' => true,
+                'data' => $transformedData,
+                'meta' => [
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'exchange' => $actualExchange,
+                    'requested_exchange' => $requestedExchange,
+                    'count' => count($transformedData),
+                    'source' => 'CryptoQuant Exchange Inflow CDD - Real Data Only',
+                    'latest_data_date' => !empty($transformedData) ? end($transformedData)['date'] : null,
+                    'api_limitations' => 'CryptoQuant free tier: max 30 days historical data',
+                    'is_native_all_exchange' => $requestedExchange === 'all_exchange',
+                    'note' => $requestedExchange === 'all_exchange' 
+                        ? 'CryptoQuant native all_exchange endpoint (complete aggregation)' 
+                        : 'Single exchange data'
+                ]
+            ]);
 
         } catch (\Exception $e) {
             Log::error('CryptoQuant API Exception: ' . $e->getMessage());
@@ -661,5 +633,148 @@ class CryptoQuantController extends Controller
                 'message' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Fetch CDD data from single exchange
+     */
+    private function fetchSingleExchangeCDD($url, $exchange, $fromDate, $toDate, $limit, $startDate, $endDate)
+    {
+        $params = [
+            'exchange' => $exchange,
+            'window' => 'day',
+            'from' => $fromDate,
+            'to' => $toDate,
+            'limit' => $limit
+        ];
+        
+        $response = Http::timeout(30)->withHeaders([
+            'Authorization' => "Bearer {$this->apiKey}",
+            'Accept' => 'application/json',
+        ])->get($url, $params);
+
+        if (!$response->successful()) {
+            Log::error('CryptoQuant Single Exchange CDD API Failed', [
+                'exchange' => $exchange,
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+            return [];
+        }
+
+        $data = $response->json();
+        $transformedData = [];
+        
+        if (isset($data['result']['data']) && is_array($data['result']['data'])) {
+            $startTimestamp = strtotime($startDate);
+            $endTimestamp = strtotime($endDate);
+            
+            foreach ($data['result']['data'] as $item) {
+                $itemDate = $item['date'] ?? null;
+                if ($itemDate) {
+                    $itemTimestamp = strtotime($itemDate);
+                    if ($itemTimestamp >= $startTimestamp && $itemTimestamp <= $endTimestamp) {
+                        $transformedData[] = [
+                            'date' => $itemDate,
+                            'value' => $item['inflow_cdd'] ?? 0
+                        ];
+                    }
+                }
+            }
+            
+            // Sort by date ascending
+            usort($transformedData, function($a, $b) {
+                return strtotime($a['date']) - strtotime($b['date']);
+            });
+        }
+        
+        return $transformedData;
+    }
+
+    /**
+     * Fetch and aggregate CDD data from multiple exchanges
+     */
+    private function fetchAndAggregateAllExchangesCDD($url, $fromDate, $toDate, $limit, $startDate, $endDate)
+    {
+        // Major exchanges for CDD aggregation
+        $exchanges = ['binance', 'coinbase', 'kraken', 'bitfinex', 'huobi'];
+        $allExchangeData = [];
+        $successfulExchanges = [];
+        
+        foreach ($exchanges as $exchange) {
+            try {
+                Log::info("Fetching CDD data from {$exchange}");
+                
+                $exchangeData = $this->fetchSingleExchangeCDD($url, $exchange, $fromDate, $toDate, $limit, $startDate, $endDate);
+                
+                if (!empty($exchangeData)) {
+                    $allExchangeData[$exchange] = $exchangeData;
+                    $successfulExchanges[] = $exchange;
+                    Log::info("Successfully fetched {$exchange} CDD data", ['count' => count($exchangeData)]);
+                } else {
+                    Log::warning("No data from {$exchange}");
+                }
+                
+            } catch (\Exception $e) {
+                Log::error("Failed to fetch CDD data from {$exchange}", ['error' => $e->getMessage()]);
+            }
+        }
+        
+        if (empty($allExchangeData)) {
+            Log::error('No CDD data available from any exchange');
+            return [];
+        }
+        
+        // Aggregate data by date
+        $aggregatedData = $this->aggregateCDDByDate($allExchangeData, $successfulExchanges);
+        
+        Log::info('CDD All Exchanges Aggregation Complete', [
+            'successful_exchanges' => $successfulExchanges,
+            'total_data_points' => count($aggregatedData),
+            'exchanges_count' => count($successfulExchanges)
+        ]);
+        
+        return $aggregatedData;
+    }
+
+    /**
+     * Aggregate CDD data by date across multiple exchanges
+     */
+    private function aggregateCDDByDate($allExchangeData, $successfulExchanges)
+    {
+        $dateMap = [];
+        
+        // Collect all data points by date
+        foreach ($allExchangeData as $exchange => $data) {
+            foreach ($data as $item) {
+                $date = $item['date'];
+                if (!isset($dateMap[$date])) {
+                    $dateMap[$date] = [];
+                }
+                $dateMap[$date][$exchange] = $item['value'];
+            }
+        }
+        
+        // Calculate aggregated values for each date
+        $aggregatedData = [];
+        foreach ($dateMap as $date => $exchangeValues) {
+            // Sum all exchange values for this date
+            $totalCDD = array_sum($exchangeValues);
+            $exchangeCount = count($exchangeValues);
+            
+            $aggregatedData[] = [
+                'date' => $date,
+                'value' => $totalCDD, // Total CDD across all exchanges
+                'exchange_count' => $exchangeCount,
+                'exchanges' => array_keys($exchangeValues)
+            ];
+        }
+        
+        // Sort by date ascending
+        usort($aggregatedData, function($a, $b) {
+            return strtotime($a['date']) - strtotime($b['date']);
+        });
+        
+        return $aggregatedData;
     }
 }

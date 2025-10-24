@@ -113,4 +113,83 @@ Route::get('/test/open-interest-debug', function() {
     }
 })->name('test.open-interest-debug');
 
+// Test CDD API
+Route::get('/test/cdd-debug', function() {
+    try {
+        $controller = new App\Http\Controllers\CryptoQuantController();
+        $request = new Illuminate\Http\Request([
+            'start_date' => now()->subDays(7)->format('Y-m-d'),
+            'end_date' => now()->format('Y-m-d'),
+            'exchange' => 'binance'
+        ]);
+        
+        return $controller->getExchangeInflowCDD($request);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => 'Test failed',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+})->name('test.cdd-debug');
+
+// Test CDD API with different exchanges
+Route::get('/test/cdd-all-exchanges', function() {
+    try {
+        $controller = new App\Http\Controllers\CryptoQuantController();
+        $exchanges = ['binance', 'coinbase', 'kraken', 'bitfinex', 'huobi', 'okex', 'bybit', 'bitstamp', 'gemini'];
+        $results = [];
+        
+        foreach ($exchanges as $exchange) {
+            $request = new Illuminate\Http\Request([
+                'start_date' => '2025-10-22',
+                'end_date' => '2025-10-23',
+                'exchange' => $exchange
+            ]);
+            
+            try {
+                $response = $controller->getExchangeInflowCDD($request);
+                $data = $response->getData(true);
+                
+                if ($data['success'] && !empty($data['data'])) {
+                    $oct22Data = collect($data['data'])->firstWhere('date', '2025-10-22');
+                    $results[$exchange] = [
+                        'success' => true,
+                        'oct_22_value' => $oct22Data['value'] ?? 'No data',
+                        'total_points' => count($data['data'])
+                    ];
+                } else {
+                    $results[$exchange] = [
+                        'success' => false,
+                        'error' => 'No data returned'
+                    ];
+                }
+            } catch (\Exception $e) {
+                $results[$exchange] = [
+                    'success' => false,
+                    'error' => $e->getMessage()
+                ];
+            }
+        }
+        
+        return response()->json([
+            'success' => true,
+            'comparison_date' => '2025-10-22',
+            'cryptoquant_web_value' => '193.2K',
+            'our_values' => $results,
+            'analysis' => [
+                'note' => 'Comparing Oct 22 values across exchanges',
+                'web_vs_api_difference' => 'CryptoQuant web shows 193.2K, our API shows much lower values'
+            ]
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => 'Test failed',
+            'message' => $e->getMessage()
+        ], 500);
+    }
+})->name('test.cdd-all-exchanges');
+
 // API consumption happens directly from frontend using meta api-base-url

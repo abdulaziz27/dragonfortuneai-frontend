@@ -20,7 +20,7 @@ function exchangeInflowCDDController() {
         // Global state
         globalPeriod: '1m', // Changed from '30d' to match new time ranges
         globalLoading: false,
-        selectedExchange: 'binance',
+        selectedExchange: 'all_exchange', // Default to all exchanges
 
         // Enhanced chart controls with YTD (initialized in init method)
         timeRanges: [],
@@ -597,22 +597,9 @@ function exchangeInflowCDDController() {
                         mode: 'index',
                         intersect: false
                     },
-                    // Enhanced plugins with zoom and pan
+                    // Enhanced plugins with zoom and pan (with safety checks)
                     plugins: {
-                        zoom: {
-                            enabled: true,
-                            mode: 'xy',
-                            limits: {
-                                x: { min: 'original', max: 'original' },
-                                y: { min: 'original', max: 'original' },
-                                y1: { min: 'original', max: 'original' }
-                            },
-                            pan: {
-                                enabled: true,
-                                mode: 'xy',
-                                threshold: 10,
-                                modifierKey: null
-                            },
+                        zoom: typeof Chart !== 'undefined' && Chart.Zoom ? {
                             zoom: {
                                 wheel: {
                                     enabled: true,
@@ -621,15 +608,13 @@ function exchangeInflowCDDController() {
                                 pinch: {
                                     enabled: true
                                 },
-                                mode: 'xy',
-                                drag: {
-                                    enabled: true,
-                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                    borderColor: 'rgba(59, 130, 246, 0.5)',
-                                    borderWidth: 1
-                                }
+                                mode: 'xy'
+                            },
+                            pan: {
+                                enabled: true,
+                                mode: 'xy'
                             }
-                        },
+                        } : undefined,
                         legend: {
                             display: this.priceData.length > 0,
                             position: 'top',
@@ -1155,6 +1140,24 @@ function exchangeInflowCDDController() {
                 'Neutral': 'text-secondary'
             };
             return colorMap[this.marketSignal] || 'text-secondary';
+        },
+
+        // Utility: Format exchange name for display
+        formatExchangeName(exchange) {
+            const exchangeNames = {
+                'all_exchange': 'All Exchanges',
+                'spot_exchange': 'Spot Exchanges',
+                'derivative_exchange': 'Derivative Exchanges',
+                'binance': 'Binance',
+                'kraken': 'Kraken',
+                'bybit': 'Bybit',
+                'gemini': 'Gemini',
+                'bitfinex': 'Bitfinex',
+                'kucoin': 'KuCoin',
+                'bitstamp': 'Bitstamp',
+                'mexc': 'MEXC'
+            };
+            return exchangeNames[exchange] || exchange.charAt(0).toUpperCase() + exchange.slice(1);
         },
 
         // Utility: Show error

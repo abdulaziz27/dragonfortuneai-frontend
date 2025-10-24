@@ -22,23 +22,34 @@
                         <span class="pulse-dot pulse-success"></span>
                     </div>
                     <p class="mb-0 text-secondary">
-                        Monitor coin age of exchange inflows to detect long-term holder distribution and potential selling pressure
+                        Monitor umur koin yang masuk ke exchange untuk mendeteksi distribusi long-term holder dan potensi selling pressure
                     </p>
                 </div>
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                     <!-- Exchange Selector -->
-                    <select class="form-select" style="width: 160px;" x-model="selectedExchange" @change="updateExchange()">
+                    <select class="form-select" style="width: 200px;" x-model="selectedExchange" @change="updateExchange()">
+                        <option value="all_exchange">All Exchanges</option>
+                        <option value="spot_exchange">Spot Exchanges</option>
+                        <option value="derivative_exchange">Derivative Exchanges</option>
+                        <option disabled>──────────</option>
                         <option value="binance">Binance</option>
-                        <option value="coinbase">Coinbase</option>
                         <option value="kraken">Kraken</option>
-                        <option value="bitfinex">Bitfinex</option>
-                        <option value="bitstamp">Bitstamp</option>
+                        <option value="bybit">Bybit</option>
                         <option value="gemini">Gemini</option>
-                        <option value="huobi">Huobi</option>
-                        <option value="okex">OKEx</option>
+                        <option value="bitfinex">Bitfinex</option>
+                        <option value="kucoin">KuCoin</option>
+                        <option value="bitstamp">Bitstamp</option>
+                        <option value="mexc">MEXC</option>
                     </select>
+                    
+                    <!-- Info tooltip for Aggregated Exchanges -->
+                    <div x-show="['all_exchange', 'spot_exchange', 'derivative_exchange'].includes(selectedExchange)" class="small text-muted mt-1" style="font-size: 0.75em;">
+                        <span x-show="selectedExchange === 'all_exchange'">*Semua exchange yang didukung (agregasi lengkap)</span>
+                        <span x-show="selectedExchange === 'spot_exchange'">*Hanya exchange spot trading</span>
+                        <span x-show="selectedExchange === 'derivative_exchange'">*Hanya exchange derivatives trading</span>
+                    </div>
 
 
 
@@ -61,7 +72,7 @@
                     </div>
                     <div class="h3 mb-1 text-warning" x-text="formatPriceUSD(currentPrice)">--</div>
                     <div class="small" :class="getPriceTrendClass(priceChange)">
-                        <span x-text="formatChange(priceChange)">--</span> 24h
+                        <span x-text="formatChange(priceChange)">--</span> 24j
                     </div>
                 </div>
             </div>
@@ -70,12 +81,12 @@
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Current CDD</span>
-                        <span class="badge text-bg-primary">Latest</span>
+                        <span class="small text-secondary">CDD Saat Ini</span>
+                        <span class="badge text-bg-primary">Terbaru</span>
                     </div>
                     <div class="h3 mb-1" x-text="formatCDD(currentCDD)">--</div>
                     <div class="small" :class="getTrendClass(cddChange)">
-                        <span x-text="formatChange(cddChange)">--</span> 24h
+                        <span x-text="formatChange(cddChange)">--</span> 24j
                     </div>
                 </div>
             </div>
@@ -84,7 +95,7 @@
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Period Avg</span>
+                        <span class="small text-secondary">Rata-rata Periode</span>
                         <span class="badge text-bg-info">Avg</span>
                     </div>
                     <div class="h3 mb-1" x-text="formatCDD(avgCDD)">--</div>
@@ -98,7 +109,7 @@
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Peak CDD</span>
+                        <span class="small text-secondary">CDD Tertinggi</span>
                         <span class="badge text-bg-danger">Max</span>
                     </div>
                     <div class="h3 mb-1 text-danger" x-text="formatCDD(maxCDD)">--</div>
@@ -110,7 +121,7 @@
             <div class="col-md-4">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Market Signal</span>
+                        <span class="small text-secondary">Sinyal Market</span>
                         <span class="badge" :class="getSignalBadgeClass()" x-text="signalStrength">--</span>
                     </div>
                     <div class="h4 mb-1" :class="getSignalColorClass()" x-text="marketSignal">--</div>
@@ -125,7 +136,12 @@
                 <div class="tradingview-chart-container">
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0">Exchange Inflow CDD</h5>
+                            <h5 class="mb-0">
+                                Exchange Inflow CDD
+                                <!-- <span class="text-muted" style="font-size: 0.8em; font-weight: normal;" x-text="'(' + formatExchangeName(selectedExchange) + ')'">
+                                    (All Exchanges)
+                                </span> -->
+                            </h5>
                             <div class="chart-info">
                                 <span class="current-value" x-text="formatCDD(currentCDD)">--</span>
                                 <span class="change-badge" :class="cddChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(cddChange)">--</span>
@@ -258,7 +274,7 @@
                                     <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1"/>
                                     <path d="M6 3v3l2 2" stroke="currentColor" stroke-width="1" fill="none"/>
                                 </svg>
-                                Higher CDD values indicate older coins moving to exchanges (potential distribution)
+                                Nilai CDD tinggi menunjukkan koin lama bergerak ke exchange (potensi distribusi)
                             </small>
                             <small class="text-muted" x-data="{ source: 'Loading...' }" x-init="
                                 fetch('/api/cryptoquant/exchange-inflow-cdd?start_date=' + new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0] + '&end_date=' + new Date().toISOString().split('T')[0])
@@ -279,17 +295,17 @@
             <!-- Distribution Analysis -->
             <div class="col-lg-6">
                 <div class="df-panel p-3 h-100">
-                    <h5 class="mb-3">📈 Distribution Analysis</h5>
+                    <h5 class="mb-3">📈 Analisis Distribusi</h5>
                     <div style="height: 300px; position: relative;">
                         <canvas id="cddDistributionChart"></canvas>
                     </div>
                     <div class="mt-3">
                         <div class="d-flex justify-content-between mb-2">
-                            <span class="small text-secondary">High CDD Events (>2σ)</span>
+                            <span class="small text-secondary">Event CDD Tinggi (>2σ)</span>
                             <span class="badge text-bg-warning" x-text="highCDDEvents">0</span>
                         </div>
                         <div class="d-flex justify-content-between">
-                            <span class="small text-secondary">Extreme Events (>3σ)</span>
+                            <span class="small text-secondary">Event Ekstrem (>3σ)</span>
                             <span class="badge text-bg-danger" x-text="extremeCDDEvents">0</span>
                         </div>
                     </div>
@@ -299,17 +315,17 @@
             <!-- Moving Averages -->
             <div class="col-lg-6">
                 <div class="df-panel p-3 h-100">
-                    <h5 class="mb-3">📉 Moving Averages</h5>
+                    <h5 class="mb-3">📉 Moving Average</h5>
                     <div style="height: 300px; position: relative;">
                         <canvas id="cddMAChart"></canvas>
                     </div>
                     <div class="mt-3">
                         <div class="d-flex justify-content-between mb-2">
-                            <span class="small">7-Day MA:</span>
+                            <span class="small">MA 7 Hari:</span>
                             <span class="fw-bold" x-text="formatCDD(ma7)">--</span>
                         </div>
                         <div class="d-flex justify-content-between">
-                            <span class="small">30-Day MA:</span>
+                            <span class="small">MA 30 Hari:</span>
                             <span class="fw-bold" x-text="formatCDD(ma30)">--</span>
                         </div>
                     </div>
@@ -321,18 +337,18 @@
         <div class="row g-3">
             <div class="col-12">
                 <div class="df-panel p-4">
-                    <h5 class="mb-3">📚 Understanding Exchange Inflow CDD</h5>
+                    <h5 class="mb-3">📚 Memahami Exchange Inflow CDD</h5>
 
                     <div class="row g-3">
                         <div class="col-md-4">
                             <div class="p-3 rounded" style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444;">
-                                <div class="fw-bold mb-2 text-danger">🔴 High CDD (Distribution)</div>
+                                <div class="fw-bold mb-2 text-danger">🔴 CDD Tinggi (Distribution)</div>
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
-                                        <li>Old coins (long-term holders) moving to exchanges</li>
-                                        <li>Potential selling pressure incoming</li>
-                                        <li>Often precedes price corrections</li>
-                                        <li>Strategy: Watch for resistance, consider taking profits</li>
+                                        <li>Koin lama (long-term holder) pindah ke exchange</li>
+                                        <li>Potensi selling pressure akan datang</li>
+                                        <li>Sering mendahului koreksi harga</li>
+                                        <li>Strategi: Perhatikan resistance, pertimbangkan ambil profit</li>
                                     </ul>
                                 </div>
                             </div>
@@ -340,13 +356,13 @@
 
                         <div class="col-md-4">
                             <div class="p-3 rounded" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e;">
-                                <div class="fw-bold mb-2 text-success">🟢 Low CDD (Accumulation)</div>
+                                <div class="fw-bold mb-2 text-success">🟢 CDD Rendah (Accumulation)</div>
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
-                                        <li>Young coins moving (normal trading activity)</li>
-                                        <li>Long-term holders not distributing</li>
-                                        <li>Healthy market conditions</li>
-                                        <li>Strategy: Look for dip buying opportunities</li>
+                                        <li>Koin muda bergerak (aktivitas trading normal)</li>
+                                        <li>Long-term holder tidak melakukan distribusi</li>
+                                        <li>Kondisi market yang sehat</li>
+                                        <li>Strategi: Cari peluang beli saat dip</li>
                                     </ul>
                                 </div>
                             </div>
@@ -354,13 +370,13 @@
 
                         <div class="col-md-4">
                             <div class="p-3 rounded" style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6;">
-                                <div class="fw-bold mb-2 text-primary">⚡ CDD Spikes</div>
+                                <div class="fw-bold mb-2 text-primary">⚡ CDD Spike</div>
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
-                                        <li>Sudden large movements of old coins</li>
-                                        <li>Major holders repositioning</li>
-                                        <li>High volatility expected</li>
-                                        <li>Strategy: Wait for confirmation, manage risk carefully</li>
+                                        <li>Pergerakan besar koin lama secara tiba-tiba</li>
+                                        <li>Holder besar melakukan reposisi</li>
+                                        <li>Volatilitas tinggi diperkirakan</li>
+                                        <li>Strategi: Tunggu konfirmasi, kelola risiko dengan hati-hati</li>
                                     </ul>
                                 </div>
                             </div>
@@ -368,7 +384,7 @@
                     </div>
 
                     <div class="alert alert-info mt-3 mb-0">
-                        <strong>💡 Pro Tip:</strong> Combine CDD analysis with price action and volume. High CDD during price rallies often signals distribution, while high CDD during crashes may indicate capitulation.
+                        <strong>💡 Pro Tip:</strong> Kombinasikan analisis CDD dengan price action dan volume. CDD tinggi saat rally harga sering menandakan distribusi, sedangkan CDD tinggi saat crash bisa menunjukkan kapitulasi.
                     </div>
                 </div>
             </div>
@@ -394,6 +410,9 @@
         });
     </script>
 
+    <!-- Safe Chart Renderer -->
+    <script src="{{ asset('js/cdd-chart-safe.js') }}"></script>
+    
     <!-- Exchange Inflow CDD Controller -->
     <script src="{{ asset('js/exchange-inflow-cdd-controller.js') }}"></script>
 
