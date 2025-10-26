@@ -7,6 +7,7 @@
     <title>{{ config('app.name', 'DragonFortune AI') }}</title>
 
     <meta name="api-base-url" content="{{ config('services.api.base_url') }}">
+    <meta name="spot-microstructure-api" content="{{ config('services.spot_microstructure.base_url') }}">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
