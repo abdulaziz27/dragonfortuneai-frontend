@@ -66,7 +66,9 @@ class CryptoQuantController extends Controller
                     'params' => $endpoint['params']
                 ]);
                 
-                $response = Http::timeout(30)->withHeaders([
+                $response = Http::timeout(30)->withOptions([
+                    'verify' => false, // Disable SSL verification for local development
+                ])->withHeaders([
                     'Authorization' => "Bearer {$this->apiKey}",
                     'Accept' => 'application/json',
                 ])->get($endpoint['url'], $endpoint['params']);
@@ -291,7 +293,9 @@ class CryptoQuantController extends Controller
                 $params['exchange'] = $exchange;
             }
             
-            $response = Http::timeout(30)->withHeaders([
+            $response = Http::timeout(30)->withOptions([
+                'verify' => false, // Disable SSL verification for local development
+            ])->withHeaders([
                 'Authorization' => "Bearer {$this->apiKey}",
                 'Accept' => 'application/json',
             ])->get($url, $params);
@@ -432,7 +436,9 @@ class CryptoQuantController extends Controller
                 $params['symbol'] = $symbol;
             }
             
-            $response = Http::timeout(30)->withHeaders([
+            $response = Http::timeout(30)->withOptions([
+                'verify' => false, // Disable SSL verification for local development
+            ])->withHeaders([
                 'Authorization' => "Bearer {$this->apiKey}",
                 'Accept' => 'application/json',
             ])->get($url, $params);
@@ -546,7 +552,9 @@ class CryptoQuantController extends Controller
                 try {
                     $url = "{$this->baseUrl}/btc/market-data/funding-rates";
                     
-                    $response = Http::timeout(15)->withHeaders([
+                    $response = Http::timeout(15)->withOptions([
+                        'verify' => false, // Disable SSL verification for local development
+                    ])->withHeaders([
                         'Authorization' => "Bearer {$this->apiKey}",
                         'Accept' => 'application/json',
                     ])->get($url, [
@@ -648,7 +656,9 @@ class CryptoQuantController extends Controller
             'limit' => $limit
         ];
         
-        $response = Http::timeout(30)->withHeaders([
+        $response = Http::timeout(30)->withOptions([
+            'verify' => false, // Disable SSL verification for local development
+        ])->withHeaders([
             'Authorization' => "Bearer {$this->apiKey}",
             'Accept' => 'application/json',
         ])->get($url, $params);

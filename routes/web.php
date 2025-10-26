@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\SpotMicrostructureController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'workspace')->name('workspace');
@@ -68,6 +69,17 @@ Route::get('/api/cryptoquant/funding-rates', [App\Http\Controllers\CryptoQuantCo
 Route::get('/api/cryptoquant/open-interest', [App\Http\Controllers\CryptoQuantController::class, 'getOpenInterest'])->name('api.cryptoquant.open-interest');
 Route::get('/api/cryptoquant/funding-rates-comparison', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRatesComparison'])->name('api.cryptoquant.funding-rates-comparison');
 
+// Spot microstructure API (direct provider proxy)
+Route::prefix('/api/spot-microstructure')->name('api.spot-microstructure.')->group(function () {
+    Route::get('/trades', [SpotMicrostructureController::class, 'getRecentTrades'])->name('trades');
+    Route::get('/trades/summary', [SpotMicrostructureController::class, 'getTradeSummary'])->name('trades.summary');
+    Route::get('/cvd', [SpotMicrostructureController::class, 'getCvd'])->name('cvd');
+    Route::get('/trade-bias', [SpotMicrostructureController::class, 'getTradeBias'])->name('trade-bias');
+    Route::get('/large-orders', [SpotMicrostructureController::class, 'getLargeOrders'])->name('large-orders');
+    Route::get('/coinglass/large-trades', [SpotMicrostructureController::class, 'getCoinglassLargeTrades'])->name('coinglass.large-trades');
+    Route::get('/coinglass/spot-flow', [SpotMicrostructureController::class, 'getCoinglassSpotFlow'])->name('coinglass.spot-flow');
+});
+
 // Chart Components Demo
 Route::view('/examples/chart-components', 'examples.chart-components-demo')->name('examples.chart-components');
 
@@ -133,6 +145,48 @@ Route::get('/test/cdd-debug', function() {
         ], 500);
     }
 })->name('test.cdd-debug');
+
+// Test CoinGlass API Integration
+Route::get('/test/coinglass-integration', function() {
+    try {
+        $controller = new App\Http\Controllers\SpotMicrostructureController();
+        $results = [];
+        
+        // Test large trades
+        $request = new Illuminate\Http\Request(['symbol' => 'BTCUSDT', 'limit' => 5]);
+        $largeTrades = $controller->getCoinglassLargeTrades($request);
+        $results['large_trades'] = $largeTrades->getData(true);
+        
+        // Test spot flow
+        $request = new Illuminate\Http\Request(['symbol' => 'BTCUSDT', 'limit' => 5]);
+        $spotFlow = $controller->getCoinglassSpotFlow($request);
+        $results['spot_flow'] = $spotFlow->getData(true);
+        
+        // Test hybrid large orders
+        $request = new Illuminate\Http\Request(['symbol' => 'BTCUSDT', 'limit' => 5, 'min_notional' => 100000]);
+        $hybridOrders = $controller->getLargeOrders($request);
+        $results['hybrid_orders'] = $hybridOrders->getData(true);
+        
+        return response()->json([
+            'success' => true,
+            'test_results' => $results,
+            'summary' => [
+                'coinglass_large_trades_count' => count($results['large_trades']['data'] ?? []),
+                'coinglass_spot_flow_count' => count($results['spot_flow']['data'] ?? []),
+                'hybrid_orders_count' => count($results['hybrid_orders']['data'] ?? []),
+                'coinglass_enabled' => env('SPOT_USE_COINGLASS', true),
+                'stub_data_enabled' => env('SPOT_STUB_DATA', true),
+            ]
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => 'CoinGlass integration test failed',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+})->name('test.coinglass-integration');
 
 // Test CDD API with different exchanges
 Route::get('/test/cdd-all-exchanges', function() {
