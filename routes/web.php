@@ -17,6 +17,7 @@ Route::view('/derivatives/funding-rate', 'derivatives.funding-rate-exact')->name
 Route::view('/derivatives/open-interest', 'derivatives.open-interest')->name('derivatives.open-interest');
 Route::view('/derivatives/open-interest-old', 'derivatives.open-interest-old')->name('derivatives.open-interest-old');
 Route::view('/derivatives/long-short-ratio', 'derivatives.long-short-ratio')->name('derivatives.long-short-ratio');
+
 Route::view('/derivatives/liquidations', 'derivatives.liquidations')->name('derivatives.liquidations');
 Route::view('/derivatives/basis-term-structure', 'derivatives.basis-term-structure')->name('derivatives.basis-term-structure');
 Route::view('/derivatives/perp-quarterly-spread', 'derivatives.perp-quarterly-spread')->name('derivatives.perp-quarterly-spread');
@@ -63,10 +64,25 @@ Route::view('/sentiment-flow/dashboard', 'sentiment-flow.dashboard')->name('sent
 // CryptoQuant API Proxy Routes
 Route::get('/api/cryptoquant/exchange-inflow-cdd', [App\Http\Controllers\CryptoQuantController::class, 'getExchangeInflowCDD'])->name('api.cryptoquant.exchange-inflow-cdd');
 Route::get('/api/cryptoquant/btc-market-price', [App\Http\Controllers\CryptoQuantController::class, 'getBitcoinPrice'])->name('api.cryptoquant.btc-market-price');
+Route::get('/api/cryptoquant/btc-price', [App\Http\Controllers\CryptoQuantController::class, 'getBitcoinPrice'])->name('api.cryptoquant.btc-price');
 Route::get('/api/cryptoquant/funding-rate', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRates'])->name('api.cryptoquant.funding-rate');
 Route::get('/api/cryptoquant/funding-rates', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRates'])->name('api.cryptoquant.funding-rates');
 Route::get('/api/cryptoquant/open-interest', [App\Http\Controllers\CryptoQuantController::class, 'getOpenInterest'])->name('api.cryptoquant.open-interest');
 Route::get('/api/cryptoquant/funding-rates-comparison', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRatesComparison'])->name('api.cryptoquant.funding-rates-comparison');
+
+// Coinglass API Proxy Routes
+Route::get('/api/coinglass/global-account-ratio', [App\Http\Controllers\CoinglassController::class, 'getGlobalAccountRatio'])->name('api.coinglass.global-account-ratio');
+Route::get('/api/coinglass/top-account-ratio', [App\Http\Controllers\CoinglassController::class, 'getTopAccountRatio'])->name('api.coinglass.top-account-ratio');
+Route::get('/api/coinglass/top-position-ratio', [App\Http\Controllers\CoinglassController::class, 'getTopPositionRatio'])->name('api.coinglass.top-position-ratio');
+Route::get('/api/coinglass/net-position', [App\Http\Controllers\CoinglassController::class, 'getNetPosition'])->name('api.coinglass.net-position');
+Route::get('/api/coinglass/taker-buy-sell', [App\Http\Controllers\CoinglassController::class, 'getTakerBuySell'])->name('api.coinglass.taker-buy-sell');
+Route::get('/api/coinglass/liquidation-coin-list', [App\Http\Controllers\CoinglassController::class, 'getLiquidationCoinList'])->name('api.coinglass.liquidation-coin-list');
+Route::get('/api/coinglass/liquidation-aggregated-history', [App\Http\Controllers\CoinglassController::class, 'getLiquidationAggregatedHistory'])->name('api.coinglass.liquidation-aggregated-history');
+Route::get('/api/coinglass/liquidation-exchange-list', [App\Http\Controllers\CoinglassController::class, 'getLiquidationExchangeList'])->name('api.coinglass.liquidation-exchange-list');
+Route::get('/api/coinglass/liquidation-history', [App\Http\Controllers\CoinglassController::class, 'getLiquidationHistory'])->name('api.coinglass.liquidation-history');
+Route::get('/api/coinglass/liquidation-summary', [App\Http\Controllers\CoinglassController::class, 'getLiquidationSummary'])->name('api.coinglass.liquidation-summary');
+
+
 
 // Chart Components Demo
 Route::view('/examples/chart-components', 'examples.chart-components-demo')->name('examples.chart-components');
@@ -191,5 +207,123 @@ Route::get('/test/cdd-all-exchanges', function() {
         ], 500);
     }
 })->name('test.cdd-all-exchanges');
+
+
+
+// Test Liquidation Summary
+Route::get('/test/liquidation-summary', function() {
+    try {
+        $controller = new App\Http\Controllers\CoinglassController();
+        $request = new Illuminate\Http\Request([
+            'symbol' => 'BTC'
+        ]);
+        
+        return $controller->getLiquidationSummary($request);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => 'Test failed',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+})->name('test.liquidation-summary');
+
+// Test Coinglass API endpoints
+Route::get('/test/coinglass-debug', function() {
+    try {
+        $controller = new App\Http\Controllers\CoinglassController();
+        
+        $results = [];
+        
+        // Test Global Account Ratio
+        $request1 = new Illuminate\Http\Request([
+            'exchange' => 'Binance',
+            'symbol' => 'BTCUSDT',
+            'interval' => '1h',
+            'limit' => 50
+        ]);
+        $results['global_account'] = $controller->getGlobalAccountRatio($request1)->getData(true);
+        
+        // Test Top Account Ratio
+        $request2 = new Illuminate\Http\Request([
+            'exchange' => 'Binance',
+            'symbol' => 'BTCUSDT',
+            'interval' => '1h',
+            'limit' => 5
+        ]);
+        $results['top_account'] = $controller->getTopAccountRatio($request2)->getData(true);
+        
+        // Test Top Position Ratio
+        $request3 = new Illuminate\Http\Request([
+            'exchange' => 'Binance',
+            'symbol' => 'BTCUSDT',
+            'interval' => '1h',
+            'limit' => 5
+        ]);
+        $results['top_position'] = $controller->getTopPositionRatio($request3)->getData(true);
+        
+        // Test Net Position
+        $request4 = new Illuminate\Http\Request([
+            'exchange' => 'Binance',
+            'symbol' => 'BTCUSDT',
+            'interval' => '1h',
+            'limit' => 5
+        ]);
+        $results['net_position'] = $controller->getNetPosition($request4)->getData(true);
+        
+        // Test Taker Buy/Sell
+        $request5 = new Illuminate\Http\Request([
+            'symbol' => 'BTC',
+            'range' => '1h'
+        ]);
+        $results['taker_buysell'] = $controller->getTakerBuySell($request5)->getData(true);
+        
+        // Test Liquidation Coin List
+        $request6 = new Illuminate\Http\Request([
+            'exchange' => 'Binance'
+        ]);
+        $results['liquidation_coinlist'] = $controller->getLiquidationCoinList($request6)->getData(true);
+        
+        // Test Liquidation Aggregated History
+        $request7 = new Illuminate\Http\Request([
+            'exchange_list' => 'Binance',
+            'symbol' => 'BTC',
+            'interval' => '1h',
+            'limit' => 10
+        ]);
+        $results['liquidation_aggregated'] = $controller->getLiquidationAggregatedHistory($request7)->getData(true);
+        
+        // Test Liquidation Exchange List
+        $request8 = new Illuminate\Http\Request([
+            'symbol' => 'BTC',
+            'range' => '1h'
+        ]);
+        $results['liquidation_exchange'] = $controller->getLiquidationExchangeList($request8)->getData(true);
+        
+        // Test Liquidation History
+        $request9 = new Illuminate\Http\Request([
+            'exchange' => 'Binance',
+            'symbol' => 'BTCUSDT',
+            'interval' => '1h',
+            'limit' => 10
+        ]);
+        $results['liquidation_history'] = $controller->getLiquidationHistory($request9)->getData(true);
+        
+        return response()->json([
+            'success' => true,
+            'timestamp' => now()->toISOString(),
+            'results' => $results
+        ]);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => 'Test failed',
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+})->name('test.coinglass-debug');
 
 // API consumption happens directly from frontend using meta api-base-url
