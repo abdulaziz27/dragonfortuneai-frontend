@@ -68,7 +68,6 @@ Route::get('/api/cryptoquant/funding-rates', [App\Http\Controllers\CryptoQuantCo
 Route::get('/api/cryptoquant/open-interest', [App\Http\Controllers\CryptoQuantController::class, 'getOpenInterest'])->name('api.cryptoquant.open-interest');
 Route::get('/api/cryptoquant/funding-rates-comparison', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRatesComparison'])->name('api.cryptoquant.funding-rates-comparison');
 
-<<<<<<< HEAD
 // Coinglass API Proxy Routes
 Route::get('/api/coinglass/global-account-ratio', [App\Http\Controllers\CoinglassController::class, 'getGlobalAccountRatio'])->name('api.coinglass.global-account-ratio');
 Route::get('/api/coinglass/top-account-ratio', [App\Http\Controllers\CoinglassController::class, 'getTopAccountRatio'])->name('api.coinglass.top-account-ratio');
@@ -81,8 +80,6 @@ Route::get('/api/coinglass/liquidation-exchange-list', [App\Http\Controllers\Coi
 Route::get('/api/coinglass/liquidation-history', [App\Http\Controllers\CoinglassController::class, 'getLiquidationHistory'])->name('api.coinglass.liquidation-history');
 Route::get('/api/coinglass/liquidation-summary', [App\Http\Controllers\CoinglassController::class, 'getLiquidationSummary'])->name('api.coinglass.liquidation-summary');
 
-
-=======
 // Spot microstructure API (direct provider proxy)
 Route::prefix('/api/spot-microstructure')->name('api.spot-microstructure.')->group(function () {
     Route::get('/trades', [SpotMicrostructureController::class, 'getRecentTrades'])->name('trades');
@@ -114,7 +111,6 @@ Route::prefix('/api/spot-microstructure')->name('api.spot-microstructure.')->gro
     // Unified data endpoint for single page
     Route::get('/unified', [SpotMicrostructureController::class, 'getUnifiedData'])->name('unified');
 });
->>>>>>> 91365ac790f24c464bf854021919f3d4eb8059b8
 
 // Chart Components Demo
 Route::view('/examples/chart-components', 'examples.chart-components-demo')->name('examples.chart-components');
