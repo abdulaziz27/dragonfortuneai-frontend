@@ -23,11 +23,8 @@ Route::view('/derivatives/basis-term-structure', 'derivatives.basis-term-structu
 Route::view('/derivatives/perp-quarterly-spread', 'derivatives.perp-quarterly-spread')->name('derivatives.perp-quarterly-spread');
 Route::view('/derivatives/exchange-inflow-cdd', 'derivatives.exchange-inflow-cdd')->name('derivatives.exchange-inflow-cdd');
 
-// Spot Microstructure Routes
-Route::view('/spot-microstructure/trades', 'spot-microstructure.trades')->name('spot-microstructure.trades');
-Route::view('/spot-microstructure/orderbook-snapshots', 'spot-microstructure.orderbook-snapshots')->name('spot-microstructure.orderbook-snapshots');
-Route::view('/spot-microstructure/vwap-twap', 'spot-microstructure.vwap-twap')->name('spot-microstructure.vwap-twap');
-Route::view('/spot-microstructure/volume-trade-stats', 'spot-microstructure.volume-trade-stats')->name('spot-microstructure.volume-trade-stats');
+// Spot Microstructure - Single Unified Page
+Route::view('/spot-microstructure', 'spot-microstructure.unified')->name('spot-microstructure.unified');
 
 // On-Chain Metrics Routes (CryptoQuant integrated into main dashboard)
 Route::view('/onchain-metrics', 'onchain-metrics.dashboard')->name('onchain-metrics.index');
@@ -78,6 +75,27 @@ Route::prefix('/api/spot-microstructure')->name('api.spot-microstructure.')->gro
     Route::get('/large-orders', [SpotMicrostructureController::class, 'getLargeOrders'])->name('large-orders');
     Route::get('/coinglass/large-trades', [SpotMicrostructureController::class, 'getCoinglassLargeTrades'])->name('coinglass.large-trades');
     Route::get('/coinglass/spot-flow', [SpotMicrostructureController::class, 'getCoinglassSpotFlow'])->name('coinglass.spot-flow');
+    
+    // Orderbook endpoints removed - CoinGlass doesn't provide real orderbook data
+    // Only keeping endpoints with real provider data
+    
+    // VWAP/TWAP endpoints
+    Route::get('/vwap', [SpotMicrostructureController::class, 'getVWAP'])->name('vwap');
+    Route::get('/vwap/latest', [SpotMicrostructureController::class, 'getLatestVWAP'])->name('vwap.latest');
+    Route::get('/twap', [SpotMicrostructureController::class, 'getTWAP'])->name('twap');
+    Route::get('/vwap/signals', [SpotMicrostructureController::class, 'getVWAPSignals'])->name('vwap.signals');
+    
+    // Volume & Trade Stats endpoints
+    Route::get('/trade-stats', [SpotMicrostructureController::class, 'getTradeStats'])->name('trade-stats');
+    Route::get('/volume-profile', [SpotMicrostructureController::class, 'getVolumeProfile'])->name('volume-profile');
+    Route::get('/volume-profile-detailed', [SpotMicrostructureController::class, 'getVolumeProfileDetailed'])->name('volume-profile-detailed');
+    Route::get('/volume-stats', [SpotMicrostructureController::class, 'getVolumeStats'])->name('volume-stats');
+    
+    // Orderbook endpoints (no real data available)
+    Route::get('/orderbook-snapshots', [SpotMicrostructureController::class, 'getOrderbookSnapshots'])->name('orderbook-snapshots');
+    
+    // Unified data endpoint for single page
+    Route::get('/unified', [SpotMicrostructureController::class, 'getUnifiedData'])->name('unified');
 });
 
 // Chart Components Demo

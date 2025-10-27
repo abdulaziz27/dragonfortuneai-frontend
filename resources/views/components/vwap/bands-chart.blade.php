@@ -113,6 +113,9 @@ function vwapBandsChart(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', in
         listenForData() {
             console.log('📈 VWAP Chart listening for centralized data...');
             
+            // Set initial loading state
+            this.loading = true;
+            
             // Listen for centralized data (primary source)
             const handleData = (e) => {
                 if (e.detail?.historical && Array.isArray(e.detail.historical)) {
@@ -139,6 +142,14 @@ function vwapBandsChart(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', in
                 console.error('❌ Chart received error:', this.error);
             });
 
+            // Fallback: Load data directly if centralized data doesn't arrive within 4 seconds
+            setTimeout(() => {
+                if (this.loading && (!this.data || this.data.length === 0)) {
+                    console.log('⚠️ Centralized chart data not received, loading directly...');
+                    this.loadDataDirectly();
+                }
+            }, 4000);
+
             // Listen to filter changes (will trigger controller to reload data)
             window.addEventListener('symbol-changed', () => {
                 this.loading = true;
@@ -149,6 +160,37 @@ function vwapBandsChart(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', in
             window.addEventListener('exchange-changed', () => {
                 this.loading = true;
             });
+        },
+
+        // Fallback method to load chart data directly
+        async loadDataDirectly() {
+            try {
+                this.loading = true;
+                this.error = null;
+                
+                const response = await fetch(`/api/spot-microstructure/vwap?symbol=${this.symbol}&interval=${this.timeframe}&exchange=${this.exchange}&limit=${this.limit}`);
+                const result = await response.json();
+                
+                if (result.success && result.data && Array.isArray(result.data)) {
+                    this.data = result.data;
+                    console.log('✅ Chart loaded data directly:', this.data.length, 'points');
+                    
+                    // Render chart
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            this.renderChart();
+                        });
+                    });
+                } else {
+                    this.error = result.error || 'Failed to load chart data';
+                    console.error('❌ Direct chart load failed:', this.error);
+                }
+            } catch (error) {
+                this.error = 'Network error: ' + error.message;
+                console.error('❌ Direct chart load error:', error);
+            } finally {
+                this.loading = false;
+            }
         },
 
         renderChart() {

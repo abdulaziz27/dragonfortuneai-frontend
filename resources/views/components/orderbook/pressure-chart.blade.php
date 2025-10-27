@@ -1,76 +1,47 @@
-{{-- Book Pressure History Table Component --}}
-<div class="df-panel p-3" x-data="bookPressureTable()" x-init="init()">
+{{-- Book Pressure History Chart --}}
+<div class="df-panel p-3 h-100">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h5 class="mb-0">📈 Book Pressure History</h5>
-            <small class="text-secondary">Recent pressure data</small>
-        </div>
-        <div class="d-flex gap-2 align-items-center">
-            <span class="badge bg-secondary" x-show="loading">Loading...</span>
+        <h5 class="mb-0">📈 Book Pressure History</h5>
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary active">1H</button>
+            <button class="btn btn-outline-secondary">4H</button>
+            <button class="btn btn-outline-secondary">1D</button>
         </div>
     </div>
 
-    <!-- Book Pressure Table -->
-    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-        <table class="table table-sm table-striped">
-            <thead class="sticky-top bg-white">
-                <tr>
-                    <th>Time</th>
-                    <th>Exchange</th>
-                    <th>Symbol</th>
-                    <th class="text-end">Bid Pressure</th>
-                    <th class="text-end">Ask Pressure</th>
-                    <th class="text-end">Ratio</th>
-                    <th class="text-center">Direction</th>
-                </tr>
-            </thead>
-            <tbody>
-                <template x-for="(item, index) in pressureData" :key="'pressure-' + index + '-' + item.timestamp">
-                    <tr>
-                        <td x-text="formatTime(item.timestamp)">--</td>
-                        <td>
-                            <span class="badge bg-secondary" x-text="item.exchange">--</span>
-                        </td>
-                        <td x-text="item.symbol">--</td>
-                        <td class="text-end text-success fw-bold" x-text="formatPressure(item.bid_pressure)">--</td>
-                        <td class="text-end text-danger fw-bold" x-text="formatPressure(item.ask_pressure)">--</td>
-                        <td class="text-end fw-bold" x-text="formatRatio(item.pressure_ratio)">--</td>
-                        <td class="text-center">
-                            <span class="badge" :class="getDirectionClass(item.pressure_direction)" x-text="item.pressure_direction?.toUpperCase()">--</span>
-                        </td>
-                    </tr>
-                </template>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Summary Stats -->
-    <div class="mt-3 pt-3 border-top">
-        <div class="row g-2 small">
-            <div class="col-3">
-                <div class="text-secondary">Data Points</div>
-                <div class="fw-bold" x-text="pressureData.length">--</div>
+    <div class="chart-container" style="height: 300px; position: relative;">
+        <canvas id="pressureChart"></canvas>
+        
+        <!-- Chart Loading State -->
+        <div x-show="$parent.loading" class="position-absolute top-50 start-50 translate-middle">
+            <div class="text-center">
+                <div class="spinner-border text-primary"></div>
+                <div class="small text-secondary mt-2">Loading pressure chart...</div>
             </div>
-            <div class="col-3">
-                <div class="text-secondary">Avg Bid Pressure</div>
-                <div class="fw-bold text-success" x-text="formatPressure(avgBidPressure)">--</div>
-            </div>
-            <div class="col-3">
-                <div class="text-secondary">Avg Ask Pressure</div>
-                <div class="fw-bold text-danger" x-text="formatPressure(avgAskPressure)">--</div>
-            </div>
-            <div class="col-3">
-                <div class="text-secondary">Avg Ratio</div>
-                <div class="fw-bold" x-text="formatRatio(avgRatio)">--</div>
+        </div>
+        
+        <!-- No Data State -->
+        <div x-show="!$parent.loading && !$parent.pressureData" class="position-absolute top-50 start-50 translate-middle text-center">
+            <div class="text-muted">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 3v18h18"/>
+                    <path d="M8 17l4-4 4 4"/>
+                    <path d="M8 12l4-4 4 4"/>
+                </svg>
+                <div class="mt-2">No pressure data available</div>
             </div>
         </div>
     </div>
 
-    <!-- No Data State -->
-    <div x-show="!loading && pressureData.length === 0" class="text-center py-4">
-        <div class="text-secondary mb-2" style="font-size: 3rem;">📈</div>
-        <div class="text-secondary">No book pressure data available</div>
-        <div class="small text-muted mt-2">Try refreshing the data</div>
+    <!-- Chart Legend -->
+    <div class="mt-3 d-flex justify-content-center gap-4">
+        <div class="d-flex align-items-center gap-2">
+            <div class="rounded-circle" style="width: 12px; height: 12px; background-color: #22c55e;"></div>
+            <small class="text-secondary">Bid Pressure</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div class="rounded-circle" style="width: 12px; height: 12px; background-color: #ef4444;"></div>
+            <small class="text-secondary">Ask Pressure</small>
+        </div>
     </div>
 </div>
-

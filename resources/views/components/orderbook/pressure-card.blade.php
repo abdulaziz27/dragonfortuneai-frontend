@@ -1,61 +1,75 @@
-{{-- Book Pressure Card Component --}}
-<div class="df-panel p-4" x-data="bookPressureCard()" x-init="init()">
-    <div class="d-flex justify-content-between align-items-start mb-3">
-        <div>
-            <h5 class="mb-1">📊 Book Pressure Analysis</h5>
-            <p class="small text-secondary mb-0">Order book pressure direction and strength based on bid/ask depth</p>
-        </div>
-        <span class="badge" :class="getDirectionClass()" x-text="pressureDirection.toUpperCase()">Loading...</span>
+{{-- Book Pressure Card - Simplified --}}
+<div class="df-panel p-3 h-100">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">📊 Book Pressure Analysis</h5>
+        <span class="badge" :class="getPressureBadgeClass()" x-text="pressureDirection.toUpperCase()">NEUTRAL</span>
     </div>
 
     <div class="row g-3">
+        <!-- Current Pressure -->
         <div class="col-md-3">
-            <div class="text-center">
-                <div class="small text-secondary mb-1">Bid Pressure</div>
-                <div class="h4 mb-0 text-success" x-text="formatNumber(bidPressure)">--</div>
+            <div class="stat-item">
+                <div class="small text-secondary mb-1">Current Pressure</div>
+                <div class="h4 mb-0" :class="getPressureClass()" x-text="formatPressure(currentPressure)">50.0%</div>
+                <small class="text-muted">Bid vs Ask Balance</small>
             </div>
         </div>
+
+        <!-- Pressure Strength -->
         <div class="col-md-3">
-            <div class="text-center">
-                <div class="small text-secondary mb-1">Ask Pressure</div>
-                <div class="h4 mb-0 text-danger" x-text="formatNumber(askPressure)">--</div>
+            <div class="stat-item">
+                <div class="small text-secondary mb-1">Strength</div>
+                <div class="h4 mb-0" x-text="pressureStrength.toFixed(1) + '%'">0.0%</div>
+                <small class="text-muted">Pressure Intensity</small>
             </div>
         </div>
+
+        <!-- Imbalance -->
         <div class="col-md-3">
-            <div class="text-center">
-                <div class="small text-secondary mb-1">Pressure Ratio</div>
-                <div class="h4 mb-0" :class="pressureRatio >= 1 ? 'text-success' : 'text-danger'" x-text="formatNumber(pressureRatio)">--</div>
+            <div class="stat-item">
+                <div class="small text-secondary mb-1">Imbalance</div>
+                <div class="h4 mb-0" :class="getImbalanceClass()" x-text="formatVolume(imbalance)">$0</div>
+                <small class="text-muted">Bid - Ask Volume</small>
             </div>
         </div>
+
+        <!-- Total Volume -->
         <div class="col-md-3">
-            <div class="text-center">
-                <div class="small text-secondary mb-1">Sample Size</div>
-                <div class="h4 mb-0" x-text="sampleSize">--</div>
+            <div class="stat-item">
+                <div class="small text-secondary mb-1">Total Volume</div>
+                <div class="h4 mb-0" x-text="formatVolume(pressureData?.total_volume || 0)">$0</div>
+                <small class="text-muted">Combined Volume</small>
             </div>
         </div>
     </div>
 
-    <!-- Progress bar for bid/ask pressure -->
+    <!-- Pressure Bar Visualization -->
     <div class="mt-3">
-        <div class="d-flex justify-content-between small mb-1">
-            <span class="text-success">Bid Pressure</span>
-            <span class="text-danger">Ask Pressure</span>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <small class="text-success fw-semibold">Bid Pressure</small>
+            <small class="text-danger fw-semibold">Ask Pressure</small>
         </div>
-        <div class="progress" style="height: 24px;">
-            <div class="progress-bar bg-success" role="progressbar"
-                 :style="`width: ${(bidPressure / (bidPressure + askPressure)) * 100}%`"
-                 x-text="((bidPressure / (bidPressure + askPressure)) * 100).toFixed(1) + '%'">
+        <div class="progress" style="height: 20px;">
+            <div class="progress-bar bg-success" 
+                 role="progressbar" 
+                 :style="`width: ${(currentPressure * 100).toFixed(1)}%`"
+                 :aria-valuenow="(currentPressure * 100).toFixed(1)" 
+                 aria-valuemin="0" 
+                 aria-valuemax="100">
+                <span class="fw-semibold" x-text="formatPressure(currentPressure)">50.0%</span>
             </div>
-            <div class="progress-bar bg-danger" role="progressbar"
-                 :style="`width: ${(askPressure / (bidPressure + askPressure)) * 100}%`"
-                 x-text="((askPressure / (bidPressure + askPressure)) * 100).toFixed(1) + '%'">
-            </div>
+        </div>
+        <div class="d-flex justify-content-between mt-1">
+            <small class="text-success">Strong Bid</small>
+            <small class="text-secondary">Balanced</small>
+            <small class="text-danger">Strong Ask</small>
         </div>
     </div>
 
-    <div class="mt-3 text-center" x-show="loading">
-        <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
-        <span class="small text-secondary ms-2">Loading book pressure...</span>
+    <!-- Loading State -->
+    <div x-show="loading" class="text-center py-3">
+        <div class="spinner-border spinner-border-sm text-primary"></div>
+        <div class="small text-secondary mt-2">Loading pressure data...</div>
     </div>
 </div>
 

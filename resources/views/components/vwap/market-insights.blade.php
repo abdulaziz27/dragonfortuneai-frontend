@@ -149,6 +149,9 @@ function marketInsightsCard(initialSymbol = 'BTCUSDT', initialTimeframe = '5min'
         init() {
             console.log('🎯 Market Insights component initialized');
             
+            // Set initial loading state
+            this.loading = true;
+            
             // Listen for centralized data (primary data source)
             window.addEventListener('vwap-data-ready', (e) => {
                 if (e.detail?.latest) {
@@ -178,8 +181,55 @@ function marketInsightsCard(initialSymbol = 'BTCUSDT', initialTimeframe = '5min'
                 console.error('❌ Market Insights received error:', this.error);
             });
 
-            // No individual API calls - rely entirely on centralized data
+            // Fallback: Load data directly if centralized data doesn't arrive within 3 seconds
+            setTimeout(() => {
+                if (this.loading && !this.latestData) {
+                    console.log('⚠️ Centralized data not received, loading insights directly...');
+                    this.loadDataDirectly();
+                }
+            }, 3000);
+
             console.log('🎯 Market Insights waiting for centralized data...');
+        },
+
+        // Fallback method to load data directly
+        async loadDataDirectly() {
+            try {
+                this.loading = true;
+                this.error = null;
+                
+                // Load both VWAP data and signals
+                const [vwapResponse, signalsResponse] = await Promise.all([
+                    fetch(`/api/spot-microstructure/vwap/latest?symbol=${this.symbol}&interval=${this.timeframe}&exchange=${this.exchange}`),
+                    fetch(`/api/spot-microstructure/vwap/signals?symbol=${this.symbol}&interval=${this.timeframe}&exchange=${this.exchange}`)
+                ]);
+                
+                const vwapResult = await vwapResponse.json();
+                const signalsResult = await signalsResponse.json();
+                
+                if (vwapResult.success && vwapResult.data) {
+                    this.latestData = vwapResult.data;
+                    
+                    // Merge signals data if available
+                    if (signalsResult.success && signalsResult.data) {
+                        this.latestData.signals = signalsResult.data;
+                        // Use signals data for better insights
+                        this.latestData.current_price = signalsResult.data.current_price;
+                        this.latestData.price_vs_vwap_pct = signalsResult.data.price_vs_vwap_pct;
+                    }
+                    
+                    this.lastUpdate = new Date().toLocaleTimeString();
+                    console.log('✅ Market Insights loaded data directly:', this.latestData);
+                } else {
+                    this.error = vwapResult.error || 'Failed to load insights';
+                    console.error('❌ Direct insights load failed:', this.error);
+                }
+            } catch (error) {
+                this.error = 'Network error: ' + error.message;
+                console.error('❌ Direct insights load error:', error);
+            } finally {
+                this.loading = false;
+            }
         },
 
         // Removed individual loadData() and refresh() methods
@@ -187,15 +237,17 @@ function marketInsightsCard(initialSymbol = 'BTCUSDT', initialTimeframe = '5min'
 
         // Get current price from centralized data
         getCurrentPrice() {
-            // Use actual current price if available and different from VWAP
-            if (this.latestData?.current_price && 
-                this.latestData.current_price !== this.latestData.vwap &&
-                this.latestData.current_price > 0) {
+            // Use price from VWAP data (this is the actual market price used in calculation)
+            if (this.latestData?.price && this.latestData.price > 0) {
+                return parseFloat(this.latestData.price);
+            }
+            
+            // Fallback to current_price if available
+            if (this.latestData?.current_price && this.latestData.current_price > 0) {
                 return parseFloat(this.latestData.current_price);
             }
             
-            // For now, use VWAP as current price (shows 0% distance)
-            // In production, this would be replaced with real-time spot price
+            // Last fallback to VWAP
             if (this.latestData?.vwap) {
                 return parseFloat(this.latestData.vwap);
             }
@@ -206,7 +258,12 @@ function marketInsightsCard(initialSymbol = 'BTCUSDT', initialTimeframe = '5min'
         getBias() {
             if (!this.latestData) return 'neutral';
             
-            // Use VWAP signal strength for bias
+            // Use signal from VWAP data if available
+            if (this.latestData.signal && this.latestData.signal.signal) {
+                return this.latestData.signal.signal;
+            }
+            
+            // Fallback: calculate from price vs VWAP
             return this.getVWAPSignalStrength();
         },
 
@@ -332,20 +389,22 @@ function marketInsightsCard(initialSymbol = 'BTCUSDT', initialTimeframe = '5min'
         getDistanceFromVWAP() {
             if (!this.latestData) return 'N/A';
             
-            // Use VWAP vs Band position as trading signal
+            // Use actual price vs VWAP percentage from API data
+            if (this.latestData.price_vs_vwap !== undefined && this.latestData.price_vs_vwap !== null) {
+                const percentage = parseFloat(this.latestData.price_vs_vwap);
+                return (percentage >= 0 ? '+' : '') + percentage.toFixed(2) + '%';
+            }
+            
+            // Fallback: calculate manually
+            const currentPrice = this.getCurrentPrice();
             const vwap = parseFloat(this.latestData.vwap);
-            const upperBand = parseFloat(this.latestData.upper_band);
-            const lowerBand = parseFloat(this.latestData.lower_band);
             
-            // Calculate VWAP position within bands (more meaningful for trading)
-            const bandRange = upperBand - lowerBand;
-            const vwapFromLower = vwap - lowerBand;
-            const positionPercent = (vwapFromLower / bandRange) * 100;
+            if (currentPrice && vwap && vwap > 0) {
+                const percentage = ((currentPrice - vwap) / vwap) * 100;
+                return (percentage >= 0 ? '+' : '') + percentage.toFixed(2) + '%';
+            }
             
-            // Convert to distance from center (50%)
-            const distanceFromCenter = positionPercent - 50;
-            
-            return (distanceFromCenter >= 0 ? '+' : '') + distanceFromCenter.toFixed(1) + '%';
+            return 'N/A';
         },
 
         getPriceSourceInfo() {
@@ -355,18 +414,29 @@ function marketInsightsCard(initialSymbol = 'BTCUSDT', initialTimeframe = '5min'
         getVWAPSignalStrength() {
             if (!this.latestData) return 'neutral';
             
+            // Use signals data if available
+            if (this.latestData.signals && this.latestData.signals.signal) {
+                return this.latestData.signals.signal;
+            }
+            
+            // Use signal from VWAP data
+            if (this.latestData.signal && this.latestData.signal.signal) {
+                return this.latestData.signal.signal;
+            }
+            
+            // Fallback: calculate from price vs VWAP
+            const currentPrice = this.getCurrentPrice();
             const vwap = parseFloat(this.latestData.vwap);
             const upperBand = parseFloat(this.latestData.upper_band);
             const lowerBand = parseFloat(this.latestData.lower_band);
             
-            const bandRange = upperBand - lowerBand;
-            const vwapFromLower = vwap - lowerBand;
-            const positionPercent = (vwapFromLower / bandRange) * 100;
+            if (currentPrice && vwap && upperBand && lowerBand) {
+                if (currentPrice > upperBand) return 'strong_bullish';
+                if (currentPrice > vwap) return 'bullish';
+                if (currentPrice < lowerBand) return 'strong_bearish';
+                if (currentPrice < vwap) return 'bearish';
+            }
             
-            if (positionPercent > 70) return 'strong_bullish';
-            if (positionPercent > 55) return 'bullish';
-            if (positionPercent < 30) return 'strong_bearish';
-            if (positionPercent < 45) return 'bearish';
             return 'neutral';
         },
 
