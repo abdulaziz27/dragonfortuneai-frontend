@@ -40,4 +40,9 @@ return [
         'base_url' => env('API_BASE_URL', 'http://localhost:5000'),
     ],
 
+    // Spot microstructure API base URL (CoinGlass integration)
+    'spot_microstructure' => [
+        'base_url' => env('SPOT_MICROSTRUCTURE_API_URL', 'http://localhost:8000'),
+    ],
+
 ];

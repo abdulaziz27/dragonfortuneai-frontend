@@ -129,6 +129,9 @@ function latestStatsCard(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', i
         init() {
             console.log('📊 Latest VWAP Stats component initialized');
             
+            // Set initial loading state
+            this.loading = true;
+            
             // Listen for centralized data (primary data source)
             window.addEventListener('vwap-data-ready', (e) => {
                 if (e.detail?.latest) {
@@ -151,8 +154,54 @@ function latestStatsCard(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', i
                 console.error('❌ Latest Stats received error:', this.error);
             });
 
-            // No individual API calls - rely entirely on centralized data
+            // Fallback: Load data directly if centralized data doesn't arrive within 3 seconds
+            setTimeout(() => {
+                if (this.loading && !this.data) {
+                    console.log('⚠️ Centralized data not received, loading directly...');
+                    this.loadDataDirectly();
+                }
+            }, 3000);
+
             console.log('📊 Latest Stats waiting for centralized data...');
+        },
+
+        // Fallback method to load data directly
+        async loadDataDirectly() {
+            try {
+                this.loading = true;
+                this.error = null;
+                
+                // Load both VWAP data and signals for complete information
+                const [vwapResponse, signalsResponse] = await Promise.all([
+                    fetch(`/api/spot-microstructure/vwap/latest?symbol=${this.symbol}&interval=${this.timeframe}&exchange=${this.exchange}`),
+                    fetch(`/api/spot-microstructure/vwap/signals?symbol=${this.symbol}&interval=${this.timeframe}&exchange=${this.exchange}`)
+                ]);
+                
+                const vwapResult = await vwapResponse.json();
+                const signalsResult = await signalsResponse.json();
+                
+                if (vwapResult.success && vwapResult.data) {
+                    this.data = vwapResult.data;
+                    
+                    // Merge signals data for better display
+                    if (signalsResult.success && signalsResult.data) {
+                        this.data.signals = signalsResult.data;
+                        this.data.current_price = signalsResult.data.current_price;
+                        this.data.price_vs_vwap_pct = signalsResult.data.price_vs_vwap_pct;
+                    }
+                    
+                    this.lastUpdate = new Date().toLocaleTimeString();
+                    console.log('✅ Latest Stats loaded data directly:', this.data);
+                } else {
+                    this.error = vwapResult.error || 'Failed to load data';
+                    console.error('❌ Direct load failed:', this.error);
+                }
+            } catch (error) {
+                this.error = 'Network error: ' + error.message;
+                console.error('❌ Direct load error:', error);
+            } finally {
+                this.loading = false;
+            }
         },
 
         // Removed individual loadData() and refresh() methods
