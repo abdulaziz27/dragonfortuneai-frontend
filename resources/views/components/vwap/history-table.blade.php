@@ -137,6 +137,9 @@ function vwapHistoryTable(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', 
         init() {
             console.log('📋 VWAP History Table component initialized');
             
+            // Set initial loading state
+            this.loading = true;
+            
             // Listen for centralized data (primary data source)
             window.addEventListener('vwap-data-ready', (e) => {
                 if (e.detail?.historical && Array.isArray(e.detail.historical)) {
@@ -165,8 +168,46 @@ function vwapHistoryTable(initialSymbol = 'BTCUSDT', initialTimeframe = '5min', 
                 console.error('❌ History Table received error:', this.error);
             });
 
-            // No individual API calls - rely entirely on centralized data
+            // Fallback: Load data directly if centralized data doesn't arrive within 3 seconds
+            setTimeout(() => {
+                if (this.loading && this.data.length === 0) {
+                    console.log('⚠️ Centralized table data not received, loading directly...');
+                    this.loadDataDirectly();
+                }
+            }, 3000);
+
             console.log('📋 History Table waiting for centralized data...');
+        },
+
+        // Fallback method to load table data directly
+        async loadDataDirectly() {
+            try {
+                this.loading = true;
+                this.error = null;
+                
+                const response = await fetch(`/api/spot-microstructure/vwap?symbol=${this.symbol}&interval=${this.timeframe}&exchange=${this.exchange}&limit=${this.limit}`);
+                const result = await response.json();
+                
+                if (result.success && result.data && Array.isArray(result.data)) {
+                    // Sort by timestamp descending (newest first)
+                    this.data = result.data.sort((a, b) => {
+                        const timestampA = a.timestamp || a.ts;
+                        const timestampB = b.timestamp || b.ts;
+                        return new Date(timestampB) - new Date(timestampA);
+                    });
+                    
+                    this.lastUpdate = new Date().toLocaleTimeString();
+                    console.log('✅ History Table loaded data directly:', this.data.length, 'records');
+                } else {
+                    this.error = result.error || 'Failed to load table data';
+                    console.error('❌ Direct table load failed:', this.error);
+                }
+            } catch (error) {
+                this.error = 'Network error: ' + error.message;
+                console.error('❌ Direct table load error:', error);
+            } finally {
+                this.loading = false;
+            }
         },
 
         // Removed individual loadData() and refresh() methods

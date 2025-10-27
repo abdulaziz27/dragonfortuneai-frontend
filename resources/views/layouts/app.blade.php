@@ -163,7 +163,7 @@
                             </div>
                         </li>
                         <li class="df-sidebar-menu-item">
-                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('spot-microstructure')">
+                            <a href="/spot-microstructure" class="df-sidebar-menu-button {{ request()->routeIs('spot-microstructure.*') ? 'active' : '' }}" @click="closeSidebar()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M3 3v18h18"/>
                                     <path d="M7 12l3-3 3 3 5-5"/>
@@ -171,16 +171,7 @@
                                     <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
                                 </svg>
                                 <span>Spot Microstructure</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['spot-microstructure'] }">
-                                    <path d="M9 18l6-6-6-6"/>
-                                </svg>
-                            </button>
-                            <div class="df-submenu{{ request()->routeIs('spot-microstructure.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['spot-microstructure'] }">
-                                <a href="/spot-microstructure/trades" class="df-submenu-item {{ request()->routeIs('spot-microstructure.trades') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Trades & Large Orders</a>
-                                <a href="/spot-microstructure/orderbook-snapshots" class="df-submenu-item {{ request()->routeIs('spot-microstructure.orderbook-snapshots') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Orderbook Snapshots</a>
-                                <a href="/spot-microstructure/vwap-twap" class="df-submenu-item {{ request()->routeIs('spot-microstructure.vwap-twap') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">VWAP & TWAP</a>
-                                <a href="/spot-microstructure/volume-trade-stats" class="df-submenu-item {{ request()->routeIs('spot-microstructure.volume-trade-stats') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Volume & Trade Stats</a>
-                            </div>
+                            </a>
                         </li>
                         <li class="df-sidebar-menu-item">
                             <button class="df-sidebar-menu-button" @click="toggleSubmenu('onchain-metrics')">
