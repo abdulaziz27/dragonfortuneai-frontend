@@ -136,7 +136,7 @@
                     <div class="realtime-header">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                             <div class="d-flex align-items-center gap-2">
-                                <h5 class="mb-0">⚡ Real-Time Liquidations</h5>
+                                <h5 class="mb-0">Real-Time Liquidations</h5>
                                 <span class="pulse-dot pulse-success"></span>
                                 <span class="badge text-bg-success" x-show="isConnected">Live</span>
                                 <span class="badge text-bg-danger" x-show="!isConnected">Disconnected</span>
@@ -304,7 +304,7 @@
                     <div class="total-liquidations-header">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                             <div class="d-flex align-items-center gap-2">
-                                <h5 class="mb-0">📊 Total Liquidations</h5>
+                                <h5 class="mb-0">Total Liquidations</h5>
                                 <span class="badge text-bg-info" x-show="!loading">Updated</span>
                                 <span class="badge text-bg-warning" x-show="loading">Loading...</span>
                             </div>
@@ -449,9 +449,9 @@
                     <div class="chart-header">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                             <div class="d-flex align-items-center gap-2">
-                                <h5 class="mb-0">📈 Total Liquidations Chart</h5>
-                                <span class="badge text-bg-info" x-show="!loading">Live</span>
-                                <span class="badge text-bg-warning" x-show="loading">Loading...</span>
+                                <h5 class="mb-0">Total Liquidations Chart</h5>
+                                <!-- <span class="badge text-bg-info" x-show="!loading">Live</span>
+                                <span class="badge text-bg-warning" x-show="loading">Loading...</span> -->
                             </div>
 
                             <!-- Chart Controls -->
@@ -550,7 +550,7 @@
                     <div class="exchange-header">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                             <div class="d-flex align-items-center gap-2">
-                                <h5 class="mb-0">🏢 Exchange Liquidations</h5>
+                                <h5 class="mb-0">Exchange Liquidations</h5>
                                 <span class="badge text-bg-info" x-show="!loading">Updated</span>
                                 <span class="badge text-bg-warning" x-show="loading">Loading...</span>
                             </div>
@@ -693,7 +693,7 @@
                     <div class="chart-header">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                             <div class="d-flex align-items-center gap-3">
-                                <h5 class="mb-0">💥 Liquidation History Chart</h5>
+                                <h5 class="mb-0">Liquidation History Chart</h5>
                                 <div class="chart-info">
                                     <span class="current-value" x-text="formatLiq(currentTotalLiq)">--</span>
                                     <span class="change-badge" :class="liqChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(liqChange)">--</span>
