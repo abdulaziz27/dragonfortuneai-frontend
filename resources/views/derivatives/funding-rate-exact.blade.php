@@ -63,22 +63,6 @@
                         <span class="small text-secondary">₿ BTC/USD</span>
                         <span class="badge text-bg-warning">Live</span>
                     </div>
-<<<<<<< HEAD
-                    <div class="h3 mb-1 text-warning" x-show="summaryDataLoaded" x-text="formatPriceUSD(currentPrice)"></div>
-                    <div class="h3 mb-1 text-secondary" x-show="!summaryDataLoaded">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-8"></span>
-                        </div>
-                    </div>
-                    <div class="small" x-show="summaryDataLoaded" :class="getPriceTrendClass(priceChange)">
-                        <span x-text="formatChange(priceChange)"></span> 24h
-                    </div>
-                    <div class="small text-secondary" x-show="!summaryDataLoaded">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-6"></span>
-                        </div>
-                    </div>
-=======
                     <template x-if="globalLoading">
                         <div>
                             <div class="h3 mb-2 skeleton skeleton-text" style="width: 80%; height: 28px;"></div>
@@ -96,7 +80,6 @@
                             </div>
                         </div>
                     </template>
->>>>>>> 7eec0b7 (UX: add skeleton loading to key pages; standardize chart toolbars (hide export/share/scale); fix liquidations loading state; keep only date range, interval and minimal toggles)
                 </div>
             </div>
 
@@ -107,22 +90,6 @@
                         <span class="small text-secondary">Current Rate</span>
                         <span class="badge text-bg-primary">Latest</span>
                     </div>
-<<<<<<< HEAD
-                    <div class="h3 mb-1" x-show="summaryDataLoaded" x-text="formatFundingRate(currentFundingRate)"></div>
-                    <div class="h3 mb-1 text-secondary" x-show="!summaryDataLoaded">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-7"></span>
-                        </div>
-                    </div>
-                    <div class="small" x-show="summaryDataLoaded" :class="getTrendClass(fundingChange)">
-                        <span x-text="formatChange(fundingChange)"></span> 24h
-                    </div>
-                    <div class="small text-secondary" x-show="!summaryDataLoaded">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-5"></span>
-                        </div>
-                    </div>
-=======
                     <template x-if="globalLoading">
                         <div>
                             <div class="h3 mb-2 skeleton skeleton-text" style="width: 70%; height: 28px;"></div>
@@ -140,7 +107,6 @@
                             </div>
                         </div>
                     </template>
->>>>>>> 7eec0b7 (UX: add skeleton loading to key pages; standardize chart toolbars (hide export/share/scale); fix liquidations loading state; keep only date range, interval and minimal toggles)
                 </div>
             </div>
 
@@ -151,22 +117,6 @@
                         <span class="small text-secondary">Period Avg</span>
                         <span class="badge text-bg-info">Avg</span>
                     </div>
-<<<<<<< HEAD
-                    <div class="h3 mb-1" x-show="summaryDataLoaded" x-text="formatFundingRate(avgFundingRate)"></div>
-                    <div class="h3 mb-1 text-secondary" x-show="!summaryDataLoaded">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-7"></span>
-                        </div>
-                    </div>
-                    <div class="small text-secondary" x-show="summaryDataLoaded">
-                        Med: <span x-text="formatFundingRate(medianFundingRate)"></span>
-                    </div>
-                    <div class="small text-secondary" x-show="!summaryDataLoaded">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-6"></span>
-                        </div>
-                    </div>
-=======
                     <template x-if="globalLoading">
                         <div>
                             <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
@@ -184,7 +134,6 @@
                             </div>
                         </div>
                     </template>
->>>>>>> 7eec0b7 (UX: add skeleton loading to key pages; standardize chart toolbars (hide export/share/scale); fix liquidations loading state; keep only date range, interval and minimal toggles)
                 </div>
             </div>
 
@@ -195,20 +144,6 @@
                         <span class="small text-secondary">Peak Rate</span>
                         <span class="badge text-bg-danger">Max</span>
                     </div>
-<<<<<<< HEAD
-                    <div class="h3 mb-1 text-danger" x-show="summaryDataLoaded" x-text="formatFundingRate(maxFundingRate)"></div>
-                    <div class="h3 mb-1 text-secondary" x-show="!summaryDataLoaded">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-7"></span>
-                        </div>
-                    </div>
-                    <div class="small text-secondary" x-show="summaryDataLoaded" x-text="peakDate"></div>
-                    <div class="small text-secondary" x-show="!summaryDataLoaded">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-5"></span>
-                        </div>
-                    </div>
-=======
                     <template x-if="globalLoading">
                         <div>
                             <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
@@ -221,7 +156,6 @@
                             <div class="small text-secondary" x-text="peakDate"></div>
                         </div>
                     </template>
->>>>>>> 7eec0b7 (UX: add skeleton loading to key pages; standardize chart toolbars (hide export/share/scale); fix liquidations loading state; keep only date range, interval and minimal toggles)
                 </div>
             </div>
 
@@ -237,20 +171,6 @@
                             <span class="badge" :class="getSignalBadgeClass()" x-text="signalStrength"></span>
                         </template>
                     </div>
-<<<<<<< HEAD
-                    <div class="h4 mb-1" x-show="summaryDataLoaded" :class="getSignalColorClass()" x-text="marketSignal"></div>
-                    <div class="h4 mb-1 text-secondary" x-show="!summaryDataLoaded">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-6"></span>
-                        </div>
-                    </div>
-                    <div class="small text-secondary" x-show="summaryDataLoaded" x-text="signalDescription"></div>
-                    <div class="small text-secondary" x-show="!summaryDataLoaded">
-                        <div class="placeholder-glow">
-                            <span class="placeholder col-8"></span>
-                        </div>
-                    </div>
-=======
                     <template x-if="globalLoading">
                         <div>
                             <div class="h4 mb-2 skeleton skeleton-text" style="width: 60%; height: 22px;"></div>
@@ -263,7 +183,6 @@
                             <div class="small text-secondary" x-text="signalDescription"></div>
                         </div>
                     </template>
->>>>>>> 7eec0b7 (UX: add skeleton loading to key pages; standardize chart toolbars (hide export/share/scale); fix liquidations loading state; keep only date range, interval and minimal toggles)
                 </div>
             </div>
         </div>
