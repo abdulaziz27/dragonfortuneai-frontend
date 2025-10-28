@@ -316,10 +316,14 @@ function fundingRateController() {
 
                 // Render charts with small delay to ensure DOM is ready
                 setTimeout(() => {
-                    this.renderChart();
-                    this.renderDistributionChart();
-                    this.renderMAChart();
-                }, 100);
+                    try {
+                        this.renderChart();
+                        this.renderDistributionChart();
+                        this.renderMAChart();
+                    } catch (error) {
+                        console.error('❌ Error rendering charts:', error);
+                    }
+                }, 150); // Increased delay slightly
 
             } catch (error) {
                 console.error('❌ Error loading data:', error);
@@ -477,11 +481,17 @@ function fundingRateController() {
             // Outlier detection (flexible approach) - ADAPTED FOR FUNDING RATES
             if (fundingValues.length >= 2) {
                 const stdDev = this.calculateStdDev(fundingValues);
-                const threshold2Sigma = this.avgFundingRate + (2 * stdDev);
-                const threshold3Sigma = this.avgFundingRate + (3 * stdDev);
-
-                this.highFundingEvents = fundingValues.filter(v => Math.abs(v) > Math.abs(threshold2Sigma)).length;
-                this.extremeFundingEvents = fundingValues.filter(v => Math.abs(v) > Math.abs(threshold3Sigma)).length;
+                
+                // Count outliers using Z-score (correct statistical approach)
+                this.highFundingEvents = fundingValues.filter(v => {
+                    const zScore = Math.abs((v - this.avgFundingRate) / stdDev);
+                    return zScore > 2; // |Z-score| > 2σ
+                }).length;
+                
+                this.extremeFundingEvents = fundingValues.filter(v => {
+                    const zScore = Math.abs((v - this.avgFundingRate) / stdDev);
+                    return zScore > 3; // |Z-score| > 3σ
+                }).length;
 
                 // Market signal
                 this.calculateMarketSignal(stdDev);
@@ -507,9 +517,13 @@ function fundingRateController() {
             console.log('📊 Metrics calculated:', {
                 current: this.currentFundingRate,
                 avg: this.avgFundingRate,
+                stdDev: fundingValues.length >= 2 ? this.calculateStdDev(fundingValues) : 'N/A',
                 max: this.maxFundingRate,
+                highEvents: this.highFundingEvents,
+                extremeEvents: this.extremeFundingEvents,
                 signal: this.marketSignal,
-                zScore: this.currentZScore
+                zScore: this.currentZScore,
+                dataPoints: fundingValues.length
             });
         },
 
@@ -542,32 +556,46 @@ function fundingRateController() {
 
         // Render main chart (CryptoQuant style with price overlay) - ADAPTED FOR FUNDING RATES
         renderChart() {
-            const canvas = document.getElementById('fundingRateMainChart');
-            if (!canvas) {
-                console.warn('⚠️ Canvas element not found: fundingRateMainChart');
-                return;
-            }
-
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                console.warn('⚠️ Cannot get 2D context from canvas');
-                return;
-            }
-
-            // Destroy existing chart safely
-            if (this.mainChart) {
-                try {
-                    this.mainChart.destroy();
-                } catch (error) {
-                    console.warn('⚠️ Error destroying chart:', error);
+            try {
+                // Check if Chart.js is available
+                if (typeof Chart === 'undefined') {
+                    console.warn('⚠️ Chart.js not loaded yet, retrying...');
+                    setTimeout(() => this.renderChart(), 100);
+                    return;
                 }
-                this.mainChart = null;
-            }
 
-            // Check if we have data
-            if (!this.rawData || this.rawData.length === 0) {
-                console.warn('⚠️ No data available for chart rendering');
-                return;
+                const canvas = document.getElementById('fundingRateMainChart');
+                if (!canvas) {
+                    console.warn('⚠️ Canvas element not found: fundingRateMainChart');
+                    return;
+                }
+
+                // Check if canvas is still in DOM
+                if (!canvas.isConnected) {
+                    console.warn('⚠️ Canvas element is not connected to DOM');
+                    return;
+                }
+
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    console.warn('⚠️ Cannot get 2D context from canvas');
+                    return;
+                }
+
+                // Destroy existing chart safely
+                if (this.mainChart) {
+                    try {
+                        this.mainChart.destroy();
+                    } catch (error) {
+                        console.warn('⚠️ Error destroying chart:', error);
+                    }
+                    this.mainChart = null;
+                }
+
+                // Check if we have data
+                if (!this.rawData || this.rawData.length === 0) {
+                    console.warn('⚠️ No data available for chart rendering');
+                    return;
             }
 
             // Prepare Funding Rate data
@@ -817,6 +845,10 @@ function fundingRateController() {
                 console.error('❌ Error creating chart:', error);
                 this.mainChart = null;
             }
+        } catch (error) {
+            console.error('❌ Error in renderChart function:', error);
+            this.mainChart = null;
+        }
         },
 
         // Render distribution chart (histogram) - ADAPTED FOR FUNDING RATES
