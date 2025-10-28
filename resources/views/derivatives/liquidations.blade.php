@@ -68,10 +68,23 @@
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">₿ BTC/USD</span>
                     </div>
-                    <div class="h3 mb-1 text-warning" x-text="formatPriceUSD(currentPrice)">--</div>
-                    <div class="small" :class="getPriceTrendClass(priceChange)">
-                        <span x-text="formatChange(priceChange)">--</span> 24h
-                    </div>
+                    <template x-if="globalLoading">
+                        <div>
+                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 80%; height: 28px;"></div>
+                            <div class="small">
+                                <span class="skeleton skeleton-text" style="width: 60px; height: 16px;"></span>
+                                <span class="text-secondary ms-1">24h</span>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="!globalLoading">
+                        <div>
+                            <div class="h3 mb-1 text-warning" x-text="formatPriceUSD(currentPrice)"></div>
+                            <div class="small" :class="getPriceTrendClass(priceChange)">
+                                <span x-text="formatChange(priceChange)"></span> 24h
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -82,7 +95,12 @@
                         <span class="small text-secondary">Total Liq 24h</span>
                         <span class="badge text-bg-primary">Latest</span>
                     </div>
-                    <div class="h3 mb-1" x-text="formatLiquidation(totalLiquidations)">--</div>
+                    <template x-if="globalLoading">
+                        <div class="h3 mb-2 skeleton skeleton-text" style="width: 70%; height: 28px;"></div>
+                    </template>
+                    <template x-if="!globalLoading">
+                        <div class="h3 mb-1" x-text="formatLiquidation(totalLiquidations)"></div>
+                    </template>
                     <div class="small text-secondary">All Exchanges</div>
                 </div>
             </div>
@@ -94,8 +112,18 @@
                         <span class="small text-secondary">Long Liq</span>
                         <span class="badge text-bg-danger">Shorts Win</span>
                     </div>
-                    <div class="h3 mb-1 text-danger" x-text="formatLiquidation(longLiquidations)">--</div>
-                    <div class="small text-secondary" x-text="formatPercentage(longLiquidationRatio)">--</div>
+                    <template x-if="globalLoading">
+                        <div>
+                            <div class="h3 mb-2 text-danger skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
+                            <div class="small text-secondary skeleton skeleton-text" style="width: 60px; height: 16px;"></div>
+                        </div>
+                    </template>
+                    <template x-if="!globalLoading">
+                        <div>
+                            <div class="h3 mb-1 text-danger" x-text="formatLiquidation(longLiquidations)"></div>
+                            <div class="small text-secondary" x-text="formatPercentage(longLiquidationRatio)"></div>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -106,8 +134,18 @@
                         <span class="small text-secondary">Short Liq</span>
                         <span class="badge text-bg-success">Longs Win</span>
                     </div>
-                    <div class="h3 mb-1 text-success" x-text="formatLiquidation(shortLiquidations)">--</div>
-                    <div class="small text-secondary" x-text="formatPercentage(shortLiquidationRatio)">--</div>
+                    <template x-if="globalLoading">
+                        <div>
+                            <div class="h3 mb-2 text-success skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
+                            <div class="small text-secondary skeleton skeleton-text" style="width: 60px; height: 16px;"></div>
+                        </div>
+                    </template>
+                    <template x-if="!globalLoading">
+                        <div>
+                            <div class="h3 mb-1 text-success" x-text="formatLiquidation(shortLiquidations)"></div>
+                            <div class="small text-secondary" x-text="formatPercentage(shortLiquidationRatio)"></div>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -116,14 +154,34 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Liquidation Sentiment</span>
-                        <span class="badge" :class="getLiquidationSentimentBadgeClass()" x-text="liquidationSentimentStrength">--</span>
+                        <template x-if="globalLoading">
+                            <span class="badge skeleton skeleton-badge" style="width: 100px; height: 22px;"></span>
+                        </template>
+                        <template x-if="!globalLoading">
+                            <span class="badge" :class="getLiquidationSentimentBadgeClass()" x-text="liquidationSentimentStrength"></span>
+                        </template>
                     </div>
-                    <div class="h4 mb-1" :class="getLiquidationSentimentColorClass()" x-text="liquidationSentiment">--</div>
-                    <div class="small text-secondary" x-text="liquidationSentimentDescription">--</div>
+                    <template x-if="globalLoading">
+                        <div>
+                            <div class="h4 mb-2 skeleton skeleton-text" style="width: 60%; height: 22px;"></div>
+                            <div class="small text-secondary skeleton skeleton-text" style="width: 90%; height: 16px;"></div>
+                        </div>
+                    </template>
+                    <template x-if="!globalLoading">
+                        <div>
+                            <div class="h4 mb-1" :class="getLiquidationSentimentColorClass()" x-text="liquidationSentiment"></div>
+                            <div class="small text-secondary" x-text="liquidationSentimentDescription"></div>
+                        </div>
+                    </template>
                     <!-- Long/Short Ratio Display -->
                     <div class="mt-2 d-flex justify-content-between">
                         <span class="small text-secondary">Long/Short Ratio:</span>
-                        <span class="badge" :class="getLongShortRatioBadgeClass(longShortLiqRatio)" x-text="formatRatio(longShortLiqRatio)">--</span>
+                        <template x-if="globalLoading">
+                            <span class="badge skeleton skeleton-badge" style="width: 80px; height: 22px;"></span>
+                        </template>
+                        <template x-if="!globalLoading">
+                            <span class="badge" :class="getLongShortRatioBadgeClass(longShortLiqRatio)" x-text="formatRatio(longShortLiqRatio)"></span>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -454,7 +512,7 @@
                                 <span class="badge text-bg-warning" x-show="loading">Loading...</span> -->
                             </div>
 
-                            <!-- Chart Controls -->
+                            <!-- Chart Controls (standardized) -->
                             <div class="d-flex gap-2 align-items-center flex-wrap">
                                 <!-- Symbol Filter -->
                                 <select class="form-select form-select-sm" style="width: 120px;" x-model="selectedSymbol" @change="setSymbol(selectedSymbol)">
@@ -475,7 +533,7 @@
                                     </template>
                                 </div>
 
-                                <!-- Chart Type Toggle -->
+                                <!-- Chart Type Toggle (keep) -->
                                 <div class="btn-group btn-group-sm me-3" role="group">
                                     <button type="button" class="btn" :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType('line')">
                                         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -490,16 +548,8 @@
                                         </svg>
                                     </button>
                                 </div>
-
-                                <!-- Chart Tools -->
-                                <div class="btn-group btn-group-sm chart-tools" role="group">
-                                    <button type="button" class="btn btn-outline-secondary chart-tool-btn" @click="refreshChart()" :disabled="loading" title="Refresh Data">
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                            <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                                        </svg>
-                                    </button>
-                                </div>
+                                <!-- Chart Tools (hidden for consistency) -->
+                                <div class="btn-group btn-group-sm chart-tools" role="group" style="display: none;"></div>
                             </div>
                         </div>
                     </div>
@@ -726,7 +776,7 @@
                                     </template>
                                 </div>
 
-                                <!-- Chart Type Toggle -->
+                                <!-- Chart Type Toggle (keep) -->
                                 <div class="btn-group btn-group-sm me-3" role="group">
                                     <button type="button" class="btn" :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType('line')">
                                         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -768,66 +818,11 @@
                                     </ul>
                                 </div>
 
-                                <!-- Scale Toggle -->
-                                <div class="btn-group btn-group-sm me-3" role="group">
-                                    <button type="button" 
-                                            class="btn scale-toggle-btn"
-                                            :class="scaleType === 'linear' ? 'btn-primary' : 'btn-outline-secondary'"
-                                            @click="toggleScale('linear')"
-                                            title="Skala Linear - Interval sama, bagus untuk perubahan absolut">
-                                        Linear
-                                    </button>
-                                    <button type="button" 
-                                            class="btn scale-toggle-btn"
-                                            :class="scaleType === 'logarithmic' ? 'btn-primary' : 'btn-outline-secondary'"
-                                            @click="toggleScale('logarithmic')"
-                                            title="Skala Logaritmik - Interval eksponensial, bagus untuk perubahan persentase">
-                                        Log
-                                    </button>
-                                </div>
+                                <!-- Scale Toggle (hidden for simplicity) -->
+                                <div class="btn-group btn-group-sm me-3" role="group" style="display: none;"></div>
 
-                                <!-- Chart Tools -->
-                                <div class="btn-group btn-group-sm chart-tools" role="group">
-                                    <button type="button" class="btn btn-outline-secondary chart-tool-btn" @click="resetZoom()" title="Reset Zoom">
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                            <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                                        </svg>
-                                    </button>
-                                    
-                                    <!-- Export Dropdown -->
-                                    <div class="btn-group btn-group-sm" role="group">
-                                        <button type="button" class="btn btn-outline-secondary dropdown-toggle chart-tool-btn" data-bs-toggle="dropdown" title="Export Chart">
-                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                                                <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
-                                            </svg>
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-dark">
-                                            <li><a class="dropdown-item" href="#" @click.prevent="exportChart('png')">
-                                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-2">
-                                                    <path d="M4.502 9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM4 10.5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0z"/>
-                                                    <path d="M14 2H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zM2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2H2z"/>
-                                                    <path d="M10.648 7.646a.5.5 0 0 1 .577-.093L15.002 9.5V13h-14v-1l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71z"/>
-                                                </svg>
-                                                Export sebagai PNG
-                                            </a></li>
-                                            <li><a class="dropdown-item" href="#" @click.prevent="exportChart('svg')">
-                                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-2">
-                                                    <path d="M8.5 2a.5.5 0 0 0-1 0v5.793L5.354 5.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 7.793V2z"/>
-                                                    <path d="M3 9.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5z"/>
-                                                </svg>
-                                                Export sebagai SVG
-                                            </a></li>
-                                        </ul>
-                                    </div>
-                                    
-                                    <button type="button" class="btn btn-outline-secondary chart-tool-btn" @click="shareChart()" title="Bagikan Chart">
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                            <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.499 2.499 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5z"/>
-                                        </svg>
-                                    </button>
-                                </div>
+                                <!-- Chart Tools (hidden: remove reset/export/share for consistency) -->
+                                <div class="btn-group btn-group-sm chart-tools" role="group" style="display: none;"></div>
                             </div>
                         </div>
                     </div>
@@ -967,6 +962,31 @@
     <script src="{{ asset('js/laevitas-heatmap.js') }}"></script>
 
     <style>
+        /* Skeleton placeholders */
+        [x-cloak] { display: none !important; }
+        .skeleton {
+            position: relative;
+            overflow: hidden;
+            background: rgba(148, 163, 184, 0.15);
+            border-radius: 6px;
+        }
+        .skeleton::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            transform: translateX(-100%);
+            background: linear-gradient(90deg,
+                rgba(255,255,255,0) 0%,
+                rgba(255,255,255,0.4) 50%,
+                rgba(255,255,255,0) 100%);
+            animation: skeleton-shimmer 1.2s infinite;
+        }
+        .skeleton-text { display: inline-block; }
+        .skeleton-badge { display: inline-block; border-radius: 999px; }
+        .skeleton-pill { display: inline-block; border-radius: 999px; }
+        @keyframes skeleton-shimmer {
+            100% { transform: translateX(100%); }
+        }
         /* Light Theme Chart Container */
         .tradingview-chart-container,
         .total-liquidations-chart-container {

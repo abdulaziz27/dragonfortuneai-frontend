@@ -6,7 +6,7 @@
 function liquidationsHybridController() {
     return {
         // Global state
-        globalLoading: false,
+        globalLoading: true,
         selectedExchange: 'binance',
         selectedSymbol: 'btc_usdt',
 
@@ -38,6 +38,7 @@ function liquidationsHybridController() {
         // Load summary data
         async loadSummaryData() {
             try {
+                this.globalLoading = true;
                 // Load Bitcoin price from CryptoQuant
                 await this.loadBitcoinPrice();
 
@@ -47,6 +48,8 @@ function liquidationsHybridController() {
                 console.log('📊 Summary data loaded');
             } catch (error) {
                 console.error('Error loading summary data:', error);
+            } finally {
+                this.globalLoading = false;
             }
         },
 

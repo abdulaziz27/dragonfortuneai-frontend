@@ -46,7 +46,7 @@
                         <option value="1w">1 Week</option>
                     </select>
 
-                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
+                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading" x-show="false">
                         <span x-show="!globalLoading">🔄 Refresh</span>
                         <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
                     </button>
@@ -63,6 +63,7 @@
                         <span class="small text-secondary">₿ BTC/USD</span>
                         <span class="badge text-bg-warning">Live</span>
                     </div>
+<<<<<<< HEAD
                     <div class="h3 mb-1 text-warning" x-show="summaryDataLoaded" x-text="formatPriceUSD(currentPrice)"></div>
                     <div class="h3 mb-1 text-secondary" x-show="!summaryDataLoaded">
                         <div class="placeholder-glow">
@@ -77,6 +78,25 @@
                             <span class="placeholder col-6"></span>
                         </div>
                     </div>
+=======
+                    <template x-if="globalLoading">
+                        <div>
+                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 80%; height: 28px;"></div>
+                            <div class="small">
+                                <span class="skeleton skeleton-text" style="width: 60px; height: 16px;"></span>
+                                <span class="text-secondary ms-1">24h</span>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="!globalLoading">
+                        <div>
+                            <div class="h3 mb-1 text-warning" x-text="formatPriceUSD(currentPrice)"></div>
+                            <div class="small" :class="getPriceTrendClass(priceChange)">
+                                <span x-text="formatChange(priceChange)"></span> 24h
+                            </div>
+                        </div>
+                    </template>
+>>>>>>> 7eec0b7 (UX: add skeleton loading to key pages; standardize chart toolbars (hide export/share/scale); fix liquidations loading state; keep only date range, interval and minimal toggles)
                 </div>
             </div>
 
@@ -87,6 +107,7 @@
                         <span class="small text-secondary">Current Rate</span>
                         <span class="badge text-bg-primary">Latest</span>
                     </div>
+<<<<<<< HEAD
                     <div class="h3 mb-1" x-show="summaryDataLoaded" x-text="formatFundingRate(currentFundingRate)"></div>
                     <div class="h3 mb-1 text-secondary" x-show="!summaryDataLoaded">
                         <div class="placeholder-glow">
@@ -101,6 +122,25 @@
                             <span class="placeholder col-5"></span>
                         </div>
                     </div>
+=======
+                    <template x-if="globalLoading">
+                        <div>
+                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 70%; height: 28px;"></div>
+                            <div class="small">
+                                <span class="skeleton skeleton-text" style="width: 60px; height: 16px;"></span>
+                                <span class="text-secondary ms-1">24h</span>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="!globalLoading">
+                        <div>
+                            <div class="h3 mb-1" x-text="formatFundingRate(currentFundingRate)"></div>
+                            <div class="small" :class="getTrendClass(fundingChange)">
+                                <span x-text="formatChange(fundingChange)"></span> 24h
+                            </div>
+                        </div>
+                    </template>
+>>>>>>> 7eec0b7 (UX: add skeleton loading to key pages; standardize chart toolbars (hide export/share/scale); fix liquidations loading state; keep only date range, interval and minimal toggles)
                 </div>
             </div>
 
@@ -111,6 +151,7 @@
                         <span class="small text-secondary">Period Avg</span>
                         <span class="badge text-bg-info">Avg</span>
                     </div>
+<<<<<<< HEAD
                     <div class="h3 mb-1" x-show="summaryDataLoaded" x-text="formatFundingRate(avgFundingRate)"></div>
                     <div class="h3 mb-1 text-secondary" x-show="!summaryDataLoaded">
                         <div class="placeholder-glow">
@@ -125,6 +166,25 @@
                             <span class="placeholder col-6"></span>
                         </div>
                     </div>
+=======
+                    <template x-if="globalLoading">
+                        <div>
+                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
+                            <div class="small text-secondary d-flex align-items-center gap-1">
+                                <span>Med:</span>
+                                <span class="skeleton skeleton-text" style="width: 60px; height: 16px;"></span>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="!globalLoading">
+                        <div>
+                            <div class="h3 mb-1" x-text="formatFundingRate(avgFundingRate)"></div>
+                            <div class="small text-secondary">
+                                Med: <span x-text="formatFundingRate(medianFundingRate)"></span>
+                            </div>
+                        </div>
+                    </template>
+>>>>>>> 7eec0b7 (UX: add skeleton loading to key pages; standardize chart toolbars (hide export/share/scale); fix liquidations loading state; keep only date range, interval and minimal toggles)
                 </div>
             </div>
 
@@ -135,6 +195,7 @@
                         <span class="small text-secondary">Peak Rate</span>
                         <span class="badge text-bg-danger">Max</span>
                     </div>
+<<<<<<< HEAD
                     <div class="h3 mb-1 text-danger" x-show="summaryDataLoaded" x-text="formatFundingRate(maxFundingRate)"></div>
                     <div class="h3 mb-1 text-secondary" x-show="!summaryDataLoaded">
                         <div class="placeholder-glow">
@@ -147,6 +208,20 @@
                             <span class="placeholder col-5"></span>
                         </div>
                     </div>
+=======
+                    <template x-if="globalLoading">
+                        <div>
+                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
+                            <div class="small text-secondary skeleton skeleton-text" style="width: 80px; height: 16px;"></div>
+                        </div>
+                    </template>
+                    <template x-if="!globalLoading">
+                        <div>
+                            <div class="h3 mb-1 text-danger" x-text="formatFundingRate(maxFundingRate)"></div>
+                            <div class="small text-secondary" x-text="peakDate"></div>
+                        </div>
+                    </template>
+>>>>>>> 7eec0b7 (UX: add skeleton loading to key pages; standardize chart toolbars (hide export/share/scale); fix liquidations loading state; keep only date range, interval and minimal toggles)
                 </div>
             </div>
 
@@ -155,8 +230,14 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Market Signal</span>
-                        <span class="badge" :class="getSignalBadgeClass()" x-text="signalStrength">--</span>
+                        <template x-if="globalLoading">
+                            <span class="badge skeleton skeleton-badge" style="width: 80px; height: 22px;"></span>
+                        </template>
+                        <template x-if="!globalLoading">
+                            <span class="badge" :class="getSignalBadgeClass()" x-text="signalStrength"></span>
+                        </template>
                     </div>
+<<<<<<< HEAD
                     <div class="h4 mb-1" x-show="summaryDataLoaded" :class="getSignalColorClass()" x-text="marketSignal"></div>
                     <div class="h4 mb-1 text-secondary" x-show="!summaryDataLoaded">
                         <div class="placeholder-glow">
@@ -169,6 +250,20 @@
                             <span class="placeholder col-8"></span>
                         </div>
                     </div>
+=======
+                    <template x-if="globalLoading">
+                        <div>
+                            <div class="h4 mb-2 skeleton skeleton-text" style="width: 60%; height: 22px;"></div>
+                            <div class="small text-secondary skeleton skeleton-text" style="width: 90%; height: 16px;"></div>
+                        </div>
+                    </template>
+                    <template x-if="!globalLoading">
+                        <div>
+                            <div class="h4 mb-1" :class="getSignalColorClass()" x-text="marketSignal"></div>
+                            <div class="small text-secondary" x-text="signalDescription"></div>
+                        </div>
+                    </template>
+>>>>>>> 7eec0b7 (UX: add skeleton loading to key pages; standardize chart toolbars (hide export/share/scale); fix liquidations loading state; keep only date range, interval and minimal toggles)
                 </div>
             </div>
         </div>
@@ -181,8 +276,18 @@
                         <div class="d-flex align-items-center gap-3">
                             <h5 class="mb-0">Funding Rate</h5>
                             <div class="chart-info">
-                                <span class="current-value" x-text="formatFundingRate(currentFundingRate)">--</span>
-                                <span class="change-badge" :class="fundingChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(fundingChange)">--</span>
+                                <template x-if="globalLoading">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="current-value skeleton skeleton-text" style="width: 120px; height: 22px;"></span>
+                                        <span class="change-badge skeleton skeleton-pill" style="width: 80px; height: 24px;"></span>
+                                    </div>
+                                </template>
+                                <template x-if="!globalLoading">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="current-value" x-text="formatFundingRate(currentFundingRate)"></span>
+                                        <span class="change-badge" :class="fundingChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(fundingChange)"></span>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                         <div class="chart-controls">
@@ -198,8 +303,8 @@
                                 </template>
                             </div>
 
-                            <!-- Chart Type Toggle -->
-                            <div class="btn-group btn-group-sm me-3" role="group">
+                            <!-- Chart Type Toggle (hidden) -->
+                            <div class="btn-group btn-group-sm me-3" role="group" style="display: none;">
                                 <button type="button" class="btn" :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType('line')">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                         <path d="M2 12l3-3 3 3 6-6"/>
@@ -240,8 +345,8 @@
                                 </ul>
                             </div>
 
-                            <!-- Scale Toggle -->
-                            <div class="btn-group btn-group-sm me-3" role="group">
+                            <!-- Scale Toggle (hidden) -->
+                            <div class="btn-group btn-group-sm me-3" role="group" style="display: none;">
                                 <button type="button" 
                                         class="btn scale-toggle-btn"
                                         :class="scaleType === 'linear' ? 'btn-primary' : 'btn-outline-secondary'"
@@ -258,8 +363,8 @@
                                 </button>
                             </div>
 
-                            <!-- Chart Tools -->
-                            <div class="btn-group btn-group-sm chart-tools" role="group">
+                            <!-- Chart Tools (hidden) -->
+                            <div class="btn-group btn-group-sm chart-tools" role="group" style="display: none;">
                                 <button type="button" class="btn btn-outline-secondary chart-tool-btn" @click="resetZoom()" title="Reset Zoom">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                         <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
@@ -339,18 +444,38 @@
                     </div>
                     <div class="mt-3">
                         <!-- Z-Score Display -->
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="small text-secondary">Z-Score Saat Ini</span>
-                            <span class="badge" :class="getZScoreBadgeClass(currentZScore)" x-text="formatZScore(currentZScore)">--</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="small text-secondary">Event Funding Tinggi (>2σ)</span>
-                            <span class="badge text-bg-warning" x-text="highFundingEvents">0</span>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="small text-secondary">Event Ekstrem (>3σ)</span>
-                            <span class="badge text-bg-danger" x-text="extremeFundingEvents">0</span>
-                        </div>
+                        <template x-if="globalLoading">
+                            <div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="small text-secondary">Z-Score Saat Ini</span>
+                                    <span class="badge skeleton skeleton-badge" style="width: 70px; height: 22px;"></span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="small text-secondary">Event Funding Tinggi (>2σ)</span>
+                                    <span class="badge skeleton skeleton-badge" style="width: 36px; height: 22px;"></span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="small text-secondary">Event Ekstrem (>3σ)</span>
+                                    <span class="badge skeleton skeleton-badge" style="width: 36px; height: 22px;"></span>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="!globalLoading">
+                            <div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="small text-secondary">Z-Score Saat Ini</span>
+                                    <span class="badge" :class="getZScoreBadgeClass(currentZScore)" x-text="formatZScore(currentZScore)"></span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="small text-secondary">Event Funding Tinggi (>2σ)</span>
+                                    <span class="badge text-bg-warning" x-text="highFundingEvents"></span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="small text-secondary">Event Ekstrem (>3σ)</span>
+                                    <span class="badge text-bg-danger" x-text="extremeFundingEvents"></span>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -363,14 +488,30 @@
                         <canvas id="fundingRateMAChart"></canvas>
                     </div>
                     <div class="mt-3">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="small">Rata-rata 7 Hari:</span>
-                            <span class="fw-bold" x-text="formatFundingRate(ma7)">--</span>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="small">Rata-rata 30 Hari:</span>
-                            <span class="fw-bold" x-text="formatFundingRate(ma30)">--</span>
-                        </div>
+                        <template x-if="globalLoading">
+                            <div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="small">Rata-rata 7 Hari:</span>
+                                    <span class="fw-bold skeleton skeleton-text" style="width: 80px; height: 18px;"></span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="small">Rata-rata 30 Hari:</span>
+                                    <span class="fw-bold skeleton skeleton-text" style="width: 80px; height: 18px;"></span>
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="!globalLoading">
+                            <div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="small">Rata-rata 7 Hari:</span>
+                                    <span class="fw-bold" x-text="formatFundingRate(ma7)"></span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="small">Rata-rata 30 Hari:</span>
+                                    <span class="fw-bold" x-text="formatFundingRate(ma30)"></span>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -457,6 +598,31 @@
     <script src="{{ asset('js/funding-rate-exact-controller.js') }}"></script>
 
     <style>
+        /* Skeleton placeholders */
+        [x-cloak] { display: none !important; }
+        .skeleton {
+            position: relative;
+            overflow: hidden;
+            background: rgba(148, 163, 184, 0.15);
+            border-radius: 6px;
+        }
+        .skeleton::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            transform: translateX(-100%);
+            background: linear-gradient(90deg,
+                rgba(255,255,255,0) 0%,
+                rgba(255,255,255,0.4) 50%,
+                rgba(255,255,255,0) 100%);
+            animation: skeleton-shimmer 1.2s infinite;
+        }
+        .skeleton-text { display: inline-block; }
+        .skeleton-badge { display: inline-block; border-radius: 999px; }
+        .skeleton-pill { display: inline-block; border-radius: 999px; }
+        @keyframes skeleton-shimmer {
+            100% { transform: translateX(100%); }
+        }
         /* Light Theme Chart Container */
         .tradingview-chart-container {
             background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
