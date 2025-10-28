@@ -63,9 +63,19 @@
                         <span class="small text-secondary">₿ BTC/USD</span>
                         <span class="badge text-bg-warning">Live</span>
                     </div>
-                    <div class="h3 mb-1 text-warning" x-text="formatPriceUSD(currentPrice)">--</div>
-                    <div class="small" :class="getPriceTrendClass(priceChange)">
-                        <span x-text="formatChange(priceChange)">--</span> 24h
+                    <div class="h3 mb-1 text-warning" x-show="summaryDataLoaded" x-text="formatPriceUSD(currentPrice)"></div>
+                    <div class="h3 mb-1 text-secondary" x-show="!summaryDataLoaded">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-8"></span>
+                        </div>
+                    </div>
+                    <div class="small" x-show="summaryDataLoaded" :class="getPriceTrendClass(priceChange)">
+                        <span x-text="formatChange(priceChange)"></span> 24h
+                    </div>
+                    <div class="small text-secondary" x-show="!summaryDataLoaded">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-6"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -77,9 +87,19 @@
                         <span class="small text-secondary">Current Rate</span>
                         <span class="badge text-bg-primary">Latest</span>
                     </div>
-                    <div class="h3 mb-1" x-text="formatFundingRate(currentFundingRate)">--</div>
-                    <div class="small" :class="getTrendClass(fundingChange)">
-                        <span x-text="formatChange(fundingChange)">--</span> 24h
+                    <div class="h3 mb-1" x-show="summaryDataLoaded" x-text="formatFundingRate(currentFundingRate)"></div>
+                    <div class="h3 mb-1 text-secondary" x-show="!summaryDataLoaded">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-7"></span>
+                        </div>
+                    </div>
+                    <div class="small" x-show="summaryDataLoaded" :class="getTrendClass(fundingChange)">
+                        <span x-text="formatChange(fundingChange)"></span> 24h
+                    </div>
+                    <div class="small text-secondary" x-show="!summaryDataLoaded">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-5"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -91,9 +111,19 @@
                         <span class="small text-secondary">Period Avg</span>
                         <span class="badge text-bg-info">Avg</span>
                     </div>
-                    <div class="h3 mb-1" x-text="formatFundingRate(avgFundingRate)">--</div>
-                    <div class="small text-secondary">
-                        Med: <span x-text="formatFundingRate(medianFundingRate)">--</span>
+                    <div class="h3 mb-1" x-show="summaryDataLoaded" x-text="formatFundingRate(avgFundingRate)"></div>
+                    <div class="h3 mb-1 text-secondary" x-show="!summaryDataLoaded">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-7"></span>
+                        </div>
+                    </div>
+                    <div class="small text-secondary" x-show="summaryDataLoaded">
+                        Med: <span x-text="formatFundingRate(medianFundingRate)"></span>
+                    </div>
+                    <div class="small text-secondary" x-show="!summaryDataLoaded">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-6"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -105,8 +135,18 @@
                         <span class="small text-secondary">Peak Rate</span>
                         <span class="badge text-bg-danger">Max</span>
                     </div>
-                    <div class="h3 mb-1 text-danger" x-text="formatFundingRate(maxFundingRate)">--</div>
-                    <div class="small text-secondary" x-text="peakDate">--</div>
+                    <div class="h3 mb-1 text-danger" x-show="summaryDataLoaded" x-text="formatFundingRate(maxFundingRate)"></div>
+                    <div class="h3 mb-1 text-secondary" x-show="!summaryDataLoaded">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-7"></span>
+                        </div>
+                    </div>
+                    <div class="small text-secondary" x-show="summaryDataLoaded" x-text="peakDate"></div>
+                    <div class="small text-secondary" x-show="!summaryDataLoaded">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-5"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -117,8 +157,18 @@
                         <span class="small text-secondary">Market Signal</span>
                         <span class="badge" :class="getSignalBadgeClass()" x-text="signalStrength">--</span>
                     </div>
-                    <div class="h4 mb-1" :class="getSignalColorClass()" x-text="marketSignal">--</div>
-                    <div class="small text-secondary" x-text="signalDescription">--</div>
+                    <div class="h4 mb-1" x-show="summaryDataLoaded" :class="getSignalColorClass()" x-text="marketSignal"></div>
+                    <div class="h4 mb-1 text-secondary" x-show="!summaryDataLoaded">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-6"></span>
+                        </div>
+                    </div>
+                    <div class="small text-secondary" x-show="summaryDataLoaded" x-text="signalDescription"></div>
+                    <div class="small text-secondary" x-show="!summaryDataLoaded">
+                        <div class="placeholder-glow">
+                            <span class="placeholder col-8"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -47,18 +47,22 @@ function fundingRateController() {
         rawData: [],
         priceData: [], // Bitcoin price data for overlay
 
+        // Data loading state
+        dataLoaded: false,
+        summaryDataLoaded: false,
+
         // Summary metrics (changed from CDD to Funding Rate)
-        currentFundingRate: 0,
-        fundingChange: 0,
-        avgFundingRate: 0,
-        medianFundingRate: 0,
-        maxFundingRate: 0,
-        minFundingRate: 0,
+        currentFundingRate: null,
+        fundingChange: null,
+        avgFundingRate: null,
+        medianFundingRate: null,
+        maxFundingRate: null,
+        minFundingRate: null,
         peakDate: '--',
 
         // Price metrics
-        currentPrice: 0,
-        priceChange: 0,
+        currentPrice: null,
+        priceChange: null,
 
         // Analysis metrics (adapted for funding rates)
         ma7: 0,
@@ -305,6 +309,10 @@ function fundingRateController() {
 
                 // Calculate metrics
                 this.calculateMetrics();
+                
+                // Mark summary data as loaded
+                this.summaryDataLoaded = true;
+                this.dataLoaded = true;
 
                 // Render charts with small delay to ensure DOM is ready
                 setTimeout(() => {
