@@ -334,62 +334,6 @@
             </div>
         </div>
 
-        <!-- NET POSITION FLOW CHART SECTION -->
-        <div class="row g-3">
-            <div class="col-12">
-                <div class="tradingview-chart-container">
-                    <div class="chart-header">
-                        <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0">💰 Net Position Flow Chart</h5>
-                            <div class="chart-info">
-                                <span class="current-value" x-text="formatChange(currentNetLongChange)">--</span>
-                                <span class="small text-secondary">Long Flow</span>
-                                <span class="mx-2">|</span>
-                                <span class="current-value" x-text="formatChange(currentNetShortChange)">--</span>
-                                <span class="small text-secondary">Short Flow</span>
-                            </div>
-                        </div>
-                        <div class="chart-controls">
-                            <!-- Legend Info -->
-                            <div class="d-flex gap-3 align-items-center">
-                                <div class="d-flex align-items-center gap-1">
-                                    <div style="width: 12px; height: 2px; background-color: #22c55e;"></div>
-                                    <span class="small text-secondary">Net Long Flow</span>
-                                </div>
-                                <div class="d-flex align-items-center gap-1">
-                                    <div style="width: 12px; height: 2px; background-color: #ef4444;"></div>
-                                    <span class="small text-secondary">Net Short Flow</span>
-                                </div>
-                                <div class="small text-secondary ms-3">
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="margin-right: 4px;">
-                                        <path d="M6 2L3 6h2v4h2V6h2L6 2z" fill="currentColor"/>
-                                    </svg>
-                                    Positive = Money flowing IN, Negative = Money flowing OUT
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="chart-body">
-                        <canvas id="netPositionFlowChart"></canvas>
-                    </div>
-                    <div class="chart-footer">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="chart-footer-text">
-                                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="margin-right: 4px;">
-                                    <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1"/>
-                                    <path d="M6 3v3l2 2" stroke="currentColor" stroke-width="1" fill="none"/>
-                                </svg>
-                                Net position changes menunjukkan arah money flow - indikator leading untuk perubahan sentiment
-                            </small>
-                            <small class="text-muted">
-                                <span class="badge text-bg-info">Real-time Flow</span>
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- RATIO COMPARISON CHART SECTION -->
         <div class="row g-3">
             <div class="col-12">

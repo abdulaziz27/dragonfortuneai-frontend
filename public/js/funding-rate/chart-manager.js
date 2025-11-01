@@ -415,15 +415,16 @@ export class ChartManager {
                     display: false  // Hide legend for candlestick chart
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(17, 24, 39, 0.95)',
-                    titleColor: '#f3f4f6',
-                    bodyColor: '#f3f4f6',
-                    borderColor: 'rgba(59, 130, 246, 0.5)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                    titleColor: '#1e293b',
+                    bodyColor: '#334155',
+                    borderColor: 'rgba(59, 130, 246, 0.3)',
                     borderWidth: 1,
                     padding: 12,
                     displayColors: true,
                     boxWidth: 8,
                     boxHeight: 8,
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                     callbacks: {
                         title: (items) => {
                             const date = new Date(items[0].label);
@@ -487,7 +488,7 @@ export class ChartManager {
             scales: {
                 x: {
                     ticks: {
-                        color: '#94a3b8',
+                        color: '#64748b',
                         font: { size: 10 },
                         maxRotation: 45,
                         minRotation: 45,
@@ -569,7 +570,7 @@ export class ChartManager {
                     },
                     grid: {
                         display: true,
-                        color: 'rgba(148, 163, 184, 0.08)',
+                        color: 'rgba(148, 163, 184, 0.15)',
                         drawBorder: false
                     }
                 },
@@ -579,11 +580,11 @@ export class ChartManager {
                     title: {
                         display: true,
                         text: 'Funding Rate (%)',
-                        color: '#94a3b8',
-                        font: { size: 11, weight: '600' }
+                        color: '#475569',
+                        font: { size: 11, weight: '500' }
                     },
                     ticks: {
-                        color: '#94a3b8',
+                        color: '#64748b',
                         font: { size: 11 },
                         callback: (value) => FundingRateUtils.formatFundingRate(value)
                     },
@@ -591,9 +592,9 @@ export class ChartManager {
                         color: (context) => {
                             // Highlight zero line for bar chart
                             if (context.tick.value === 0) {
-                                return 'rgba(148, 163, 184, 0.5)';
+                                return 'rgba(148, 163, 184, 0.3)';
                             }
-                            return 'rgba(148, 163, 184, 0.08)';
+                            return 'rgba(148, 163, 184, 0.15)';
                         },
                         lineWidth: (context) => {
                             // Thicker zero line
@@ -612,11 +613,11 @@ export class ChartManager {
                     title: {
                         display: true,
                         text: 'BTC Price (USD)',
-                        color: '#f59e0b',
-                        font: { size: 11, weight: '600' }
+                        color: '#475569',
+                        font: { size: 11, weight: '500' }
                     },
                     ticks: {
-                        color: '#f59e0b',
+                        color: '#f59e0b', // Keep orange for price axis to maintain distinction
                         font: { size: 11 },
                         callback: (value) => '$' + value.toLocaleString('en-US', { maximumFractionDigits: 0 })
                     },

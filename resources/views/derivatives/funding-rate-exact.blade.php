@@ -18,7 +18,7 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <h1 class="mb-0">₿ Bitcoin: Funding Rate</h1>
+                        <h1 class="mb-0">Funding Rate</h1>
                         <span class="pulse-dot pulse-success"></span>
                     </div>
                     <p class="mb-0 text-secondary">
@@ -192,44 +192,45 @@
                             </div>
                         </div>
                         <div class="chart-controls">
-                            <!-- Time Range Buttons -->
-                            <div class="time-range-selector me-3">
-                                <template x-for="range in timeRanges" :key="range.value">
+                            <div class="d-flex flex-wrap align-items-center gap-3">
+                                <!-- Time Range Buttons -->
+                                <div class="time-range-selector">
+                                    <template x-for="range in timeRanges" :key="range.value">
+                                        <button type="button" 
+                                                class="btn btn-sm time-range-btn"
+                                                :class="globalPeriod === range.value ? 'btn-primary' : 'btn-outline-secondary'"
+                                                @click="setTimeRange(range.value)"
+                                                x-text="range.label">
+                                        </button>
+                                    </template>
+                                </div>
+
+                                <!-- Chart Type Toggle -->
+                                <div class="btn-group btn-group-sm" role="group">
                                     <button type="button" 
-                                            class="btn btn-sm time-range-btn"
-                                            :class="globalPeriod === range.value ? 'btn-primary' : 'btn-outline-secondary'"
-                                            @click="setTimeRange(range.value)"
-                                            x-text="range.label">
+                                            class="btn" 
+                                            :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" 
+                                            @click="toggleChartType('line')"
+                                            title="Line Chart - Mudah Dibaca">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 4px;">
+                                            <path d="M2 12l3-3 3 3 6-6"/>
+                                        </svg>
+                                        Line
                                     </button>
-                                </template>
-                            </div>
+                                    <button type="button" 
+                                            class="btn" 
+                                            :class="chartType === 'candlestick' ? 'btn-primary' : 'btn-outline-secondary'" 
+                                            @click="toggleChartType('candlestick')"
+                                            title="Candlestick - OHLC Detail">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 4px;">
+                                            <path d="M3 2h10v12H3V2zm1 1v10h8V3H4zm2 2h4v1H6V5zm0 3h2v1H6V8zm0 3h4v1H6v-1z"/>
+                                        </svg>
+                                        OHLC
+                                    </button>
+                                </div>
 
-                            <!-- Chart Type Toggle -->
-                            <div class="btn-group btn-group-sm me-3" role="group">
-                                <button type="button" 
-                                        class="btn" 
-                                        :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" 
-                                        @click="toggleChartType('line')"
-                                        title="Line Chart - Mudah Dibaca">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 4px;">
-                                        <path d="M2 12l3-3 3 3 6-6"/>
-                                    </svg>
-                                    Line
-                                </button>
-                                <button type="button" 
-                                        class="btn" 
-                                        :class="chartType === 'candlestick' ? 'btn-primary' : 'btn-outline-secondary'" 
-                                        @click="toggleChartType('candlestick')"
-                                        title="Candlestick - OHLC Detail">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 4px;">
-                                        <path d="M3 2h10v12H3V2zm1 1v10h8V3H4zm2 2h4v1H6V5zm0 3h2v1H6V8zm0 3h4v1H6v-1z"/>
-                                    </svg>
-                                    OHLC
-                                </button>
-                            </div>
-
-                            <!-- Interval Dropdown -->
-                            <div class="dropdown me-3">
+                                <!-- Interval Dropdown -->
+                                <div class="dropdown">
                                 <button class="btn btn-outline-secondary btn-sm dropdown-toggle interval-dropdown-btn" 
                                         type="button" 
                                         data-bs-toggle="dropdown" 
@@ -240,7 +241,7 @@
                                     </svg>
                                     <span x-text="chartIntervals.find(i => i.value === selectedInterval)?.label || '1D'"></span>
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-dark">
+                                <ul class="dropdown-menu">
                                     <template x-for="interval in chartIntervals" :key="interval.value">
                                         <li>
                                             <a class="dropdown-item" 
@@ -289,7 +290,7 @@
                                             <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
                                         </svg>
                                     </button>
-                                    <ul class="dropdown-menu dropdown-menu-dark">
+                                    <ul class="dropdown-menu">
                                         <li><a class="dropdown-item" href="#" @click.prevent="exportChart('png')">
                                             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-2">
                                                 <path d="M4.502 9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM4 10.5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0z"/>
@@ -313,6 +314,7 @@
                                         <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.499 2.499 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5z"/>
                                     </svg>
                                 </button>
+                            </div>
                             </div>
                         </div>
                     </div>
@@ -565,11 +567,11 @@
         }
         /* Light Theme Chart Container */
         .tradingview-chart-container {
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            background: #ffffff;
             border-radius: 12px;
             overflow: hidden;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
 
         .chart-header {
@@ -619,28 +621,55 @@
             color: #ef4444;
         }
 
+        /* Chart Controls - Responsive Layout */
+        .chart-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 1rem;
+            padding: 12px 20px;
+        }
+
+        .chart-controls > div {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
         .chart-controls .btn-group {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(241, 245, 249, 0.8);
             border-radius: 6px;
             padding: 2px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
 
         .chart-controls .btn {
             border: none;
             padding: 6px 12px;
-            color: #94a3b8;
+            color: #64748b;
             background: transparent;
             transition: all 0.2s;
         }
 
         .chart-controls .btn:hover {
-            color: #fff;
-            background: rgba(255, 255, 255, 0.05);
+            color: #1e293b;
+            background: rgba(241, 245, 249, 1);
         }
 
-        .chart-controls .btn-primary {
+        .chart-controls .btn-primary,
+        .chart-controls .btn.btn-primary {
             background: #3b82f6;
             color: #fff;
+        }
+
+        .chart-controls .btn-outline-secondary {
+            color: #64748b;
+            border-color: rgba(226, 232, 240, 0.8);
+        }
+
+        .chart-controls .btn-outline-secondary:hover {
+            background: rgba(241, 245, 249, 1);
+            color: #1e293b;
         }
 
         .chart-body {
@@ -648,6 +677,10 @@
             height: 500px;
             position: relative;
             background: #ffffff;
+        }
+
+        .chart-footer-text {
+            color: #64748b !important;
         }
 
         .chart-footer {
@@ -699,81 +732,20 @@
         }
 
         /* Professional Time Range Controls */
+        /* Time Range Selector */
         .time-range-selector {
             display: flex;
-            gap: 0.125rem;
-            background: linear-gradient(135deg, 
-                rgba(30, 41, 59, 0.8) 0%, 
-                rgba(51, 65, 85, 0.8) 100%);
-            border: 1px solid rgba(59, 130, 246, 0.2);
-            border-radius: 8px;
-            padding: 0.25rem;
-            box-shadow: 
-                0 4px 12px rgba(0, 0, 0, 0.2),
-                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            gap: 6px;
+            flex-wrap: wrap;
         }
 
         .time-range-btn {
-            padding: 0.5rem 0.875rem !important;
-            font-size: 0.75rem !important;
-            font-weight: 600 !important;
-            border: none !important;
-            border-radius: 6px !important;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            min-width: 44px;
-            position: relative;
-            overflow: hidden;
-            color: #94a3b8 !important;
-            background: transparent !important;
-        }
-
-        .time-range-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.1) 0%, 
-                rgba(139, 92, 246, 0.1) 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .time-range-btn:hover {
-            color: #e2e8f0 !important;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.2) !important;
-        }
-
-        .time-range-btn:hover::before {
-            opacity: 1;
-        }
-
-        .time-range-btn.btn-primary {
-            background: linear-gradient(135deg, 
-                #3b82f6 0%, 
-                #2563eb 100%) !important;
-            color: white !important;
-            box-shadow: 
-                0 4px 12px rgba(59, 130, 246, 0.4),
-                0 2px 4px rgba(59, 130, 246, 0.3) !important;
-            transform: translateY(-1px);
-        }
-
-        .time-range-btn.btn-primary::before {
-            background: linear-gradient(135deg, 
-                rgba(255, 255, 255, 0.1) 0%, 
-                rgba(255, 255, 255, 0.05) 100%);
-            opacity: 1;
-        }
-
-        .time-range-btn.btn-primary:hover {
-            box-shadow: 
-                0 6px 16px rgba(59, 130, 246, 0.5),
-                0 3px 6px rgba(59, 130, 246, 0.4) !important;
-            transform: translateY(-2px);
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 6px;
+            transition: all 0.2s;
+            white-space: nowrap;
         }
 
         .scale-toggle-btn {
@@ -858,143 +830,94 @@
         }
 
         /* Dropdown Menu Styling */
-        .dropdown-menu-dark {
-            background: linear-gradient(135deg, 
-                rgba(15, 23, 42, 0.95) 0%, 
-                rgba(30, 41, 59, 0.95) 100%) !important;
-            border: 1px solid rgba(59, 130, 246, 0.2) !important;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
-            backdrop-filter: blur(12px);
+        .dropdown-menu {
+            background: #ffffff !important;
+            border: 1px solid rgba(226, 232, 240, 0.8) !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1) !important;
         }
 
-        .dropdown-menu-dark .dropdown-item {
-            color: #e2e8f0 !important;
+        .dropdown-menu .dropdown-item {
+            color: #1e293b !important;
             transition: all 0.2s ease !important;
             border-radius: 4px !important;
             margin: 0.125rem !important;
         }
 
-        .dropdown-menu-dark .dropdown-item:hover {
-            background: rgba(59, 130, 246, 0.15) !important;
-            color: #60a5fa !important;
+        .dropdown-menu .dropdown-item:hover {
+            background: rgba(59, 130, 246, 0.1) !important;
+            color: #3b82f6 !important;
         }
 
-        /* Professional Chart Container - CryptoQuant Level */
-        .tradingview-chart-container {
-            background: linear-gradient(135deg, 
-                rgba(15, 23, 42, 0.98) 0%, 
-                rgba(30, 41, 59, 0.98) 50%,
-                rgba(15, 23, 42, 0.98) 100%);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(59, 130, 246, 0.25);
-            box-shadow: 
-                0 10px 40px rgba(0, 0, 0, 0.4),
-                0 4px 16px rgba(59, 130, 246, 0.1),
-                inset 0 1px 0 rgba(255, 255, 255, 0.08);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
+        .dropdown-menu .dropdown-item.active {
+            background: #3b82f6 !important;
+            color: #fff !important;
         }
 
-        .tradingview-chart-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(59, 130, 246, 0.5) 50%, 
-                transparent 100%);
-            z-index: 1;
+        /* Interval Dropdown Styling */
+        .interval-dropdown-btn {
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
+            padding: 0.5rem 0.75rem !important;
+            min-width: 70px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            border: 1px solid rgba(59, 130, 246, 0.15) !important;
+            background: rgba(241, 245, 249, 0.8) !important;
+            color: #64748b !important;
         }
 
-        .tradingview-chart-container:hover {
-            box-shadow: 
-                0 16px 48px rgba(0, 0, 0, 0.5),
-                0 6px 20px rgba(59, 130, 246, 0.15),
-                inset 0 1px 0 rgba(255, 255, 255, 0.12);
-            border-color: rgba(59, 130, 246, 0.4);
-            transform: translateY(-1px);
+        .interval-dropdown-btn:hover {
+            color: #1e293b !important;
+            border-color: rgba(59, 130, 246, 0.3) !important;
+            background: rgba(241, 245, 249, 1) !important;
         }
 
-        .chart-header {
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.08) 0%, 
-                rgba(139, 92, 246, 0.06) 100%);
-            border-bottom: 1px solid rgba(59, 130, 246, 0.25);
-            position: relative;
-            z-index: 2;
+        .interval-dropdown-btn:focus {
+            box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25) !important;
         }
 
-        .chart-header::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(59, 130, 246, 0.3) 50%, 
-                transparent 100%);
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .chart-controls {
+                padding: 10px 16px;
+                gap: 0.75rem;
+            }
+
+            .chart-controls > div {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .time-range-selector {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .form-select.form-select-sm {
+                width: 100% !important;
+                min-width: unset !important;
+            }
         }
 
-        .chart-header h5 {
-            color: #f1f5f9;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-            font-weight: 600;
-            letter-spacing: 0.025em;
-        }
+        @media (max-width: 576px) {
+            .chart-controls {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.75rem;
+            }
 
-        .current-value {
-            color: #60a5fa;
-            text-shadow: 0 0 12px rgba(96, 165, 250, 0.4);
-            font-weight: 700;
-            letter-spacing: -0.025em;
-        }
+            .chart-controls > div {
+                width: 100%;
+            }
 
-        .chart-body {
-            background: linear-gradient(135deg, 
-                rgba(15, 23, 42, 0.9) 0%, 
-                rgba(30, 41, 59, 0.85) 50%,
-                rgba(15, 23, 42, 0.9) 100%);
-            position: relative;
-        }
+            .time-range-selector {
+                width: 100%;
+                justify-content: space-between;
+            }
 
-        .chart-body::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: radial-gradient(circle at 50% 50%, 
-                rgba(59, 130, 246, 0.03) 0%, 
-                transparent 70%);
-            pointer-events: none;
-        }
-
-        .chart-footer {
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.04) 0%, 
-                rgba(139, 92, 246, 0.03) 100%);
-            border-top: 1px solid rgba(59, 130, 246, 0.2);
-            position: relative;
-        }
-
-        .chart-footer::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(59, 130, 246, 0.2) 50%, 
-                transparent 100%);
+            .time-range-btn {
+                flex: 1;
+                min-width: 0;
+            }
         }
 
         /* Professional Animations */
@@ -1196,60 +1119,5 @@
             }
         }
 
-        /* Dark mode enhancements */
-        @media (prefers-color-scheme: dark) {
-            .tradingview-chart-container {
-                box-shadow: 
-                    0 12px 48px rgba(0, 0, 0, 0.6),
-                    0 4px 16px rgba(59, 130, 246, 0.1),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-            }
-
-            .chart-footer-text {
-                color: #94a3b8 !important;
-            }
-        }
-
-        /* Interval Dropdown Styling */
-        .interval-dropdown-btn {
-            font-size: 0.75rem !important;
-            font-weight: 600 !important;
-            padding: 0.5rem 0.75rem !important;
-            min-width: 70px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            border: 1px solid rgba(59, 130, 246, 0.2) !important;
-            background: linear-gradient(135deg, 
-                rgba(30, 41, 59, 0.6) 0%, 
-                rgba(51, 65, 85, 0.6) 100%) !important;
-            color: #94a3b8 !important;
-        }
-
-        .interval-dropdown-btn:hover {
-            color: #e2e8f0 !important;
-            border-color: rgba(59, 130, 246, 0.4) !important;
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.1) 0%, 
-                rgba(139, 92, 246, 0.1) 100%) !important;
-        }
-
-        .interval-dropdown-btn:focus {
-            box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25) !important;
-        }
-
-        /* Light mode interval dropdown */
-        @media (prefers-color-scheme: light) {
-            .interval-dropdown-btn {
-                background: linear-gradient(135deg, 
-                    rgba(241, 245, 249, 0.8) 0%, 
-                    rgba(226, 232, 240, 0.8) 100%) !important;
-                border: 1px solid rgba(59, 130, 246, 0.15) !important;
-                color: #64748b !important;
-            }
-
-            .interval-dropdown-btn:hover {
-                color: #1e293b !important;
-                border-color: rgba(59, 130, 246, 0.3) !important;
-            }
-        }
     </style>
 @endsection
