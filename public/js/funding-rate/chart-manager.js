@@ -17,12 +17,12 @@ export class ChartManager {
      * Note: Always destroys and recreates chart to avoid Chart.js
      * internal stack overflow issues during updates.
      */
-    updateChart(data, priceData = []) {
+    updateChart(data, priceData = [], chartType = 'line') {
         // Always destroy and recreate for stability
         // Chart.js incremental updates can cause stack overflow
         // with complex configurations. Performance impact is minimal
         // with 5 second refresh interval.
-        this.renderChart(data, priceData);
+        this.renderChart(data, priceData, chartType);
     }
 
     /**
@@ -56,7 +56,7 @@ export class ChartManager {
     /**
      * Full chart render with cleanup
      */
-    renderChart(data, priceData = []) {
+    renderChart(data, priceData = [], chartType = 'line') {
         // Cleanup old chart
         this.destroy();
 
@@ -90,7 +90,110 @@ export class ChartManager {
         );
 
         const labels = sorted.map(d => d.date);
+        const fundingValues = sorted.map(d => parseFloat(d.value || d.close)); // Use value or close
         
+        // Render based on chart type
+        if (chartType === 'line') {
+            this.renderLineChart(sorted, labels, fundingValues, priceData);
+            return;
+        } else if (chartType === 'candlestick') {
+            this.renderCandlestickChart(sorted, labels, priceData);
+            return;
+        }
+        
+        // Default: render line chart
+        this.renderLineChart(sorted, labels, fundingValues, priceData);
+    }
+
+    /**
+     * Render simple line chart (easy to read)
+     */
+    renderLineChart(sorted, labels, fundingValues, priceData = []) {
+        const datasets = [
+            {
+                label: 'Funding Rate',
+                data: fundingValues,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                yAxisID: 'y'
+            }
+        ];
+
+        // Add price overlay if available
+        if (priceData.length > 0) {
+            const priceMap = new Map(priceData.map(p => [p.date, p.price]));
+            const alignedPrices = labels.map(date => priceMap.get(date) || null);
+            datasets.push({
+                label: 'Price',
+                data: alignedPrices,
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                borderWidth: 1,
+                fill: false,
+                tension: 0.4,
+                pointRadius: 0,
+                yAxisID: 'y1',
+                hidden: true // Hidden by default
+            });
+        }
+
+        console.log('📊 Line chart data prepared:', fundingValues.length, 'points');
+
+        const chartOptions = this.getChartOptions(priceData.length > 0);
+        
+        // Update tooltip to match OHLC format (same time format)
+        chartOptions.plugins.tooltip = {
+            ...chartOptions.plugins.tooltip,
+            callbacks: {
+                ...chartOptions.plugins.tooltip.callbacks,
+                title: (items) => {
+                    // Use same format as OHLC chart: yyyy-mm-dd HH:mm
+                    const date = new Date(items[0].label);
+                    // Match exactly with OHLC format (toLocaleString approach)
+                    return date.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    }).replace(',', '');
+                },
+                label: (context) => {
+                    const value = context.parsed.y;
+                    return `Funding Rate: ${(value * 100).toFixed(4)}%`;
+                }
+            }
+        };
+
+        const canvas = document.getElementById(this.canvasId);
+        const ctx = canvas.getContext('2d');
+        
+        this.chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: chartOptions,
+            plugins: [] // No candlestick plugin for line chart
+        });
+
+        console.log('✅ Line chart rendered successfully');
+    }
+
+    /**
+     * Render candlestick chart (OHLC visualization)
+     */
+    renderCandlestickChart(sorted, labels, priceData = []) {
+        // Get canvas (already validated in renderChart)
+        const canvas = document.getElementById(this.canvasId);
+        const ctx = canvas.getContext('2d');
         // Prepare OHLC data for candlestick
         const candlestickData = sorted.map(d => ({
             open: d.open,
@@ -157,6 +260,25 @@ export class ChartManager {
 
         console.log('📊 Candlestick chart data prepared with OHLC:', candlestickDataPoints.length, 'candles');
 
+        // Add price overlay if available (for candlestick)
+
+        if (priceData.length > 0) {
+            const priceMap = new Map(priceData.map(p => [p.date, p.price]));
+            const alignedPrices = labels.map(date => priceMap.get(date) || null);
+            datasets.push({
+                label: 'Price',
+                data: alignedPrices,
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                borderWidth: 1,
+                fill: false,
+                tension: 0.4,
+                pointRadius: 0,
+                yAxisID: 'y1',
+                hidden: true
+            });
+        }
+
         // Create custom candlestick plugin
         const candlestickPlugin = {
             id: 'candlestick',
@@ -217,11 +339,55 @@ export class ChartManager {
         
         // Create chart with candlestick plugin
         // Use 'line' type as base (bar not needed, we draw candlesticks manually)
+        const chartOptions = this.getChartOptions(priceData.length > 0);
+        
+        // Store candlestick data in datasets for tooltip access
+        datasets[0]._candlestickDataForTooltip = candlestickData;
+        
+        // Update tooltip for candlestick to show OHLC
+        chartOptions.plugins.tooltip = {
+            ...chartOptions.plugins.tooltip,
+            callbacks: {
+                title: (context) => {
+                    const index = context[0].dataIndex;
+                    const label = labels[index];
+                    const date = new Date(label);
+                    // Format: yyyy-mm-dd HH:mm
+                    return date.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    }).replace(',', '');
+                },
+                label: (context) => {
+                    const index = context.dataIndex;
+                    const dataset = context.chart.data.datasets[0];
+                    const candlestickDataForTooltip = dataset._candlestickDataForTooltip;
+                    if (!candlestickDataForTooltip || !candlestickDataForTooltip[index]) return [];
+                    
+                    const candle = candlestickDataForTooltip[index];
+                    return [
+                        `Open: ${(candle.open * 100).toFixed(4)}%`,
+                        `High: ${(candle.high * 100).toFixed(4)}%`,
+                        `Low: ${(candle.low * 100).toFixed(4)}%`,
+                        `Close: ${(candle.close * 100).toFixed(4)}%`
+                    ];
+                },
+                labelColor: () => ({
+                    borderColor: 'transparent',
+                    backgroundColor: 'transparent'
+                })
+            }
+        };
+        
         try {
             this.chart = new Chart(ctx, {
                 type: 'line',
                 data: { labels, datasets },
-                options: this.getChartOptions(false),
+                options: chartOptions,
                 plugins: [candlestickPlugin]
             });
             

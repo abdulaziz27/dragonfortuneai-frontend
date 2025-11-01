@@ -204,19 +204,27 @@
                                 </template>
                             </div>
 
-                            <!-- Chart Type Toggle (hidden) -->
-                            <div class="btn-group btn-group-sm me-3" role="group" style="display: none;">
-                                <button type="button" class="btn" :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType('line')">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <!-- Chart Type Toggle -->
+                            <div class="btn-group btn-group-sm me-3" role="group">
+                                <button type="button" 
+                                        class="btn" 
+                                        :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" 
+                                        @click="toggleChartType('line')"
+                                        title="Line Chart - Mudah Dibaca">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 4px;">
                                         <path d="M2 12l3-3 3 3 6-6"/>
                                     </svg>
+                                    Line
                                 </button>
-                                <button type="button" class="btn" :class="chartType === 'bar' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType('bar')">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <rect x="2" y="6" width="3" height="8"/>
-                                        <rect x="6" y="4" width="3" height="10"/>
-                                        <rect x="10" y="8" width="3" height="6"/>
+                                <button type="button" 
+                                        class="btn" 
+                                        :class="chartType === 'candlestick' ? 'btn-primary' : 'btn-outline-secondary'" 
+                                        @click="toggleChartType('candlestick')"
+                                        title="Candlestick - OHLC Detail">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 4px;">
+                                        <path d="M3 2h10v12H3V2zm1 1v10h8V3H4zm2 2h4v1H6V5zm0 3h2v1H6V8zm0 3h4v1H6v-1z"/>
                                     </svg>
+                                    OHLC
                                 </button>
                             </div>
 
@@ -313,16 +321,25 @@
                     </div>
                     <div class="chart-footer">
                         <div class="d-flex justify-content-between align-items-center">
-                            <div class="d-flex align-items-center gap-3">
-                                <small class="chart-footer-text">
-                                    <span style="display: inline-block; width: 10px; height: 10px; background: rgba(34, 197, 94, 0.8); border-radius: 2px; margin-right: 4px;"></span>
-                                    🟢 Bullish (Longs pay Shorts)
-                                </small>
-                                <small class="chart-footer-text">
-                                    <span style="display: inline-block; width: 10px; height: 10px; background: rgba(239, 68, 68, 0.8); border-radius: 2px; margin-right: 4px;"></span>
-                                    🔴 Bearish (Shorts pay Longs)
-                                </small>
-                            </div>
+                            <template x-if="chartType === 'candlestick'">
+                                <div class="d-flex align-items-center gap-3">
+                                    <small class="chart-footer-text">
+                                        <span style="display: inline-block; width: 10px; height: 10px; background: rgba(34, 197, 94, 0.8); border-radius: 2px; margin-right: 4px;"></span>
+                                        🟢 Bullish (Longs pay Shorts)
+                                    </small>
+                                    <small class="chart-footer-text">
+                                        <span style="display: inline-block; width: 10px; height: 10px; background: rgba(239, 68, 68, 0.8); border-radius: 2px; margin-right: 4px;"></span>
+                                        🔴 Bearish (Shorts pay Longs)
+                                    </small>
+                                </div>
+                            </template>
+                            <template x-if="chartType === 'line'">
+                                <div class="d-flex align-items-center gap-3">
+                                    <small class="chart-footer-text text-secondary">
+                                        📈 Line Chart - Menampilkan funding rate sebagai garis, mudah dibaca untuk melihat tren
+                                    </small>
+                                </div>
+                            </template>
                             <small class="text-muted">
                                 <span class="badge text-bg-success">Internal API v2</span>
                             </small>

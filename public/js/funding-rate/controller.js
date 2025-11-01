@@ -73,7 +73,7 @@ export function createFundingRateController() {
         analyticsLoading: false,
         
         // Chart state
-        chartType: 'line',
+        chartType: 'line', // 'line' or 'candlestick'
         distributionChart: null,
         maChart: null,
         
@@ -321,7 +321,7 @@ export function createFundingRateController() {
                 // Update charts with delay to ensure cleanup is complete
                 setTimeout(() => {
                     try {
-                        this.chartManager.updateChart(this.rawData, this.priceData);
+                        this.chartManager.updateChart(this.rawData, this.priceData, this.chartType);
                         // Distribution and MA charts removed - not industry standard for funding rate
                     } catch (error) {
                         console.error('❌ Error updating charts:', error);
@@ -899,6 +899,26 @@ export function createFundingRateController() {
             this.selectedInterval = interval;
             this.loadData();
         },
+
+        /**
+         * Toggle chart type between line and candlestick
+         */
+        toggleChartType(type) {
+            if (this.chartType === type) return;
+            console.log('🔄 Toggle chart type to:', type);
+            this.chartType = type;
+            
+            // Re-render chart with new type
+            if (this.rawData && this.rawData.length > 0) {
+                setTimeout(() => {
+                    try {
+                        this.chartManager.updateChart(this.rawData, this.priceData, this.chartType);
+                    } catch (error) {
+                        console.error('❌ Error updating chart type:', error);
+                    }
+                }, 100);
+            }
+        },
         
         /**
          * Update symbol
@@ -1034,16 +1054,36 @@ export function createFundingRateController() {
                 return strengthMap[this.signalStrength];
             }
             
-            // New format: percentage string - parse and assign color based on strength value
+            // New format: percentage string - parse and assign color based on strength value AND market signal
             // Extract numeric value from percentage string (e.g., "51.75%" -> 51.75)
             const strengthMatch = this.signalStrength.match(/(\d+\.?\d*)%/);
             if (strengthMatch) {
                 const strengthValue = parseFloat(strengthMatch[1]);
-                // Map percentage to badge color
-                if (strengthValue >= 50) return 'text-bg-danger';    // Strong (red)
-                if (strengthValue >= 20) return 'text-bg-warning';  // Moderate (yellow)
-                if (strengthValue >= 5) return 'text-bg-info';      // Weak (blue)
-                return 'text-bg-secondary';                          // Normal (gray)
+                
+                // Color should reflect market signal direction:
+                // - Long (bullish) + high strength = green (success)
+                // - Short (bearish) + high strength = red (danger)
+                // - Neutral or low strength = neutral colors
+                
+                if (this.marketSignal === 'Long') {
+                    // Long signal: green for strong, yellow for moderate, blue for weak
+                    if (strengthValue >= 50) return 'text-bg-success';    // Strong Long (green)
+                    if (strengthValue >= 20) return 'text-bg-warning';  // Moderate (yellow)
+                    if (strengthValue >= 5) return 'text-bg-info';       // Weak (blue)
+                    return 'text-bg-secondary';                           // Normal (gray)
+                } else if (this.marketSignal === 'Short') {
+                    // Short signal: red for strong, yellow for moderate, blue for weak
+                    if (strengthValue >= 50) return 'text-bg-danger';    // Strong Short (red)
+                    if (strengthValue >= 20) return 'text-bg-warning';   // Moderate (yellow)
+                    if (strengthValue >= 5) return 'text-bg-info';       // Weak (blue)
+                    return 'text-bg-secondary';                           // Normal (gray)
+                } else {
+                    // Neutral: use neutral colors
+                    if (strengthValue >= 50) return 'text-bg-secondary';   // Neutral (gray)
+                    if (strengthValue >= 20) return 'text-bg-secondary'; // Moderate (gray)
+                    if (strengthValue >= 5) return 'text-bg-secondary'; // Weak (gray)
+                    return 'text-bg-secondary';                          // Normal (gray)
+                }
             }
             
             return 'text-bg-secondary';
