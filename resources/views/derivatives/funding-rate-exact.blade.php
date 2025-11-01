@@ -28,22 +28,25 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <!-- Symbol Selector -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="updateSymbol()">
+                        <option value="BTCUSDT">BTC/USDT</option>
+                        <option value="ETHUSDT">ETH/USDT</option>
+                        <option value="SOLUSDT">SOL/USDT</option>
+                        <option value="BNBUSDT">BNB/USDT</option>
+                    </select>
+
                     <!-- Exchange Selector -->
                     <select class="form-select" style="width: 160px;" x-model="selectedExchange" @change="updateExchange()">
                         <option value="binance">Binance</option>
                         <option value="bybit">Bybit</option>
-                        <option value="okx">OKX</option>
-                        <option value="bitmex">BitMEX</option>
-                        <option value="deribit">Deribit</option>
-                        <option value="all_exchange">All Exchanges</option>
                     </select>
 
                     <!-- Interval Selector -->
                     <select class="form-select" style="width: 120px;" x-model="selectedInterval" @change="updateInterval()">
+                        <!-- <option value="1m">1 Minute</option> -->
                         <option value="1h">1 Hour</option>
-                        <option value="4h">4 Hours</option>
-                        <option value="1d">1 Day</option>
-                        <option value="1w">1 Week</option>
+                        <option value="8h">8 Hours</option>
                     </select>
 
                     <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading" x-show="false">
@@ -56,33 +59,6 @@
 
         <!-- Summary Cards Row -->
         <div class="row g-3">
-            <!-- Bitcoin Price USD -->
-            <div class="col-md-2">
-                <div class="df-panel p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">₿ BTC/USD</span>
-                        <span class="badge text-bg-warning">Live</span>
-                    </div>
-                    <template x-if="globalLoading">
-                        <div>
-                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 80%; height: 28px;"></div>
-                            <div class="small">
-                                <span class="skeleton skeleton-text" style="width: 60px; height: 16px;"></span>
-                                <span class="text-secondary ms-1">24h</span>
-                            </div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div>
-                            <div class="h3 mb-1 text-warning" x-text="formatPriceUSD(currentPrice)"></div>
-                            <div class="small" :class="getPriceTrendClass(priceChange)">
-                                <span x-text="formatChange(priceChange)"></span> 24h
-                            </div>
-                        </div>
-                    </template>
-                </div>
-            </div>
-
             <!-- Current Funding Rate -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
@@ -93,18 +69,11 @@
                     <template x-if="globalLoading">
                         <div>
                             <div class="h3 mb-2 skeleton skeleton-text" style="width: 70%; height: 28px;"></div>
-                            <div class="small">
-                                <span class="skeleton skeleton-text" style="width: 60px; height: 16px;"></span>
-                                <span class="text-secondary ms-1">24h</span>
-                            </div>
                         </div>
                     </template>
                     <template x-if="!globalLoading">
                         <div>
                             <div class="h3 mb-1" x-text="formatFundingRate(currentFundingRate)"></div>
-                            <div class="small" :class="getTrendClass(fundingChange)">
-                                <span x-text="formatChange(fundingChange)"></span> 24h
-                            </div>
                         </div>
                     </template>
                 </div>
@@ -120,18 +89,11 @@
                     <template x-if="globalLoading">
                         <div>
                             <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
-                            <div class="small text-secondary d-flex align-items-center gap-1">
-                                <span>Med:</span>
-                                <span class="skeleton skeleton-text" style="width: 60px; height: 16px;"></span>
-                            </div>
                         </div>
                     </template>
                     <template x-if="!globalLoading">
                         <div>
                             <div class="h3 mb-1" x-text="formatFundingRate(avgFundingRate)"></div>
-                            <div class="small text-secondary">
-                                Med: <span x-text="formatFundingRate(medianFundingRate)"></span>
-                            </div>
                         </div>
                     </template>
                 </div>
@@ -154,6 +116,26 @@
                         <div>
                             <div class="h3 mb-1 text-danger" x-text="formatFundingRate(maxFundingRate)"></div>
                             <div class="small text-secondary" x-text="peakDate"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Volatility -->
+            <div class="col-md-2">
+                <div class="df-panel p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary">Volatility</span>
+                        <span class="badge text-bg-warning">Vol</span>
+                    </div>
+                    <template x-if="globalLoading">
+                        <div>
+                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
+                        </div>
+                    </template>
+                    <template x-if="!globalLoading">
+                        <div>
+                            <div class="h3 mb-1" x-text="fundingVolatility !== null && fundingVolatility !== undefined ? formatFundingRate(fundingVolatility) : '--'"></div>
                         </div>
                     </template>
                 </div>
@@ -204,7 +186,7 @@
                                 <template x-if="!globalLoading">
                                     <div class="d-flex align-items-center gap-3">
                                         <span class="current-value" x-text="formatFundingRate(currentFundingRate)"></span>
-                                        <span class="change-badge" :class="fundingChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(fundingChange)"></span>
+                                        <!-- <span class="change-badge" :class="fundingChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(fundingChange)"></span> -->
                                     </div>
                                 </template>
                             </div>
@@ -331,20 +313,18 @@
                     </div>
                     <div class="chart-footer">
                         <div class="d-flex justify-content-between align-items-center">
-                            <small class="chart-footer-text">
-                                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="margin-right: 4px;">
-                                    <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1"/>
-                                    <path d="M6 3v3l2 2" stroke="currentColor" stroke-width="1" fill="none"/>
-                                </svg>
-                                Positive funding rates menandakan sentimen bullish (longs pay shorts)
-                            </small>
-                            <small class="text-muted" x-data="{ source: 'Loading...' }" x-init="
-                                fetch('/api/cryptoquant/funding-rate?start_date=' + new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0] + '&end_date=' + new Date().toISOString().split('T')[0])
-                                    .then(r => r.json())
-                                    .then(d => source = d.meta?.source || 'Unknown')
-                                    .catch(() => source = 'Error')
-                            ">
-                                <span class="badge" :class="source.includes('CryptoQuant') ? 'text-bg-success' : 'text-bg-warning'" x-text="source">Loading...</span>
+                            <div class="d-flex align-items-center gap-3">
+                                <small class="chart-footer-text">
+                                    <span style="display: inline-block; width: 10px; height: 10px; background: rgba(34, 197, 94, 0.8); border-radius: 2px; margin-right: 4px;"></span>
+                                    🟢 Bullish (Longs pay Shorts)
+                                </small>
+                                <small class="chart-footer-text">
+                                    <span style="display: inline-block; width: 10px; height: 10px; background: rgba(239, 68, 68, 0.8); border-radius: 2px; margin-right: 4px;"></span>
+                                    🔴 Bearish (Shorts pay Longs)
+                                </small>
+                            </div>
+                            <small class="text-muted">
+                                <span class="badge text-bg-success">Internal API v2</span>
                             </small>
                         </div>
                     </div>
@@ -352,86 +332,110 @@
             </div>
         </div>
 
-        <!-- Analysis Row -->
+        <!-- Exchange Comparison Table -->
         <div class="row g-3">
-            <!-- Distribution Analysis -->
-            <div class="col-lg-6">
-                <div class="df-panel p-3 h-100">
-                    <h5 class="mb-3">📈 Analisis Distribusi</h5>
-                    <div style="height: 300px; position: relative;">
-                        <canvas id="fundingRateDistributionChart"></canvas>
+            <div class="col-12">
+                <div class="df-panel p-4" style="background: #ffffff; border: 1px solid #e5e7eb;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0" style="color: #1f2937;">📊 Perbandingan Exchange</h5>
+                        <small class="text-secondary">
+                            <span class="badge text-bg-success">Internal API v2</span>
+                        </small>
                     </div>
-                    <div class="mt-3">
-                        <!-- Z-Score Display -->
-                        <template x-if="globalLoading">
-                            <div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="small text-secondary">Z-Score Saat Ini</span>
-                                    <span class="badge skeleton skeleton-badge" style="width: 70px; height: 22px;"></span>
-                                </div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="small text-secondary">Event Funding Tinggi (>2σ)</span>
-                                    <span class="badge skeleton skeleton-badge" style="width: 36px; height: 22px;"></span>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <span class="small text-secondary">Event Ekstrem (>3σ)</span>
-                                    <span class="badge skeleton skeleton-badge" style="width: 36px; height: 22px;"></span>
-                                </div>
-                            </div>
-                        </template>
-                        <template x-if="!globalLoading">
-                            <div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="small text-secondary">Z-Score Saat Ini</span>
-                                    <span class="badge" :class="getZScoreBadgeClass(currentZScore)" x-text="formatZScore(currentZScore)"></span>
-                                </div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="small text-secondary">Event Funding Tinggi (>2σ)</span>
-                                    <span class="badge text-bg-warning" x-text="highFundingEvents"></span>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <span class="small text-secondary">Event Ekstrem (>3σ)</span>
-                                    <span class="badge text-bg-danger" x-text="extremeFundingEvents"></span>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Moving Averages -->
-            <div class="col-lg-6">
-                <div class="df-panel p-3 h-100">
-                    <h5 class="mb-3">📉 Rata-rata Bergerak (Moving Averages)</h5>
-                    <div style="height: 300px; position: relative;">
-                        <canvas id="fundingRateMAChart"></canvas>
-                    </div>
-                    <div class="mt-3">
-                        <template x-if="globalLoading">
-                            <div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="small">Rata-rata 7 Hari:</span>
-                                    <span class="fw-bold skeleton skeleton-text" style="width: 80px; height: 18px;"></span>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <span class="small">Rata-rata 30 Hari:</span>
-                                    <span class="fw-bold skeleton skeleton-text" style="width: 80px; height: 18px;"></span>
-                                </div>
+                    <template x-if="exchangesLoading">
+                        <div class="text-center py-4">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
                             </div>
-                        </template>
-                        <template x-if="!globalLoading">
-                            <div>
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="small">Rata-rata 7 Hari:</span>
-                                    <span class="fw-bold" x-text="formatFundingRate(ma7)"></span>
+                            <div class="mt-2 small text-secondary">Memuat data exchange...</div>
+                        </div>
+                    </template>
+
+                    <template x-if="!exchangesLoading && exchangesData.length === 0">
+                        <div class="text-center py-4 text-secondary">
+                            <small>Tidak ada data exchange tersedia</small>
+                        </div>
+                    </template>
+
+                    <template x-if="!exchangesLoading && exchangesData.length > 0">
+                        <div>
+                            <!-- Arbitrage Info -->
+                            <template x-if="calculateArbitrage()">
+                                <div class="alert alert-info mb-3" role="alert" style="background-color: #dbeafe; border-color: #93c5fd; color: #1e40af;">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <strong>💰 Peluang Arbitrase Ditemukan:</strong>
+                                        <span class="badge text-bg-success" x-text="'Selisih: ' + (calculateArbitrage().spread * 100).toFixed(4) + '%'"></span>
+                                    </div>
+                                    <small>
+                                        Tertinggi: <strong x-text="calculateArbitrage().maxExchange"></strong> 
+                                        (<span x-text="formatFundingRate(calculateArbitrage().maxRate)"></span>) 
+                                        vs 
+                                        Terendah: <strong x-text="calculateArbitrage().minExchange"></strong> 
+                                        (<span x-text="formatFundingRate(calculateArbitrage().minRate)"></span>)
+                                    </small>
                                 </div>
-                                <div class="d-flex justify-content-between">
-                                    <span class="small">Rata-rata 30 Hari:</span>
-                                    <span class="fw-bold" x-text="formatFundingRate(ma30)"></span>
-                                </div>
+                            </template>
+
+                            <!-- Exchange Table -->
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0" style="background: #ffffff; color: #1f2937;">
+                                    <thead style="background-color: #f9fafb; border-bottom: 2px solid #e5e7eb;">
+                                        <tr>
+                                            <th style="color: #374151; font-weight: 600; padding: 12px;">Exchange</th>
+                                            <th class="text-end" style="color: #374151; font-weight: 600; padding: 12px;">Funding Rate</th>
+                                            <th class="text-end" style="color: #374151; font-weight: 600; padding: 12px;">Next Funding</th>
+                                            <th class="text-center" style="color: #374151; font-weight: 600; padding: 12px;">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="exchange in exchangesData" :key="exchange.exchange">
+                                            <tr style="border-bottom: 1px solid #e5e7eb;">
+                                                <td style="padding: 12px;">
+                                                    <strong style="color: #1f2937;" x-text="exchange.exchange"></strong>
+                                                </td>
+                                                <td class="text-end" style="padding: 12px;">
+                                                    <span :class="exchange.funding_rate >= 0 ? 'text-success' : 'text-danger'" 
+                                                          style="font-weight: 600; font-size: 0.95rem;"
+                                                          x-text="formatFundingRate(exchange.funding_rate)"></span>
+                                                </td>
+                                                <td class="text-end" style="padding: 12px;">
+                                                    <small class="text-secondary" style="font-size: 0.875rem;" x-text="formatNextFundingTime(exchange.next_funding_time)"></small>
+                                                </td>
+                                                <td class="text-center" style="padding: 12px;">
+                                                    <span class="badge" 
+                                                          :class="exchange.funding_rate >= 0 ? 'text-bg-success' : 'text-bg-danger'"
+                                                          x-text="exchange.funding_rate >= 0 ? 'Long Pay' : 'Short Pay'">
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
                             </div>
-                        </template>
-                    </div>
+
+                            <!-- Explanation in Indonesian -->
+                            <!-- <div class="mt-4 p-3 rounded" style="background-color: #f9fafb; border-left: 4px solid #3b82f6;">
+                                <h6 style="color: #1f2937; margin-bottom: 12px; font-weight: 600;">📖 Penjelasan Tabel Perbandingan Exchange</h6>
+                                <div class="small" style="color: #4b5563; line-height: 1.6;">
+                                    <p class="mb-2">
+                                        <strong>Funding Rate:</strong> Tingkat biaya yang dibayarkan atau diterima oleh trader berdasarkan posisi long/short mereka. 
+                                        Rate positif berarti trader dengan posisi long membayar trader dengan posisi short (sentimen bullish), 
+                                        sedangkan rate negatif berarti short membayar long (sentimen bearish).
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Next Funding:</strong> Waktu hingga pembayaran funding rate berikutnya. 
+                                        Funding rate biasanya dibayarkan setiap 8 jam (pada pukul 00:00, 08:00, dan 16:00 UTC).
+                                    </p>
+                                    <p class="mb-0">
+                                        <strong>Peluang Arbitrase:</strong> Selisih funding rate antar exchange dapat menciptakan peluang arbitrase. 
+                                        Trader dapat memanfaatkan perbedaan ini dengan membuka posisi long di exchange dengan rate lebih rendah 
+                                        dan short di exchange dengan rate lebih tinggi, menghasilkan keuntungan dari selisih rate.
+                                    </p>
+                                </div>
+                            </div> -->
+                        </div>
+                    </template>
                 </div>
             </div>
         </div>
@@ -513,8 +517,8 @@
         });
     </script>
 
-    <!-- Funding Rate Controller -->
-    <script src="{{ asset('js/funding-rate-exact-controller.js') }}"></script>
+    <!-- Funding Rate Controller (Modular ES6) -->
+    <script type="module" src="{{ asset('js/funding-rate-exact-controller.js') }}"></script>
 
     <style>
         /* Skeleton placeholders */

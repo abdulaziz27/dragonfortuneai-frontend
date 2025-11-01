@@ -69,6 +69,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | API URLs Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configure external API URLs from environment variables.
+    | These will be injected to frontend via APP_CONFIG.
+    |
+    */
+
+    'api_urls' => [
+        'internal' => env('API_BASE_URL', 'https://test.dragonfortune.ai'),
+        'coinglass' => env('COINGLASS_API_URL', 'https://open-api-v4.coinglass.com/api'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

@@ -9,6 +9,15 @@
     <meta name="api-base-url" content="{{ config('services.api.base_url') }}">
     <meta name="spot-microstructure-api" content="{{ config('services.spot_microstructure.base_url') }}">
 
+    <!-- API Configuration from Laravel -->
+    <script>
+        window.APP_CONFIG = {
+            apiBaseUrl: "{{ config('app.api_urls.internal') }}",
+            coinglassUrl: "{{ config('app.api_urls.coinglass') }}",
+            environment: "{{ config('app.env') }}"
+        };
+    </script>
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
