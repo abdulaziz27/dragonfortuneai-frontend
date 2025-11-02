@@ -101,7 +101,7 @@ export function createOpenInterestController() {
         },
 
         /**
-         * Load all data
+         * Load all data (OPTIMISTIC LOADING: history first, analytics in background)
          */
         async loadData() {
             // Guard: Skip if already loading
@@ -133,61 +133,59 @@ export function createOpenInterestController() {
                     limit: limit
                 });
 
-                // Fetch analytics and history in parallel
-                const [analyticsResult, historyResult] = await Promise.allSettled([
-                    this.apiService.fetchAnalytics({
-                        symbol: this.selectedSymbol,
-                        exchange: this.selectedExchange,
-                        interval: this.selectedInterval,
-                        limit: limit
-                    }),
-                    this.apiService.fetchHistory({
-                        symbol: this.selectedSymbol,
-                        exchange: this.selectedExchange,
-                        interval: this.selectedInterval,
-                        limit: limit,
-                        with_price: true
-                    })
-                ]);
+                // OPTIMISTIC LOADING: Fetch history first (main data)
+                const historyData = await this.apiService.fetchHistory({
+                    symbol: this.selectedSymbol,
+                    exchange: this.selectedExchange,
+                    interval: this.selectedInterval,
+                    limit: limit,
+                    with_price: true
+                });
 
-                // Process analytics data
-                if (analyticsResult.status === 'fulfilled' && analyticsResult.value) {
-                    this.analyticsData = analyticsResult.value;
-                    this.mapAnalyticsToState();
-                    console.log('✅ Analytics data processed');
+                // Handle cancelled requests
+                if (historyData === null) {
+                    console.log('🚫 Request was cancelled');
+                    return;
                 }
 
-                // Process history data
-                if (historyResult.status === 'fulfilled' && historyResult.value) {
-                    let historyData = historyResult.value;
-
-                    // Apply client-side date range filtering
-                    if (this.globalPeriod !== 'all') {
-                        historyData = this.apiService.filterByDateRange(
-                            historyData,
-                            dateRange.startDate,
-                            dateRange.endDate
-                        );
-                    }
-
-                    this.historyData = historyData;
-                    this.priceData = historyData.map(d => ({ ts: d.ts, price: d.price }));
-
-                    console.log('✅ History data loaded:', this.historyData.length, 'records');
-
-                    // Update current values
-                    this.updateCurrentValues();
-
-                    // Render chart
-                    if (this.chartManager && this.historyData.length > 0) {
-                        this.chartManager.renderChart(this.historyData, this.priceData);
-                    }
+                // Apply client-side date range filtering
+                let filteredData = historyData;
+                if (this.globalPeriod !== 'all') {
+                    filteredData = this.apiService.filterByDateRange(
+                        historyData,
+                        dateRange.startDate,
+                        dateRange.endDate
+                    );
                 }
 
-                // Hide loading skeleton
-                this.globalLoading = false;
+                this.historyData = filteredData;
+                this.priceData = filteredData.map(d => ({ ts: d.ts, price: d.price }));
+                this.errorCount = 0; // Reset on success
 
-                console.log('✅ All data loaded successfully');
+                console.log('✅ History data loaded:', this.historyData.length, 'records');
+
+                // Update current values from history
+                this.updateCurrentValues();
+
+                // Fetch analytics in background (non-blocking, fire-and-forget)
+                // This will update: trend, volatilityLevel, minOI, maxOI
+                this.fetchAnalyticsData().catch(err => {
+                    console.warn('⚠️ Analytics fetch failed (will use defaults):', err);
+                    // Set defaults if analytics fails
+                    this.trend = 'stable';
+                    this.volatilityLevel = 'moderate';
+                });
+
+                // Render chart with delay for safer cleanup
+                setTimeout(() => {
+                    try {
+                        if (this.chartManager && this.historyData.length > 0) {
+                            this.chartManager.renderChart(this.historyData, this.priceData);
+                        }
+                    } catch (error) {
+                        console.error('❌ Error rendering chart:', error);
+                    }
+                }, 100);
 
             } catch (error) {
                 console.error('❌ Error loading data:', error);
@@ -198,10 +196,41 @@ export function createOpenInterestController() {
                     this.stopAutoRefresh();
                 }
             } finally {
-                // Ensure skeleton is hidden even if some data fails
-                if (this.historyData.length > 0 || this.analyticsData) {
-                    this.globalLoading = false;
+                // Hide skeleton immediately after history data is loaded
+                this.globalLoading = false;
+            }
+        },
+
+        /**
+         * Fetch analytics data in background (independent from main load)
+         */
+        async fetchAnalyticsData() {
+            this.analyticsLoading = true;
+
+            try {
+                const limit = OpenInterestUtils.calculateLimit(
+                    this.timeRanges.find(r => r.value === this.globalPeriod)?.days || 1,
+                    this.selectedInterval
+                );
+
+                const analyticsData = await this.apiService.fetchAnalytics({
+                    symbol: this.selectedSymbol,
+                    exchange: this.selectedExchange,
+                    interval: this.selectedInterval,
+                    limit: limit
+                });
+
+                if (analyticsData) {
+                    this.analyticsData = analyticsData;
+                    this.mapAnalyticsToState();
+                    console.log('✅ Analytics data loaded in background');
                 }
+
+            } catch (error) {
+                console.warn('⚠️ Analytics fetch error:', error);
+                // Don't throw - let main flow continue
+            } finally {
+                this.analyticsLoading = false;
             }
         },
 
@@ -283,11 +312,24 @@ export function createOpenInterestController() {
             const intervalMs = 5000; // 5 seconds
 
             this.refreshInterval = setInterval(() => {
-                if (document.hidden) return;
-                if (this.globalLoading) return;
+                // Safety checks
+                if (document.hidden) return; // Don't refresh hidden tabs
+                if (this.globalLoading) return; // Skip if loading
+                if (this.errorCount >= this.maxErrors) {
+                    console.error('❌ Too many errors, stopping auto refresh');
+                    this.stopAutoRefresh();
+                    return;
+                }
 
                 console.log('🔄 Auto-refresh triggered');
-                this.loadData();
+                this.loadData(); // This will load history and trigger analytics in background
+
+                // Also refresh analytics independently (non-blocking)
+                if (!this.analyticsLoading) {
+                    this.fetchAnalyticsData().catch(err => {
+                        console.warn('⚠️ Analytics refresh failed:', err);
+                    });
+                }
             }, intervalMs);
 
             console.log('✅ Auto-refresh started (5s interval)');
