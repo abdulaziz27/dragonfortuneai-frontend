@@ -293,7 +293,8 @@ export function createOpenInterestController() {
 
                 // Fetch analytics in background (non-blocking, fire-and-forget)
                 // This will update: trend, volatilityLevel, minOI, maxOI
-                this.fetchAnalyticsData().then(() => {
+                // Pass isAutoRefresh to prevent skeleton during auto-refresh
+                this.fetchAnalyticsData(isAutoRefresh).then(() => {
                     // Save to cache after analytics loaded
                     this.saveToCache();
                 }).catch(err => {
@@ -336,9 +337,21 @@ export function createOpenInterestController() {
 
         /**
          * Fetch analytics data in background (independent from main load)
+         * @param {boolean} isAutoRefresh - If true, don't show loading skeleton
          */
-        async fetchAnalyticsData() {
-            this.analyticsLoading = true;
+        async fetchAnalyticsData(isAutoRefresh = false) {
+            // Never show analytics loading skeleton during auto-refresh
+            // Auto-refresh should be silent (data already visible)
+            if (isAutoRefresh) {
+                // Auto-refresh: Keep analyticsLoading = false (silent update)
+                this.analyticsLoading = false;
+            } else if (this.historyData.length === 0) {
+                // Initial load without data: Show skeleton
+                this.analyticsLoading = true;
+            } else {
+                // Background refresh when data exists: Keep false (silent)
+                this.analyticsLoading = false;
+            }
 
             try {
                 const limit = OpenInterestUtils.calculateLimit(
@@ -459,8 +472,9 @@ export function createOpenInterestController() {
                 this.loadData(true); // Silent update - no skeleton shown
 
                 // Also refresh analytics independently (non-blocking)
+                // Pass isAutoRefresh=true to prevent analytics skeleton during auto-refresh
                 if (!this.analyticsLoading) {
-                    this.fetchAnalyticsData().catch(err => {
+                    this.fetchAnalyticsData(true).catch(err => {
                         console.warn('⚠️ Analytics refresh failed:', err);
                     });
                 }
