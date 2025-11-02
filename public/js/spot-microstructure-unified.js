@@ -1,530 +1,433 @@
-/**
- * Spot Microstructure Unified Controller - FIXED VERSION
- * Handles all spot microstructure data in one page
- * Raw data from providers - no processing, no filtering
- */
+(() => {
+    const page = document.querySelector('.spot-microstructure-page');
+    if (!page) return;
 
-class SpotMicrostructureUnified {
-    constructor() {
-        // Force production URL for spot microstructure (other pages may use test.dragonfortune.ai)
-        const metaUrl = document.querySelector('meta[name="api-base-url"]')?.getAttribute('content') || '';
-        this.apiBaseUrl = metaUrl.replace('test.dragonfortune.ai', 'dragonfortune.ai');
-        this.currentSymbol = 'BTCUSDT';
-        this.currentExchange = 'binance';
-        this.refreshInterval = 5000; // 5 seconds
-        this.intervals = [];
+    const metaValue = (name) => document.querySelector(`meta[name="${name}"]`)?.getAttribute('content')?.trim();
+    const base = (metaValue('spot-microstructure-api') || metaValue('api-base-url') || 'https://test.dragonfortune.ai').replace(/\/+$/, '');
+    const el = (id) => document.getElementById(id);
 
-        // Chart instances
-        this.cvdChart = null;
-        this.vwapChart = null;
-        this.volumeChart = null;
+    const state = { loading: false, timer: null };
 
-        // Data storage
-        this.tradesData = [];
-        this.cvdData = [];
-        this.vwapData = [];
-        this.volumeData = [];
+    const refs = {
+        symbol: el('spotSymbolSelect'),
+        exchange: el('spotExchangeSelect'),
+        button: el('spotRefreshButton'),
+        lastPrice: el('spotLastPrice'),
+        lastPriceTime: el('spotLastPriceTime'),
+        tradeBias: el('spotTradeBias'),
+        biasStrength: el('spotBiasStrength'),
+        cvdDelta: el('spotCvdDelta'),
+        cvdPoints: el('spotCvdPoints'),
+        vwapSignal: el('spotVwapSignal'),
+        vwapPosition: el('spotVwapPosition'),
+        vwapCount: el('spotVwapCount'),
+        spread: el('spotSpread'),
+        depth: el('spotOrderbookDepth'),
+        bookTs: el('spotOrderbookTimestamp'),
+        pressureRatio: el('spotPressureRatio'),
+        pressureImbalance: el('spotPressureImbalance'),
+        pressureCount: el('spotBookPressureCount'),
+        summaryCount: el('spotTradeSummaryCount'),
+        tradesBody: el('spotTradesBody'),
+        bidsBody: el('spotBidsBody'),
+        asksBody: el('spotAsksBody'),
+        volumeBody: el('spotVolumeProfileBody'),
+        pressureBody: el('spotBookPressureBody')
+    };
 
-        this.init();
-    }
+    const chartIf = (id, config) => {
+        const ctx = el(id);
+        return ctx && window.Chart ? new Chart(ctx, config) : null;
+    };
 
-    init() {
-        this.setupEventListeners();
-        this.initializeCharts();
-        this.loadAllData();
-        this.startAutoRefresh();
-    }
-
-    setupEventListeners() {
-        // Symbol and exchange selectors
-        document.getElementById('symbolSelect')?.addEventListener('change', (e) => {
-            this.currentSymbol = e.target.value;
-            this.loadAllData();
-        });
-
-        document.getElementById('exchangeSelect')?.addEventListener('change', (e) => {
-            this.currentExchange = e.target.value;
-            this.loadAllData();
-        });
-    }
-
-    initializeCharts() {
-        // CVD Chart
-        const cvdLayout = {
-            title: 'Cumulative Volume Delta (CVD)',
-            xaxis: { title: 'Time' },
-            yaxis: { title: 'CVD' },
-            showlegend: true,
-            height: 300
-        };
-        this.cvdChart = Plotly.newPlot('cvdChart', [], cvdLayout);
-
-        // VWAP Chart
-        const vwapLayout = {
-            title: 'VWAP vs TWAP vs Market Price',
-            xaxis: { title: 'Time' },
-            yaxis: { title: 'Price (USD)' },
-            showlegend: true,
-            height: 300
-        };
-        this.vwapChart = Plotly.newPlot('vwapChart', [], vwapLayout);
-
-        // Volume Chart
-        const volumeLayout = {
-            title: 'Volume & Trade Statistics',
-            xaxis: { title: 'Time' },
-            yaxis: { title: 'Volume' },
-            showlegend: true,
-            height: 300
-        };
-        this.volumeChart = Plotly.newPlot('volumeChart', [], volumeLayout);
-    }
-
-    async loadAllData() {
-        try {
-            await this.loadUnifiedData();
-        } catch (error) {
-            console.error('Error loading unified data:', error);
-        }
-    }
-
-    async loadUnifiedData() {
-        try {
-            const url = `${this.apiBaseUrl}/api/spot-microstructure/unified?symbol=${this.currentSymbol}&exchange=${this.currentExchange}&limit=100`;
-            console.log('Fetching unified data from:', url);
-
-            const response = await fetch(url);
-            const data = await response.json();
-
-            console.log('Unified data response:', {
-                success: data.success,
-                trades_count: data.data?.trades?.length || 0,
-                cvd_count: data.data?.cvd?.length || 0,
-                vwap_count: data.data?.vwap?.length || 0,
-                volume_count: data.data?.volume_stats?.length || 0,
-                large_orders_count: data.data?.large_orders?.length || 0
-            });
-
-            if (data.success && data.data) {
-                this.tradesData = data.data.trades || [];
-                this.cvdData = data.data.cvd || [];
-                this.vwapData = data.data.vwap || [];
-                this.volumeData = data.data.volume_stats || [];
-
-                this.updateTradesTable();
-                this.updateBuySellRatio();
-                this.updateCVDChart();
-                this.updateCVDDelta();
-                this.updateVWAPChart();
-                this.updateVWAPMetrics();
-                this.updateVolumeChart();
-                this.updateVolumeMetrics();
-                this.updateLargeOrdersTable(data.data.large_orders || []);
-
-                console.log('All UI components updated successfully');
-            }
-        } catch (error) {
-            console.error('Error loading unified data:', error);
-            throw error;
-        }
-    }
-
-    updateTradesTable() {
-        const tbody = document.getElementById('tradesTableBody');
-        if (!tbody || !this.tradesData.length) {
-            this.showError('tradesTableBody', 'No trades data available');
-            return;
-        }
-
-        tbody.innerHTML = this.tradesData.slice(0, 20).map(trade => {
-            const timestamp = trade.timestamp || trade.ts || trade.ts_ms;
-            const exchange = trade.exchange || this.currentExchange;
-            const symbol = trade.symbol || trade.pair || this.currentSymbol;
-
-            // Determine side based on buy/sell volume
-            let side = trade.side;
-            if (!side || side === 'unknown') {
-                const buyVol = trade.buy_volume_quote || trade.buy_volume || 0;
-                const sellVol = trade.sell_volume_quote || trade.sell_volume || 0;
-                side = buyVol > sellVol ? 'buy' : 'sell';
-            }
-
-            const qty = trade.quantity || trade.qty || trade.volume_base || 0;
-            const price = trade.price || trade.avg_price || 0;
-            const notional = trade.quote_quantity || trade.volume_quote || (qty * price);
-
-            return `
-                <tr>
-                    <td>${this.formatTimestamp(timestamp)}</td>
-                    <td>${exchange}</td>
-                    <td>${symbol}</td>
-                    <td><span class="badge ${side === 'buy' ? 'bg-success' : 'bg-danger'}">${side.toUpperCase()}</span></td>
-                    <td>${this.formatNumber(qty)}</td>
-                    <td>$${this.formatPrice(price)}</td>
-                    <td>$${this.formatNumber(notional)}</td>
-                </tr>
-            `;
-        }).join('');
-    }
-
-    updateBuySellRatio() {
-        if (!this.tradesData.length) return;
-
-        const buyVolume = this.tradesData.reduce((sum, trade) => {
-            return sum + (trade.buy_volume_quote || trade.buy_volume || 0);
-        }, 0);
-
-        const sellVolume = this.tradesData.reduce((sum, trade) => {
-            return sum + (trade.sell_volume_quote || trade.sell_volume || 0);
-        }, 0);
-
-        const ratio = sellVolume > 0 ? (buyVolume / sellVolume).toFixed(2) : 'N/A';
-
-        const element = document.getElementById('buySellRatio');
-        if (element) {
-            element.textContent = ratio;
-            element.className = parseFloat(ratio) > 1 ? 'text-success' : 'text-danger';
-        }
-    }
-
-    updateCVDChart() {
-        if (!this.cvdData.length) return;
-
-        const timestamps = this.cvdData.map(d => new Date(d.timestamp || d.ts || d.ts_ms));
-        const cvdValues = this.cvdData.map(d => d.cvd || d.value || 0);
-
-        const trace = {
-            x: timestamps,
-            y: cvdValues,
-            type: 'scatter',
-            mode: 'lines',
-            name: 'CVD',
-            line: { color: '#007bff', width: 2 }
-        };
-
-        const layout = {
-            title: 'Cumulative Volume Delta (CVD)',
-            xaxis: { title: 'Time' },
-            yaxis: { title: 'CVD (USD)' },
-            showlegend: true,
-            height: 300,
-            margin: { l: 60, r: 50, t: 50, b: 50 }
-        };
-
-        Plotly.react('cvdChart', [trace], layout);
-    }
-
-    updateCVDDelta() {
-        if (!this.cvdData.length) return;
-
-        const latest = this.cvdData[0];
-        const previous = this.cvdData[1];
-
-        if (latest && previous) {
-            const latestCvd = latest.cvd || latest.value || 0;
-            const previousCvd = previous.cvd || previous.value || 0;
-            const delta = latestCvd - previousCvd;
-
-            const element = document.getElementById('cvdDelta');
-            if (element) {
-                element.textContent = this.formatNumber(delta);
-                element.className = delta > 0 ? 'text-success' : 'text-danger';
-            }
-        } else if (latest) {
-            const element = document.getElementById('cvdDelta');
-            if (element) {
-                const cvdValue = latest.cvd || latest.value || 0;
-                element.textContent = this.formatNumber(cvdValue);
-                element.className = cvdValue > 0 ? 'text-success' : 'text-danger';
-            }
-        }
-    }
-
-    updateVWAPChart() {
-        if (!this.vwapData.length) {
-            console.warn('No VWAP data available for chart');
-            return;
-        }
-
-        const timestamps = this.vwapData.map(d => new Date(d.timestamp || d.ts || d.ts_ms));
-        const vwapValues = this.vwapData.map(d => d.vwap || 0);
-        const twapValues = this.vwapData.map(d => d.twap || 0);
-        const priceValues = this.vwapData.map(d => d.price || 0);
-
-        console.log('VWAP Chart Data:', {
-            timestamps: timestamps.length,
-            vwap_sample: vwapValues.slice(0, 3),
-            twap_sample: twapValues.slice(0, 3),
-            price_sample: priceValues.slice(0, 3)
-        });
-
-        // Check if all values are the same (which would make the chart look flat)
-        const allSame = vwapValues.every(v => v === vwapValues[0]) &&
-            twapValues.every(v => v === twapValues[0]) &&
-            priceValues.every(v => v === priceValues[0]);
-
-        if (allSame) {
-            console.warn('All VWAP/TWAP/Price values are identical - this is expected for spot flow data with constant price');
-        }
-
-        const vwapTrace = {
-            x: timestamps,
-            y: vwapValues,
-            type: 'scatter',
-            mode: 'lines',
-            name: 'VWAP',
-            line: { color: '#007bff', width: 2 }
-        };
-
-        const twapTrace = {
-            x: timestamps,
-            y: twapValues,
-            type: 'scatter',
-            mode: 'lines',
-            name: 'TWAP',
-            line: { color: '#17a2b8', width: 2 }
-        };
-
-        const priceTrace = {
-            x: timestamps,
-            y: priceValues,
-            type: 'scatter',
-            mode: 'lines',
-            name: 'Market Price',
-            line: { color: '#28a745', width: 2 }
-        };
-
-        const layout = {
-            title: 'VWAP vs TWAP vs Market Price',
-            xaxis: { title: 'Time' },
-            yaxis: { title: 'Price (USD)' },
-            showlegend: true,
-            height: 300,
-            margin: { l: 60, r: 50, t: 50, b: 50 }
-        };
-
-        Plotly.react('vwapChart', [vwapTrace, twapTrace, priceTrace], layout);
-    }
-
-    updateVWAPMetrics() {
-        if (!this.vwapData.length) return;
-
-        const latest = this.vwapData[0];
-
-        const vwap = latest.vwap || 0;
-        const twap = latest.twap || 0;
-        const price = latest.price || 0;
-
-        const vwapEl = document.getElementById('currentVWAP');
-        const twapEl = document.getElementById('currentTWAP');
-        const priceEl = document.getElementById('marketPrice');
-        const deviationEl = document.getElementById('vwapDeviation');
-
-        if (vwapEl) vwapEl.textContent = `$${this.formatNumber(vwap)}`;
-        if (twapEl) twapEl.textContent = `$${this.formatNumber(twap)}`;
-        if (priceEl) priceEl.textContent = `$${this.formatNumber(price)}`;
-
-        if (deviationEl && vwap > 0) {
-            const deviation = ((price - vwap) / vwap * 100).toFixed(2);
-            deviationEl.textContent = `${deviation}%`;
-            deviationEl.className = parseFloat(deviation) > 0 ? 'text-success' : 'text-danger';
-        }
-    }
-
-    updateVolumeChart() {
-        if (!this.volumeData.length) return;
-
-        const timestamps = this.volumeData.map(d => new Date(d.timestamp || d.ts || d.ts_ms));
-        const volumeValues = this.volumeData.map(d => d.volume_quote || d.volume || 0);
-        const tradesCountValues = this.volumeData.map(d => d.trades_count || d.count || 1);
-
-        const volumeTrace = {
-            x: timestamps,
-            y: volumeValues,
+    const charts = {
+        cvd: chartIf('spotCvdChart', {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CVD',
+                    data: [],
+                    borderColor: '#60a5fa',
+                    backgroundColor: 'rgba(96, 165, 250, 0.15)',
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 0,
+                    borderWidth: 2
+                }]
+            },
+            options: { responsive: true, animation: false, plugins: { legend: { display: false } } }
+        }),
+        vwap: chartIf('spotVwapChart', {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Price', data: [], borderColor: '#facc15', tension: 0.25, pointRadius: 0, borderWidth: 2 },
+                    { label: 'VWAP', data: [], borderColor: '#3b82f6', tension: 0.25, pointRadius: 0, borderWidth: 2 },
+                    { label: 'Upper', data: [], borderColor: '#22c55e', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5 },
+                    { label: 'Lower', data: [], borderColor: '#ef4444', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5 }
+                ]
+            },
+            options: { responsive: true, animation: false, plugins: { legend: { position: 'bottom' } } }
+        }),
+        pressure: chartIf('spotBookPressureChart', {
             type: 'bar',
-            name: 'Volume (Quote)',
-            marker: { color: '#007bff' },
-            yaxis: 'y'
-        };
-
-        const tradesTrace = {
-            x: timestamps,
-            y: tradesCountValues,
-            type: 'scatter',
-            mode: 'lines+markers',
-            name: 'Trades Count',
-            yaxis: 'y2',
-            line: { color: '#dc3545', width: 2 },
-            marker: { size: 4 }
-        };
-
-        const layout = {
-            title: 'Volume & Trade Statistics',
-            xaxis: { title: 'Time' },
-            yaxis: {
-                title: 'Volume (USD)',
-                side: 'left',
-                showgrid: true
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Bid Pressure', data: [], backgroundColor: 'rgba(34, 197, 94, 0.75)', borderRadius: 4 },
+                    { label: 'Ask Pressure', data: [], backgroundColor: 'rgba(239, 68, 68, 0.75)', borderRadius: 4 }
+                ]
             },
-            yaxis2: {
-                title: 'Trades Count',
-                side: 'right',
-                overlaying: 'y',
-                showgrid: false
+            options: { responsive: true, animation: false, plugins: { legend: { position: 'bottom' } } }
+        }),
+        summary: chartIf('spotTradeSummaryChart', {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Buy Volume', data: [], backgroundColor: 'rgba(34, 197, 94, 0.75)', borderRadius: 4, stack: 'vol' },
+                    { label: 'Sell Volume', data: [], backgroundColor: 'rgba(239, 68, 68, 0.75)', borderRadius: 4, stack: 'vol' }
+                ]
             },
-            showlegend: true,
-            height: 300,
-            margin: { l: 60, r: 60, t: 50, b: 50 }
-        };
+            options: {
+                responsive: true,
+                animation: false,
+                plugins: { legend: { position: 'bottom' } },
+                scales: { x: { stacked: true }, y: { stacked: true } }
+            }
+        })
+    };
 
-        Plotly.react('volumeChart', [volumeTrace, tradesTrace], layout);
-    }
+    const toNum = (value) => {
+        const number = Number(value);
+        return Number.isFinite(number) ? number : NaN;
+    };
 
-    updateVolumeMetrics() {
-        if (!this.volumeData.length) return;
+    const fmtNum = (value, decimals = 2) => {
+        const number = toNum(value);
+        return Number.isFinite(number)
+            ? number.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+            : '-';
+    };
 
-        const latest = this.volumeData[0];
+    const fmtCur = (value) => {
+        const number = toNum(value);
+        return Number.isFinite(number)
+            ? '$' + number.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : '-';
+    };
 
-        const tradesCount = latest.trades_count || latest.count || 0;
-        const volumeBase = latest.volume_base || 0;
-        const volumeQuote = latest.volume_quote || latest.volume || 0;
-        const avgTradeSize = latest.avg_trade_size || latest.average_size || 0;
+    const fmtPct = (value, decimals = 2) => {
+        const number = toNum(value);
+        return Number.isFinite(number)
+            ? `${number >= 0 ? '' : '-'}${Math.abs(number).toFixed(decimals)}%`
+            : '-';
+    };
 
-        const tradesCountEl = document.getElementById('tradesCount');
-        const volumeBaseEl = document.getElementById('volumeBase');
-        const volumeQuoteEl = document.getElementById('volumeQuote');
-        const avgTradeSizeEl = document.getElementById('avgTradeSize');
+    const parseTs = (value) => {
+        if (value == null) return null;
+        if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+        if (typeof value === 'number') return new Date(value > 1e12 ? value : value * 1000);
+        if (typeof value === 'string' && value.trim()) {
+            const numeric = Number(value);
+            if (!Number.isNaN(numeric)) return new Date(numeric > 1e12 ? numeric : numeric * 1000);
+            const parsed = new Date(value);
+            if (!Number.isNaN(parsed.getTime())) return parsed;
+        }
+        return null;
+    };
 
-        if (tradesCountEl) tradesCountEl.textContent = this.formatNumber(tradesCount);
-        if (volumeBaseEl) volumeBaseEl.textContent = this.formatNumber(volumeBase);
-        if (volumeQuoteEl) volumeQuoteEl.textContent = `$${this.formatNumber(volumeQuote)}`;
-        if (avgTradeSizeEl) avgTradeSizeEl.textContent = `$${this.formatNumber(avgTradeSize)}`;
-    }
+    const fmtDt = (date) => (date ? date.toISOString().replace('T', ' ').slice(0, 19) : '-');
+    const fmtHm = (date) => (date ? `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` : '');
 
-    updateLargeOrdersTable(orders) {
-        const tbody = document.getElementById('largeOrdersTableBody');
-        if (!tbody) return;
+    const fmtAgo = (date) => {
+        if (!date) return '-';
+        const diffSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+        if (diffSeconds < 0) return fmtDt(date);
+        if (diffSeconds < 60) return `${diffSeconds}s ago`;
+        const diffMinutes = Math.floor(diffSeconds / 60);
+        if (diffMinutes < 60) return `${diffMinutes}m ago`;
+        const diffHours = Math.floor(diffMinutes / 60);
+        if (diffHours < 24) return `${diffHours}h ago`;
+        return `${Math.floor(diffHours / 24)}d ago`;
+    };
 
-        if (!orders || !orders.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No large orders data available from provider</td></tr>';
+    const setText = (node, text) => { if (node) node.textContent = text; };
+    const setNotice = (id, show) => {
+        const node = el(id);
+        if (!node) return;
+        node.classList.toggle('d-none', !show);
+    };
+
+    const buildUrl = (path, params = {}) => {
+        const url = new URL(path.startsWith('/') ? path : `/${path}`, `${base}/`);
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                url.searchParams.set(key, value);
+            }
+        });
+        return url.toString();
+    };
+
+    const request = async (path, params = {}) => {
+        try {
+            const response = await fetch(buildUrl(path, params), {
+                headers: { Accept: 'application/json' },
+                cache: 'no-cache'
+            });
+            if (!response.ok) return null;
+            return await response.json();
+        } catch {
+            return null;
+        }
+    };
+
+    const setLoading = (on) => {
+        state.loading = on;
+        if (!refs.button) return;
+        if (on) {
+            refs.button.disabled = true;
+            refs.button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Loading';
+        } else {
+            refs.button.disabled = false;
+            refs.button.innerHTML = 'Refresh';
+        }
+    };
+
+    const updateTrades = (payload) => {
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        if (!rows.length) {
+            refs.tradesBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No trades available.</td></tr>';
+        } else {
+            refs.tradesBody.innerHTML = rows.slice(0, 25).map((trade) => {
+                const side = (trade.side || '').toString().toLowerCase();
+                const badge = side === 'buy' ? 'bg-success' : 'bg-danger';
+                const timestamp = fmtDt(parseTs(trade.timestamp));
+                return `<tr><td>${timestamp}</td><td><span class="badge ${badge}">${side ? side.toUpperCase() : 'N/A'}</span></td><td>${fmtCur(trade.price)}</td><td>${fmtNum(trade.quantity, 4)}</td></tr>`;
+            }).join('');
+        }
+
+        const latest = rows[0];
+        setText(refs.lastPrice, latest ? fmtCur(latest.price) : '-');
+        setText(refs.lastPriceTime, latest ? fmtAgo(parseTs(latest.timestamp)) : '-');
+    };
+
+    const updateTradeSummary = (payload) => {
+        const buckets = Array.isArray(payload?.data) ? payload.data : [];
+        setText(refs.summaryCount, `${buckets.length} buckets`);
+
+        if (!charts.summary) return;
+        charts.summary.data.labels = buckets.map((item) => fmtHm(parseTs(item.timestamp)));
+        charts.summary.data.datasets[0].data = buckets.map((item) => toNum(item.buy_volume));
+        charts.summary.data.datasets[1].data = buckets.map((item) => toNum(item.sell_volume));
+        charts.summary.update('none');
+
+        setNotice('spotTradeSummaryNotice', buckets.length === 0);
+    };
+
+    const updateCvd = (payload) => {
+        const series = Array.isArray(payload?.data) ? payload.data : [];
+        if (!charts.cvd) return;
+
+        const labels = series.map((item) => fmtHm(parseTs(item.timestamp)));
+        const values = series.map((item) => toNum(item.cumulative_cvd ?? item.cvd));
+
+        charts.cvd.data.labels = labels;
+        charts.cvd.data.datasets[0].data = values;
+        charts.cvd.update('none');
+
+        const hasData = series.length > 0;
+        setText(refs.cvdPoints, `${labels.length} pts`);
+        setNotice('spotCvdNotice', !hasData);
+        setNotice('spotCvdCardNotice', !hasData);
+
+        if (!hasData) {
+            setText(refs.cvdDelta, '-');
             return;
         }
 
-        tbody.innerHTML = orders.slice(0, 20).map(order => {
-            const timestamp = order.timestamp || order.ts || order.ts_ms || order.time;
-            const exchange = order.exchange || 'Unknown';
-            const symbol = order.symbol || order.pair || this.currentSymbol;
-
-            // Determine side for large orders
-            let side = order.side;
-            if (!side || side === 'unknown') {
-                const buyVol = order.buy_volume_quote || order.buy_volume || 0;
-                const sellVol = order.sell_volume_quote || order.sell_volume || 0;
-                side = buyVol > sellVol ? 'buy' : 'sell';
-            }
-
-            const size = order.size || order.quantity || order.qty || order.volume_base || 0;
-            const price = order.price || order.avg_price || 0;
-            const notional = order.notional_usd || order.notional || order.quote_quantity || order.volume_quote || (size * price);
-            const source = order.source || order.data_source || 'CoinGlass';
-
-            return `
-                <tr>
-                    <td>${this.formatTimestamp(timestamp)}</td>
-                    <td>${exchange}</td>
-                    <td>${symbol}</td>
-                    <td><span class="badge ${side === 'buy' ? 'bg-success' : 'bg-danger'}">${side.toUpperCase()}</span></td>
-                    <td>${this.formatNumber(size)}</td>
-                    <td>$${this.formatPrice(price)}</td>
-                    <td>$${this.formatNumber(notional)}</td>
-                    <td><span class="badge bg-secondary">${source}</span></td>
-                </tr>
-            `;
-        }).join('');
-    }
-
-    startAutoRefresh() {
-        this.intervals.forEach(interval => clearInterval(interval));
-        this.intervals = [];
-
-        this.intervals.push(
-            setInterval(() => this.loadUnifiedData().catch(err => console.error('Auto-refresh failed:', err)), this.refreshInterval)
-        );
-    }
-
-    showError(elementId, message) {
-        const element = document.getElementById(elementId);
-        if (element) {
-            element.innerHTML = `<tr><td colspan="100%" class="text-center text-danger">${message}</td></tr>`;
+        const first = values[values.length - 1];
+        const latest = values[0];
+        const delta = Number.isFinite(first) && Number.isFinite(latest) ? latest - first : 0;
+        setText(refs.cvdDelta, fmtNum(delta, 2));
+        if (refs.cvdDelta) {
+            refs.cvdDelta.classList.remove('text-success', 'text-danger');
+            if (delta > 0) refs.cvdDelta.classList.add('text-success');
+            else if (delta < 0) refs.cvdDelta.classList.add('text-danger');
         }
-    }
+    };
 
-    formatNumber(num) {
-        if (num === null || num === undefined) return 'N/A';
+    const updateBias = (payload) => {
+        const bias = (payload?.bias || 'neutral').toString();
+        const strength = payload?.strength;
 
-        const number = parseFloat(num);
-        if (isNaN(number)) return 'N/A';
+        setText(refs.tradeBias, bias.charAt(0).toUpperCase() + bias.slice(1));
 
-        if (number >= 1e9) return (number / 1e9).toFixed(2) + 'B';
-        if (number >= 1e6) return (number / 1e6).toFixed(2) + 'M';
-        if (number >= 1e3) return (number / 1e3).toFixed(2) + 'K';
+        if (refs.biasStrength) {
+            refs.biasStrength.className = 'badge';
+            const value = toNum(strength);
+            if (Number.isFinite(value)) {
+                refs.biasStrength.textContent = fmtNum(value, 2);
+                refs.biasStrength.classList.add(
+                    bias === 'buy' ? 'text-bg-success' : bias === 'sell' ? 'text-bg-danger' : 'text-bg-secondary'
+                );
+            } else {
+                refs.biasStrength.textContent = 'No data';
+                refs.biasStrength.classList.add('text-bg-secondary');
+            }
+        }
 
-        return number.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 8
-        });
-    }
+        const hasData = Boolean(payload) && ((typeof payload.n === 'number' && payload.n > 0) || Number.isFinite(toNum(strength)));
+        setNotice('spotBiasCardNotice', !hasData);
+    };
 
-    formatPrice(num) {
-        if (num === null || num === undefined) return 'N/A';
+    const updateOrderbook = (payload) => {
+        const bids = Array.isArray(payload?.bids) ? payload.bids : [];
+        const asks = Array.isArray(payload?.asks) ? payload.asks : [];
 
-        const number = parseFloat(num);
-        if (isNaN(number)) return 'N/A';
+        refs.bidsBody.innerHTML = bids.length
+            ? bids.slice(0, 10).map((level) => `<tr><td class="text-success">${fmtCur(level.price)}</td><td>${fmtNum(level.quantity, 4)}</td></tr>`).join('')
+            : '<tr><td colspan="2" class="text-center text-muted py-3">No bids available.</td></tr>';
 
-        // For prices, always show full number with 2 decimals
-        return number.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-    }
+        refs.asksBody.innerHTML = asks.length
+            ? asks.slice(0, 10).map((level) => `<tr><td class="text-danger">${fmtCur(level.price)}</td><td>${fmtNum(level.quantity, 4)}</td></tr>`).join('')
+            : '<tr><td colspan="2" class="text-center text-muted py-3">No asks available.</td></tr>';
 
-    formatTimestamp(timestamp) {
-        if (!timestamp) return 'N/A';
+        setText(refs.spread, fmtPct(payload?.spread_pct, 3));
+        setText(refs.depth, bids.length ? `${bids.length} / ${asks.length}` : '-');
+        setText(refs.bookTs, fmtDt(parseTs(payload?.timestamp)));
 
-        const ts = timestamp > 10000000000 ? timestamp : timestamp * 1000;
-        const date = new Date(ts);
+        const hasData = bids.length > 0 || asks.length > 0;
+        setNotice('spotOrderbookCardNotice', !hasData);
+    };
 
-        if (isNaN(date.getTime())) return 'N/A';
+    const updatePressure = (payload) => {
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        setText(refs.pressureCount, `${rows.length} pts`);
 
-        // Format as YYYY-MM-DD HH:MM:SS
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const seconds = String(date.getSeconds()).padStart(2, '0');
+        if (charts.pressure) {
+            charts.pressure.data.labels = rows.map((item) => fmtHm(parseTs(item.timestamp)));
+            charts.pressure.data.datasets[0].data = rows.map((item) => toNum(item.bid_pressure));
+            charts.pressure.data.datasets[1].data = rows.map((item) => toNum(item.ask_pressure));
+            charts.pressure.update('none');
+        }
 
-        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-    }
+        const latest = rows[rows.length - 1];
+        const ratio = toNum(latest?.pressure_ratio);
+        setText(refs.pressureRatio, Number.isFinite(ratio) ? fmtNum(ratio, 2) : '-');
+        setText(refs.pressureImbalance, latest?.pressure_direction || latest?.imbalance || '-');
 
-    destroy() {
-        this.intervals.forEach(interval => clearInterval(interval));
-        this.intervals = [];
+        refs.pressureBody.innerHTML = rows.length
+            ? rows.slice(-15).reverse().map((item) => `
+                <tr>
+                    <td>${fmtDt(parseTs(item.timestamp))}</td>
+                    <td class="text-success">${fmtNum(item.bid_pressure, 2)}</td>
+                    <td class="text-danger">${fmtNum(item.ask_pressure, 2)}</td>
+                    <td>${fmtNum(item.pressure_ratio, 2)}</td>
+                </tr>
+            `).join('')
+            : '<tr><td colspan="4" class="text-center text-muted py-4">No book pressure data.</td></tr>';
 
-        if (this.cvdChart) Plotly.purge('cvdChart');
-        if (this.vwapChart) Plotly.purge('vwapChart');
-        if (this.volumeChart) Plotly.purge('volumeChart');
-    }
-}
+        const hasData = rows.length > 0;
+        setNotice('spotBookPressureNotice', !hasData);
+        setNotice('spotPressureCardNotice', !hasData);
+    };
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    window.spotMicrostructureUnified = new SpotMicrostructureUnified();
-});
+    const updateVolumeProfile = (payload) => {
+        if (!refs.volumeBody) return;
 
-// Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-    if (window.spotMicrostructureUnified) {
-        window.spotMicrostructureUnified.destroy();
-    }
-});
+        if (!payload || Object.keys(payload).length === 0) {
+            refs.volumeBody.innerHTML = '<tr><td class="text-center text-muted py-4">No volume profile data.</td></tr>';
+            return;
+        }
+
+        const rows = [
+            ['Period', `${fmtDt(parseTs(payload.period_start))} -> ${fmtDt(parseTs(payload.period_end))}`],
+            ['Total Trades', fmtNum(payload.total_trades, 0)],
+            ['Buy Trades', fmtNum(payload.total_buy_trades, 0)],
+            ['Sell Trades', fmtNum(payload.total_sell_trades, 0)],
+            ['Buy/Sell Ratio', fmtNum(payload.buy_sell_ratio, 2)],
+            ['Avg Trade Size', fmtNum(payload.avg_trade_size, 3)],
+            ['Max Trade Size', fmtNum(payload.max_trade_size, 3)]
+        ].filter(([, value]) => value && value !== 'NaN' && value !== '- -> -');
+
+        refs.volumeBody.innerHTML = rows.length
+            ? rows.map(([label, value]) => `<tr><th class="text-secondary fw-normal" style="width:45%;">${label}</th><td>${value}</td></tr>`).join('')
+            : '<tr><td class="text-center text-muted py-4">No volume profile data.</td></tr>';
+    };
+
+    const updateVwap = (series, latestPayload) => {
+        const rows = Array.isArray(series?.data) ? series.data : [];
+        setText(refs.vwapCount, `${rows.length} pts`);
+
+        if (charts.vwap) {
+            charts.vwap.data.labels = rows.map((item) => fmtHm(parseTs(item.timestamp)));
+            charts.vwap.data.datasets[0].data = rows.map((item) => toNum(item.price ?? item.current_price));
+            charts.vwap.data.datasets[1].data = rows.map((item) => toNum(item.vwap));
+            charts.vwap.data.datasets[2].data = rows.map((item) => toNum(item.upper_band));
+            charts.vwap.data.datasets[3].data = rows.map((item) => toNum(item.lower_band));
+            charts.vwap.update('none');
+        }
+
+        const snapshot = latestPayload || rows[rows.length - 1];
+        const signalRaw = snapshot?.signal || snapshot?.trading_signal || null;
+        const signal = signalRaw ? signalRaw.toString().toLowerCase() : null;
+        const position = snapshot?.price_position ? snapshot.price_position.toString() : null;
+
+        setText(refs.vwapSignal, signal ? signal.charAt(0).toUpperCase() + signal.slice(1) : '-');
+        setText(refs.vwapPosition, position ? position.charAt(0).toUpperCase() + position.slice(1) : '-');
+
+        if (refs.vwapSignal) {
+            refs.vwapSignal.classList.remove('text-success', 'text-danger', 'text-warning');
+            if (signal === 'overbought') refs.vwapSignal.classList.add('text-danger');
+            else if (signal === 'oversold') refs.vwapSignal.classList.add('text-success');
+            else if (signal) refs.vwapSignal.classList.add('text-warning');
+        }
+
+        const hasSeries = rows.length > 0;
+        const hasSnapshot = Boolean(snapshot);
+        setNotice('spotVwapNotice', !hasSeries);
+        setNotice('spotVwapCardNotice', !(hasSeries || hasSnapshot));
+    };
+
+    const fetchAll = () => Promise.all([
+        request('/api/spot-microstructure/trades', { symbol: refs.symbol?.value || 'BTC/USDT', exchange: refs.exchange?.value || 'binance', limit: 50 }),
+        request('/api/spot-microstructure/trades/summary', { symbol: refs.symbol?.value || 'BTC/USDT', interval: '5m', limit: 60 }),
+        request('/api/spot-microstructure/cvd', { symbol: refs.symbol?.value || 'BTC/USDT', exchange: refs.exchange?.value || 'binance', limit: 120 }),
+        request('/api/spot-microstructure/trade-bias', { symbol: refs.symbol?.value || 'BTC/USDT', limit: 1000 }),
+        request('/api/spot-microstructure/orderbook/snapshot', { symbol: refs.symbol?.value || 'BTC/USDT', exchange: refs.exchange?.value || 'binance', depth: 15 }),
+        request('/api/spot-microstructure/book-pressure', { symbol: refs.symbol?.value || 'BTC/USDT', exchange: refs.exchange?.value || 'binance', limit: 60 }),
+        request('/api/spot-microstructure/volume-profile', { symbol: refs.symbol?.value || 'BTC/USDT', limit: 720 }),
+        request('/api/spot-microstructure/vwap', { symbol: refs.symbol?.value || 'BTC/USDT', exchange: refs.exchange?.value || 'binance', timeframe: '5min', limit: 180 }),
+        request('/api/spot-microstructure/vwap/latest', { symbol: refs.symbol?.value || 'BTC/USDT', exchange: refs.exchange?.value || 'binance', timeframe: '5min' })
+    ]);
+
+    const refresh = async (force = false) => {
+        if (state.loading && !force) return;
+        setLoading(true);
+        try {
+            const [trades, summary, cvd, bias, orderbook, pressure, profile, vwapSeries, vwapLatest] = await fetchAll();
+            updateTrades(trades);
+            updateTradeSummary(summary);
+            updateCvd(cvd);
+            updateBias(bias);
+            updateOrderbook(orderbook);
+            updatePressure(pressure);
+            updateVolumeProfile(profile);
+            updateVwap(vwapSeries, vwapLatest);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    refs.symbol?.addEventListener('change', () => refresh(true));
+    refs.exchange?.addEventListener('change', () => refresh(true));
+    refs.button?.addEventListener('click', () => refresh(true));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(false); });
+
+    refresh(true);
+    state.timer = setInterval(() => refresh(false), 20000);
+    window.addEventListener('beforeunload', () => clearInterval(state.timer));
+})();

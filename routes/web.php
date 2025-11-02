@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\SpotMicrostructureController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'workspace')->name('workspace');
@@ -79,38 +78,6 @@ Route::get('/api/coinglass/liquidation-aggregated-history', [App\Http\Controller
 Route::get('/api/coinglass/liquidation-exchange-list', [App\Http\Controllers\CoinglassController::class, 'getLiquidationExchangeList'])->name('api.coinglass.liquidation-exchange-list');
 Route::get('/api/coinglass/liquidation-history', [App\Http\Controllers\CoinglassController::class, 'getLiquidationHistory'])->name('api.coinglass.liquidation-history');
 Route::get('/api/coinglass/liquidation-summary', [App\Http\Controllers\CoinglassController::class, 'getLiquidationSummary'])->name('api.coinglass.liquidation-summary');
-
-// Spot microstructure API (direct provider proxy)
-Route::prefix('/api/spot-microstructure')->name('api.spot-microstructure.')->group(function () {
-    Route::get('/trades', [SpotMicrostructureController::class, 'getRecentTrades'])->name('trades');
-    Route::get('/trades/summary', [SpotMicrostructureController::class, 'getTradeSummary'])->name('trades.summary');
-    Route::get('/cvd', [SpotMicrostructureController::class, 'getCvd'])->name('cvd');
-    Route::get('/trade-bias', [SpotMicrostructureController::class, 'getTradeBias'])->name('trade-bias');
-    Route::get('/large-orders', [SpotMicrostructureController::class, 'getLargeOrders'])->name('large-orders');
-    Route::get('/coinglass/large-trades', [SpotMicrostructureController::class, 'getCoinglassLargeTrades'])->name('coinglass.large-trades');
-    Route::get('/coinglass/spot-flow', [SpotMicrostructureController::class, 'getCoinglassSpotFlow'])->name('coinglass.spot-flow');
-    
-    // Orderbook endpoints removed - CoinGlass doesn't provide real orderbook data
-    // Only keeping endpoints with real provider data
-    
-    // VWAP/TWAP endpoints
-    Route::get('/vwap', [SpotMicrostructureController::class, 'getVWAP'])->name('vwap');
-    Route::get('/vwap/latest', [SpotMicrostructureController::class, 'getLatestVWAP'])->name('vwap.latest');
-    Route::get('/twap', [SpotMicrostructureController::class, 'getTWAP'])->name('twap');
-    Route::get('/vwap/signals', [SpotMicrostructureController::class, 'getVWAPSignals'])->name('vwap.signals');
-    
-    // Volume & Trade Stats endpoints
-    Route::get('/trade-stats', [SpotMicrostructureController::class, 'getTradeStats'])->name('trade-stats');
-    Route::get('/volume-profile', [SpotMicrostructureController::class, 'getVolumeProfile'])->name('volume-profile');
-    Route::get('/volume-profile-detailed', [SpotMicrostructureController::class, 'getVolumeProfileDetailed'])->name('volume-profile-detailed');
-    Route::get('/volume-stats', [SpotMicrostructureController::class, 'getVolumeStats'])->name('volume-stats');
-    
-    // Orderbook endpoints (no real data available)
-    Route::get('/orderbook-snapshots', [SpotMicrostructureController::class, 'getOrderbookSnapshots'])->name('orderbook-snapshots');
-    
-    // Unified data endpoint for single page
-    Route::get('/unified', [SpotMicrostructureController::class, 'getUnifiedData'])->name('unified');
-});
 
 // Chart Components Demo
 Route::view('/examples/chart-components', 'examples.chart-components-demo')->name('examples.chart-components');
