@@ -13,7 +13,7 @@ export function createOpenInterestController() {
         initialized: false,
 
         // Loading states
-        globalLoading: true,
+        globalLoading: false, // Start false - will show skeleton only if no cache
         analyticsLoading: false,
         errorCount: 0,
         maxErrors: 3,
@@ -82,6 +82,10 @@ export function createOpenInterestController() {
             // Initialize services
             this.apiService = new OpenInterestAPIService();
             this.chartManager = new ChartManager('openInterestMainChart');
+
+            // Set globalLoading = false initially (will show skeleton only if no cache)
+            this.globalLoading = false;
+            this.analyticsLoading = false;
 
             // STEP 1: Load cache data INSTANT (no loading skeleton)
             const cacheLoaded = this.loadFromCache();
@@ -159,6 +163,10 @@ export function createOpenInterestController() {
                         
                         // Update current values
                         this.updateCurrentValues();
+                        
+                        // IMPORTANT: Hide loading skeletons immediately after cache loaded
+                        this.globalLoading = false;
+                        this.analyticsLoading = false;
                         
                         console.log('✅ Loaded from cache:', {
                             records: this.historyData.length,
@@ -485,6 +493,10 @@ export function createOpenInterestController() {
          * Handle filter change with cache support
          */
         async handleFilterChange() {
+            // Set loading states to false initially (will show skeleton only if no cache)
+            this.globalLoading = false;
+            this.analyticsLoading = false;
+            
             // Try to load cache for new filter combination
             const cacheLoaded = this.loadFromCache();
             
