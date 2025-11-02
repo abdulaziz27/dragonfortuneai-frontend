@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Sentiment Flow | DragonFortune')
+
 @section('content')
     {{--
         Sentiment & Flow Dashboard

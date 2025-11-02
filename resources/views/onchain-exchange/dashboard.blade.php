@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'OnChain Exchange | DragonFortune')
+
 @section('content')
     {{--
         Exchange Reserves & Market Indicators Dashboard

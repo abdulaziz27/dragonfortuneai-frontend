@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Open Interest | DragonFortune')
+
 @section('content')
     {{--
         Bitcoin: Open Interest Dashboard (HYBRID)

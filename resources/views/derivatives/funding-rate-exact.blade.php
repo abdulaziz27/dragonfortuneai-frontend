@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Funding Rate | DragonFortune')
+
 @section('content')
     {{--
         Bitcoin: Funding Rate Dashboard

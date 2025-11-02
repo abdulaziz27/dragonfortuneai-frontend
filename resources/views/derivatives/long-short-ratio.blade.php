@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Long Short Ratio | DragonFortune')
+
 @section('content')
     {{--
         Bitcoin: Long/Short Ratio Dashboard (HYBRID)

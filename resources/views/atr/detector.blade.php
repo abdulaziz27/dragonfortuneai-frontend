@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'ATR Detector | DragonFortune')
+
 @section('content')
 <div class="container-fluid">
     <!-- Header Section -->

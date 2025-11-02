@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Liquidations | DragonFortune')
+
 @section('content')
     {{--
         Bitcoin: Liquidations Dashboard (HYBRID)

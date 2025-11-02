@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'OnChain Ethereum | DragonFortune')
+
 @section('content')
     {{--
         Ethereum On-Chain Metrics Dashboard

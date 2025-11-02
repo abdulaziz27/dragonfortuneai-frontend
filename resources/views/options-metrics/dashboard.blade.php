@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Options Metrics | DragonFortune')
+
 @section('content')
     <div class="d-flex flex-column h-100 gap-3" x-data="optionsMetricsController()">
         <!-- Page Header -->

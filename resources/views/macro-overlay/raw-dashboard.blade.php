@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Macro Overlay | DragonFortune')
+
 @section('content')
     {{--
         Macro Overlay (Raw) Dashboard

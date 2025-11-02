@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'OnChain Mining & Price | DragonFortune')
+
 @section('content')
     {{--
         Mining & Price Analytics Dashboard

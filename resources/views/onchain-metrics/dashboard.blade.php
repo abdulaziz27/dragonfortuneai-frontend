@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'OnChain Metrics | DragonFortune')
+
 @section('content')
     {{--
         On-Chain Metrics Dashboard

@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'ETF Institutional | DragonFortune')
+
 @section('content')
     {{--
         ETF & Institutional Dashboard

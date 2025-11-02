@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Volatility Regime | DragonFortune')
+
 @section('scripts')
     <!-- Chart.js and dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

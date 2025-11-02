@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Perp-Quarterly Spread | DragonFortune')
+
 @section('content')
     {{--
         Perpetual-Quarterly Spread Dashboard

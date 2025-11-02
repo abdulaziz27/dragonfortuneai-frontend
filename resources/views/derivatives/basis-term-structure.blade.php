@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Basis & Term Structure | DragonFortune')
+
 @section('content')
     {{--
         Basis & Term Structure Dashboard

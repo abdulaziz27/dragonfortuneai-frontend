@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Spot Microstructure | DragonFortune')
+
 @section('content')
 <div class="container-fluid">
     <!-- Page Header -->
