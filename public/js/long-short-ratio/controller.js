@@ -302,81 +302,55 @@ export function createLongShortRatioController() {
         },
 
         /**
-         * Map analytics data to state
+         * Map analytics data to state (use direct values from /analytics API only)
          */
         mapAnalyticsToState() {
-            // First, try to use overview data if available
-            if (this.overviewData) {
-                this.mapOverviewToState();
-            }
-
-            // Then override with analytics if available (more detailed)
+            // Use analytics data directly from /analytics endpoint
             if (!this.analyticsData) return;
 
-            // Map positioning and trend from analytics
+            // Use positioning directly from API (format for display only)
             if (this.analyticsData.positioning) {
-                const positioning = this.analyticsData.positioning.toLowerCase();
-                if (positioning.includes('extreme_bullish') || positioning.includes('extreme_bull')) {
-                    this.marketSentiment = 'Long Crowded';
-                    this.sentimentStrength = 'Strong';
-                } else if (positioning.includes('bullish') || positioning.includes('bull')) {
-                    this.marketSentiment = 'Bullish Bias';
-                    this.sentimentStrength = 'Moderate';
-                } else if (positioning.includes('extreme_bearish') || positioning.includes('extreme_bear')) {
-                    this.marketSentiment = 'Short Crowded';
-                    this.sentimentStrength = 'Strong';
-                } else if (positioning.includes('bearish') || positioning.includes('bear')) {
-                    this.marketSentiment = 'Bearish Bias';
-                    this.sentimentStrength = 'Moderate';
-                }
+                // Format: "extreme_bullish" -> "Extreme Bullish"
+                const positioning = this.analyticsData.positioning;
+                this.marketSentiment = this.formatPositioning(positioning);
             }
 
-            // Update description based on trend
+            // Use trend directly from API
             if (this.analyticsData.trend) {
-                const trend = this.analyticsData.trend.toLowerCase();
-                if (trend === 'increasing') {
-                    this.sentimentDescription = 'Trend meningkat - sentimen bullish menguat';
-                } else if (trend === 'decreasing') {
-                    this.sentimentDescription = 'Trend menurun - sentimen bearish menguat';
-                } else if (trend === 'stable') {
-                    this.sentimentDescription = 'Trend stabil - sentimen tidak berubah signifikan';
-                }
+                // Format: "stable" -> "Trend stabil - sentimen tidak berubah signifikan"
+                const trend = this.analyticsData.trend;
+                this.sentimentDescription = this.formatTrendDescription(trend);
             }
         },
 
         /**
-         * Map overview data to state (from /overview endpoint)
+         * Format positioning value for display (from analytics API)
+         * Example: "extreme_bullish" -> "Extreme Bullish"
          */
-        mapOverviewToState() {
-            if (!this.overviewData) return;
+        formatPositioning(positioning) {
+            if (!positioning) return 'Unknown';
+            
+            // Replace underscores with spaces and capitalize each word
+            return positioning
+                .split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        },
 
-            // Map signals
-            if (this.overviewData.signals) {
-                const accountsSignal = this.overviewData.signals.accounts_signal?.toLowerCase();
-                const positionsSignal = this.overviewData.signals.positions_signal?.toLowerCase();
-
-                // Determine overall sentiment from signals
-                if (accountsSignal === 'bullish' || positionsSignal === 'bullish') {
-                    this.marketSentiment = 'Bullish Bias';
-                    this.sentimentStrength = accountsSignal === 'bullish' && positionsSignal === 'bullish' ? 'Strong' : 'Moderate';
-                } else if (accountsSignal === 'bearish' || positionsSignal === 'bearish') {
-                    this.marketSentiment = 'Bearish Bias';
-                    this.sentimentStrength = accountsSignal === 'bearish' && positionsSignal === 'bearish' ? 'Strong' : 'Moderate';
-                }
-            }
-
-            // Map summary stats (for reference, actual values come from current data)
-            // These can be used for summary cards if needed
-            if (this.overviewData.accounts_summary) {
-                const avgRatio = parseFloat(this.overviewData.accounts_summary.avg_ratio);
-                if (avgRatio > 2.0) {
-                    this.marketSentiment = 'Long Crowded';
-                    this.sentimentStrength = 'Strong';
-                } else if (avgRatio > 1.2) {
-                    this.marketSentiment = 'Bullish Bias';
-                    this.sentimentStrength = 'Moderate';
-                }
-            }
+        /**
+         * Format trend description for display (from analytics API)
+         * Example: "stable" -> "Trend stabil - sentimen tidak berubah signifikan"
+         */
+        formatTrendDescription(trend) {
+            if (!trend) return 'No trend data';
+            
+            const trendMap = {
+                'increasing': 'Trend meningkat - sentimen bullish menguat',
+                'decreasing': 'Trend menurun - sentimen bearish menguat',
+                'stable': 'Trend stabil - sentimen tidak berubah signifikan'
+            };
+            
+            return trendMap[trend.toLowerCase()] || `Trend: ${trend.charAt(0).toUpperCase() + trend.slice(1)}`;
         },
 
         /**
@@ -440,50 +414,8 @@ export function createLongShortRatioController() {
                 change24h: this.globalRatioChange
             });
 
-            // Update market sentiment based on current ratio
-            this.updateMarketSentiment();
-        },
-
-        /**
-         * Update market sentiment based on current ratio
-         */
-        updateMarketSentiment() {
-            const ratio = this.currentGlobalRatio;
-            if (!ratio) return;
-
-            // Override with analytics if available
-            if (this.analyticsData && this.analyticsData.positioning) {
-                // Already mapped in mapAnalyticsToState
-                return;
-            }
-
-            // Fallback calculation
-            if (ratio > 2.0) {
-                this.marketSentiment = 'Long Crowded';
-                this.sentimentStrength = 'Strong';
-                this.sentimentDescription = `Ratio > 2.0: Long posisi sangat ramai - potensi koreksi`;
-                this.crowdingLevel = 'Extreme Long';
-            } else if (ratio > 1.2) {
-                this.marketSentiment = 'Bullish Bias';
-                this.sentimentStrength = 'Moderate';
-                this.sentimentDescription = `Ratio ${ratio.toFixed(2)}: Bias bullish - lebih banyak long`;
-                this.crowdingLevel = 'Long Bias';
-            } else if (ratio >= 0.8 && ratio <= 1.2) {
-                this.marketSentiment = 'Balanced';
-                this.sentimentStrength = 'Normal';
-                this.sentimentDescription = `Ratio 0.8-1.2: Pasar seimbang`;
-                this.crowdingLevel = 'Balanced';
-            } else if (ratio < 0.5) {
-                this.marketSentiment = 'Short Crowded';
-                this.sentimentStrength = 'Strong';
-                this.sentimentDescription = `Ratio < 0.5: Short posisi sangat ramai - potensi rally`;
-                this.crowdingLevel = 'Extreme Short';
-            } else {
-                this.marketSentiment = 'Bearish Bias';
-                this.sentimentStrength = 'Moderate';
-                this.sentimentDescription = `Ratio ${ratio.toFixed(2)}: Bias bearish - lebih banyak short`;
-                this.crowdingLevel = 'Short Bias';
-            }
+            // Market sentiment will be updated from analytics API via mapAnalyticsToState()
+            // No fallback calculation needed - use analytics data only
         },
 
 

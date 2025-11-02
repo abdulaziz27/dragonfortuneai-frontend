@@ -110,17 +110,9 @@
             </div>
 
             <!-- Market Sentiment -->
-            <div class="col-md-2">
+            <div class="col-md-4">
                 <div class="df-panel p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Sentimen Pasar</span>
-                        <template x-if="globalLoading">
-                            <span class="badge skeleton skeleton-badge" style="width: 80px; height: 22px;"></span>
-                        </template>
-                        <template x-if="!globalLoading">
-                            <span class="badge" :class="getSentimentBadgeClass()" x-text="sentimentStrength"></span>
-                        </template>
-                    </div>
+                    <div class="small text-secondary mb-2">Sentimen Pasar</div>
                     <template x-if="globalLoading">
                         <div>
                             <div class="h4 mb-2 skeleton skeleton-text" style="width: 60%; height: 22px;"></div>
@@ -133,16 +125,6 @@
                             <div class="small text-secondary" x-text="sentimentDescription"></div>
                         </div>
                     </template>
-                    <!-- Crowding Level Display -->
-                    <div class="mt-2 d-flex justify-content-between">
-                        <span class="small text-secondary">Crowding:</span>
-                        <template x-if="globalLoading">
-                            <span class="badge skeleton skeleton-badge" style="width: 70px; height: 22px;"></span>
-                        </template>
-                        <template x-if="!globalLoading">
-                            <span class="badge text-bg-secondary" x-text="crowdingLevel"></span>
-                        </template>
-                    </div>
                 </div>
             </div>
         </div>
