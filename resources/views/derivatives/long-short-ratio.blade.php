@@ -48,33 +48,12 @@
 
 
 
-                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
-                        <span x-show="!globalLoading">🔄 Refresh</span>
-                        <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
-                    </button>
                 </div>
             </div>
         </div>
 
         <!-- Summary Cards Row -->
         <div class="row g-3">
-            <!-- Global Account Ratio -->
-            <div class="col-md-2">
-                <div class="df-panel p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Global Ratio</span>
-                        <span class="badge text-bg-primary">Latest</span>
-                    </div>
-                    <template x-if="globalLoading">
-                        <div class="h3 mb-2 skeleton skeleton-text" style="width: 70%; height: 28px;"></div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div class="h3 mb-1" x-text="formatRatio(currentGlobalRatio)"></div>
-                    </template>
-                    <div class="small text-secondary">Real-time</div>
-                </div>
-            </div>
-
             <!-- Top Account Ratio -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
@@ -135,7 +114,7 @@
                 <div class="tradingview-chart-container">
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0">Long/Short Ratio Chart</h5>
+                            <h5 class="mb-0">Top Accounts Ratio & Distribution</h5>
                             <div class="chart-info">
                                 <template x-if="globalLoading">
                                     <div class="d-flex align-items-center gap-3">
@@ -143,12 +122,12 @@
                                         <span class="change-badge skeleton skeleton-pill" style="width: 80px; height: 24px;"></span>
                                     </div>
                                 </template>
-                                <template x-if="!globalLoading">
+                                <!-- <template x-if="!globalLoading">
                                     <div class="d-flex align-items-center gap-3">
                                         <span class="current-value" x-text="formatRatio(currentGlobalRatio)"></span>
                                         <span class="change-badge" :class="globalRatioChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(globalRatioChange)"></span>
                                     </div>
-                                </template>
+                                </template> -->
                             </div>
                         </div>
                         <div class="chart-controls">
@@ -249,6 +228,86 @@
                             </small>
                             <small class="text-muted">
                                 <span class="badge text-bg-primary">Internal API v2</span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Positions Ratio & Distribution Chart -->
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="tradingview-chart-container">
+                    <div class="chart-header">
+                        <div class="d-flex align-items-center gap-3">
+                            <h5 class="mb-0">Top Positions Ratio & Distribution</h5>
+                            <div class="chart-info">
+                                <template x-if="globalLoading || analyticsLoading">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="current-value skeleton skeleton-text" style="width: 120px; height: 22px;"></span>
+                                        <span class="change-badge skeleton skeleton-pill" style="width: 80px; height: 24px;"></span>
+                                    </div>
+                                </template>
+                                <!-- <template x-if="!globalLoading && !analyticsLoading">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="current-value" x-text="formatRatio(currentTopPositionRatio)"></span>
+                                        <span class="change-badge" :class="topPositionRatioChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(topPositionRatioChange)"></span>
+                                    </div>
+                                </template> -->
+                            </div>
+                        </div>
+                        <div class="chart-controls">
+                            <!-- Time Range Buttons -->
+                            <div class="time-range-selector me-3">
+                                <template x-for="range in timeRanges" :key="range.value">
+                                    <button type="button" 
+                                            class="btn btn-sm time-range-btn"
+                                            :class="globalPeriod === range.value ? 'btn-primary' : 'btn-outline-secondary'"
+                                            @click="setTimeRange(range.value)"
+                                            x-text="range.label">
+                                    </button>
+                                </template>
+                            </div>
+
+                            <!-- Interval Dropdown -->
+                            <div class="dropdown me-3">
+                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle interval-dropdown-btn" 
+                                        type="button" 
+                                        data-bs-toggle="dropdown" 
+                                            :title="'Chart Interval: ' + (chartIntervals.find(i => i.value === selectedInterval)?.label || '1D')">
+                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1">
+                                        <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
+                                        <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
+                                    </svg>
+                                        <span x-text="chartIntervals.find(i => i.value === selectedInterval)?.label || '1D'"></span>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <template x-for="interval in chartIntervals" :key="interval.value">
+                                        <li>
+                                            <a class="dropdown-item" 
+                                               href="#" 
+                                               @click.prevent="setChartInterval(interval.value)"
+                                               :class="selectedInterval === interval.value ? 'active' : ''"
+                                               x-text="interval.label">
+                                            </a>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="longShortRatioPositionsChart"></canvas>
+                    </div>
+                    <div class="chart-footer">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="chart-footer-text">
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="margin-right: 4px;">
+                                    <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1"/>
+                                    <path d="M6 3v3l2 2" stroke="currentColor" stroke-width="1" fill="none"/>
+                                </svg>
+                                Ratio menunjukkan distribusi posisi long vs short berdasarkan ukuran modal (USD)
                             </small>
                         </div>
                     </div>

@@ -16,7 +16,7 @@
         - Falling OI = Trend weakening (profit taking)
     --}}
 
-    <div class="d-flex flex-column h-100 gap-3" x-data="openInterestHybridController()">
+    <div class="d-flex flex-column h-100 gap-3" x-data="openInterestController()">
         <!-- Page Header -->
         <div class="derivatives-header">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
@@ -32,27 +32,30 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <!-- Symbol Selector -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="updateSymbol($event.target.value)">
+                        <option value="BTCUSDT">BTC/USDT</option>
+                        <option value="ETHUSDT">ETH/USDT</option>
+                        <option value="SOLUSDT">SOL/USDT</option>
+                        <option value="BNBUSDT">BNB/USDT</option>
+                    </select>
+
                     <!-- Exchange Selector -->
-                    <select class="form-select" style="width: 160px;" x-model="selectedExchange" @change="updateExchange()">
-                        <option value="binance">Binance</option>
-                        <option value="bybit">Bybit</option>
-                        <option value="okx">OKX</option>
-                        <option value="bitmex">BitMEX</option>
-                        <option value="bitfinex">Bitfinex</option>
-                        <option value="all_exchange">All Exchanges</option>
+                    <select class="form-select" style="width: 160px;" x-model="selectedExchange" @change="updateExchange($event.target.value)">
+                        <option value="Binance">Binance</option>
+                        <option value="Bybit">Bybit</option>
                     </select>
 
-                    <!-- Symbol/Pair Selector -->
-                    <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="updateSymbol()">
-                        <option value="all_symbol">All Symbols</option>
-                        <option value="btc_usdt">BTC/USDT</option>
-                        <option value="btc_usd">BTC/USD</option>
-                        <!-- <option value="btc_busd">BTC/BUSD</option> -->
+                    <!-- Interval Selector -->
+                    <select class="form-select" style="width: 140px;" x-model="selectedInterval" @change="updateInterval($event.target.value)">
+                        <option value="1m">1 Minute</option>
+                        <option value="5m">5 Minutes</option>
+                        <option value="15m">15 Minutes</option>
+                        <option value="1h">1 Hour</option>
                     </select>
 
-
-
-                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
+                    <!-- Hidden refresh button (auto-refresh is active) -->
+                    <button class="btn btn-primary" @click="loadData()" :disabled="globalLoading" x-show="false">
                         <span x-show="!globalLoading">🔄 Refresh</span>
                         <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
                     </button>
@@ -66,7 +69,7 @@
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">₿ BTC/USD</span>
+                        <span class="small text-secondary">Price (USD)</span>
                         <span class="badge text-bg-warning">Live</span>
                     </div>
                     <template x-if="globalLoading">
@@ -80,8 +83,8 @@
                     </template>
                     <template x-if="!globalLoading">
                         <div>
-                            <div class="h3 mb-1 text-warning" x-text="formatPriceUSD(currentPrice)"></div>
-                            <div class="small" :class="getPriceTrendClass(priceChange)">
+                            <div class="h3 mb-1 text-warning" x-text="formatPrice(currentPrice)"></div>
+                            <div class="small" :class="priceChange >= 0 ? 'text-success' : 'text-danger'">
                                 <span x-text="formatChange(priceChange)"></span> 24h
                             </div>
                         </div>
@@ -108,7 +111,7 @@
                     <template x-if="!globalLoading">
                         <div>
                             <div class="h3 mb-1" x-text="formatOI(currentOI)"></div>
-                            <div class="small" :class="getTrendClass(oiChange)">
+                            <div class="small" :class="oiChange >= 0 ? 'text-success' : 'text-danger'">
                                 <span x-text="formatChange(oiChange)"></span> 24h
                             </div>
                         </div>
@@ -116,89 +119,94 @@
                 </div>
             </div>
 
-            <!-- Average Open Interest -->
+            <!-- Min OI -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Rata-rata Periode</span>
-                        <span class="badge text-bg-info">Avg</span>
+                        <span class="small text-secondary">Min OI</span>
+                        <span class="badge text-bg-success">Low</span>
                     </div>
-                    <template x-if="globalLoading">
+                    <template x-if="globalLoading || analyticsLoading">
                         <div>
                             <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
-                            <div class="small text-secondary d-flex align-items-center gap-1">
-                                <span>Med:</span>
-                                <span class="skeleton skeleton-text" style="width: 60px; height: 16px;"></span>
-                            </div>
                         </div>
                     </template>
-                    <template x-if="!globalLoading">
+                    <template x-if="!globalLoading && !analyticsLoading">
                         <div>
-                            <div class="h3 mb-1" x-text="formatOI(avgOI)"></div>
-                            <div class="small text-secondary">
-                                Med: <span x-text="formatOI(medianOI)"></span>
-                            </div>
+                            <div class="h3 mb-1" x-text="minOI ? formatOI(minOI) : '--'"></div>
                         </div>
                     </template>
                 </div>
             </div>
 
-            <!-- Peak Open Interest -->
+            <!-- Max OI -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Peak OI</span>
-                        <span class="badge text-bg-danger">Max</span>
+                        <span class="small text-secondary">Max OI</span>
+                        <span class="badge text-bg-danger">High</span>
                     </div>
-                    <template x-if="globalLoading">
+                    <template x-if="globalLoading || analyticsLoading">
                         <div>
                             <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
-                            <div class="small text-secondary skeleton skeleton-text" style="width: 80px; height: 16px;"></div>
                         </div>
                     </template>
-                    <template x-if="!globalLoading">
+                    <template x-if="!globalLoading && !analyticsLoading">
                         <div>
-                            <div class="h3 mb-1 text-danger" x-text="formatOI(maxOI)"></div>
-                            <div class="small text-secondary" x-text="peakDate"></div>
+                            <div class="h3 mb-1 text-danger" x-text="maxOI ? formatOI(maxOI) : '--'"></div>
                         </div>
                     </template>
                 </div>
             </div>
 
-            <!-- Market Signal -->
-            <div class="col-md-4">
+            <!-- Trend -->
+            <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Sinyal Pasar</span>
-                        <template x-if="globalLoading">
+                        <span class="small text-secondary">Trend</span>
+                        <template x-if="globalLoading || analyticsLoading">
                             <span class="badge skeleton skeleton-badge" style="width: 80px; height: 22px;"></span>
                         </template>
-                        <template x-if="!globalLoading">
-                            <span class="badge" :class="getSignalBadgeClass()" x-text="signalStrength"></span>
+                        <template x-if="!globalLoading && !analyticsLoading">
+                            <span class="badge" :class="getTrendBadgeClass(trend)" x-text="trend || 'stable'"></span>
                         </template>
                     </div>
-                    <template x-if="globalLoading">
+                    <template x-if="globalLoading || analyticsLoading">
                         <div>
-                            <div class="h4 mb-2 skeleton skeleton-text" style="width: 60%; height: 22px;"></div>
-                            <div class="small text-secondary skeleton skeleton-text" style="width: 90%; height: 16px;"></div>
+                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 60%; height: 28px;"></div>
                         </div>
                     </template>
-                    <template x-if="!globalLoading">
+                    <template x-if="!globalLoading && !analyticsLoading">
                         <div>
-                            <div class="h4 mb-1" :class="getSignalColorClass()" x-text="marketSignal"></div>
-                            <div class="small text-secondary" x-text="signalDescription"></div>
+                            <div class="h3 mb-1" :class="getTrendColorClass(trend)" x-text="trend || '--'"></div>
                         </div>
                     </template>
-                    <!-- Z-Score Display -->
-                    <div class="mt-2 d-flex justify-content-between">
-                        <span class="small text-secondary">Z-Score:</span>
-                        <template x-if="globalLoading">
-                            <span class="badge skeleton skeleton-badge" style="width: 70px; height: 22px;"></span>
+                </div>
+            </div>
+
+            <!-- Volatility -->
+            <div class="col-md-2">
+                <div class="df-panel p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary">Volatility</span>
+                        <template x-if="globalLoading || analyticsLoading">
+                            <span class="badge skeleton skeleton-badge" style="width: 80px; height: 22px;"></span>
                         </template>
-                        <template x-if="!globalLoading">
-                            <span class="badge" :class="getZScoreBadgeClass(currentZScore)" x-text="formatZScore(currentZScore)"></span>
+                        <template x-if="!globalLoading && !analyticsLoading">
+                            <span class="badge" :class="getVolatilityBadgeClass(volatilityLevel)" x-text="volatilityLevel || 'moderate'"></span>
                         </template>
                     </div>
+                    <template x-if="globalLoading || analyticsLoading">
+                        <div>
+                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 60%; height: 28px;"></div>
+                        </div>
+                    </template>
+                    <template x-if="!globalLoading && !analyticsLoading">
+                        <div>
+                            <div class="h3 mb-1" x-text="volatilityLevel || '--'"></div>
+                            <div class="small text-secondary" x-text="dataPoints > 0 ? dataPoints + ' data points' : ''"></div>
+                        </div>
+                    </template>
                 </div>
             </div>
         </div>
@@ -240,17 +248,17 @@
 
                             <!-- Chart Type Toggle -->
                             <div class="btn-group btn-group-sm me-3" role="group">
-                                <button type="button" class="btn" :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType('line')">
+                                <button type="button" class="btn" :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType()">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                         <path d="M2 12l3-3 3 3 6-6"/>
                                     </svg>
+                                    Line
                                 </button>
-                                <button type="button" class="btn" :class="chartType === 'bar' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType('bar')">
+                                <button type="button" class="btn" :class="chartType === 'area' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType()">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <rect x="2" y="6" width="3" height="8"/>
-                                        <rect x="6" y="4" width="3" height="10"/>
-                                        <rect x="10" y="8" width="3" height="6"/>
+                                        <path d="M2 12 L5 9 L8 12 L14 6 L14 14 L2 14 Z" opacity="0.3"/>
                                     </svg>
+                                    Area
                                 </button>
                             </div>
 
@@ -259,19 +267,19 @@
                                 <button class="btn btn-outline-secondary btn-sm dropdown-toggle interval-dropdown-btn" 
                                         type="button" 
                                         data-bs-toggle="dropdown" 
-                                        :title="'Chart Interval: ' + (chartIntervals.find(i => i.value === selectedInterval)?.label || '1D')">
+                                        :title="'Chart Interval: ' + (intervals.find(i => i.value === selectedInterval)?.label || '5m')">
                                     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1">
                                         <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
                                         <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
                                     </svg>
-                                    <span x-text="chartIntervals.find(i => i.value === selectedInterval)?.label || '1D'"></span>
+                                    <span x-text="intervals.find(i => i.value === selectedInterval)?.label || '5m'"></span>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-dark">
-                                    <template x-for="interval in chartIntervals" :key="interval.value">
+                                    <template x-for="interval in intervals" :key="interval.value">
                                         <li>
                                             <a class="dropdown-item" 
                                                href="#" 
-                                               @click.prevent="setChartInterval(interval.value)"
+                                               @click.prevent="updateInterval(interval.value)"
                                                :class="selectedInterval === interval.value ? 'active' : ''"
                                                x-text="interval.label">
                                             </a>
@@ -840,11 +848,8 @@
         });
     </script>
 
-    <!-- Open Interest Hybrid Controller -->
-    <script src="{{ asset('js/open-interest-hybrid-controller.js') }}"></script>
-    
-    <!-- Open Interest Internal API Handler -->
-    <script src="{{ asset('js/open-interest-internal-api.js') }}"></script>
+    <!-- Open Interest Modular Controller -->
+    <script type="module" src="{{ asset('js/open-interest-controller.js') }}"></script>
     
     <!-- Exchange Dominance Heatmap Controller -->
     <script src="{{ asset('js/laevitas-heatmap.js') }}"></script>
@@ -2863,5 +2868,7 @@
                 border-color: rgba(59, 130, 246, 0.3) !important;
             }
         }
+    </style>
+@endsection
     </style>
 @endsection

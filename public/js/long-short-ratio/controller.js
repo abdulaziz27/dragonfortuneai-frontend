@@ -52,10 +52,8 @@ export function createLongShortRatioController() {
         analyticsLoading: false,
 
         // Current metrics
-        currentGlobalRatio: null,
         currentTopAccountRatio: null,
         currentTopPositionRatio: null,
-        globalRatioChange: 0,
         topAccountRatioChange: 0,
         topPositionRatioChange: 0,
 
@@ -81,6 +79,7 @@ export function createLongShortRatioController() {
             // Initialize services
             this.apiService = new LongShortRatioAPIService();
             this.mainChartManager = new ChartManager('longShortRatioMainChart');
+            this.positionsChartManager = new ChartManager('longShortRatioPositionsChart');
             this.comparisonChartManager = new ChartManager('longShortRatioComparisonChart');
 
             // Initialize time ranges (simplified: 1D, 7D, 1M, ALL)
@@ -271,16 +270,23 @@ export function createLongShortRatioController() {
 
                 // ⚡ OPTIMIZATION: Render all charts ONCE with complete data
                 setTimeout(() => {
-                    // Render main chart (Top Account Ratio)
+                    // Render main chart (Top Account Ratio & Distribution)
                     if (this.topAccountData.length > 0) {
                         this.mainChartManager.renderMainChart(
-                            this.topAccountData,  // Direct use, no duplicate variable
-                            this.chartType, 
-                            [] // No price overlay
+                            this.topAccountData,
+                            this.chartType
                         );
                     }
 
-                    // Render comparison chart (only Top Account vs Top Position)
+                    // Render positions chart (Top Positions Ratio & Distribution)
+                    if (this.topPositionData.length > 0) {
+                        this.positionsChartManager.renderPositionsChart(
+                            this.topPositionData,
+                            this.chartType
+                        );
+                    }
+
+                    // Render comparison chart (Top Account vs Top Position ratio lines only)
                     if (this.topAccountData.length > 0 || this.topPositionData.length > 0) {
                         this.comparisonChartManager.renderComparisonChart(
                             [], // No global account data (redundant with top accounts)
@@ -359,14 +365,17 @@ export function createLongShortRatioController() {
         updateCurrentValues() {
             // FASE 1: Update from top accounts data (Internal API)
             if (this.topAccountData.length > 0) {
-                const latest = this.topAccountData[this.topAccountData.length - 1];
+                // Get latest by timestamp (not just array index) to ensure truly latest value
+                const sorted = [...this.topAccountData].sort((a, b) => (a.ts || a.time || 0) - (b.ts || b.time || 0));
+                const latest = sorted[sorted.length - 1];
                 
-                // Use internal API field names
-                this.currentTopAccountRatio = parseFloat(latest.ls_ratio_accounts || 0);
+                // Use internal API field names - handle string "2.06000000" correctly
+                const ratioValue = latest.ls_ratio_accounts;
+                this.currentTopAccountRatio = ratioValue ? parseFloat(ratioValue) : 0;
                 
                 // Calculate 24h change
-                if (this.topAccountData.length > 24) {
-                    const previous = this.topAccountData[this.topAccountData.length - 25];
+                if (sorted.length > 24) {
+                    const previous = sorted[sorted.length - 25];
                     const prevRatio = parseFloat(previous.ls_ratio_accounts || 0);
                     this.topAccountRatioChange = prevRatio > 0 
                         ? ((this.currentTopAccountRatio - prevRatio) / prevRatio) * 100 
@@ -374,23 +383,29 @@ export function createLongShortRatioController() {
                 }
                 
                 console.log('✅ Top Account Ratio:', {
-                    current: this.currentTopAccountRatio,
+                    raw: ratioValue,
+                    parsed: this.currentTopAccountRatio,
+                    formatted: LongShortRatioUtils.formatRatio(this.currentTopAccountRatio),
                     change24h: this.topAccountRatioChange,
                     long: latest.long_accounts,
-                    short: latest.short_accounts
+                    short: latest.short_accounts,
+                    timestamp: latest.ts || latest.time
                 });
             }
 
             // FASE 1: Update from top positions data (Internal API)
             if (this.topPositionData.length > 0) {
-                const latest = this.topPositionData[this.topPositionData.length - 1];
+                // Get latest by timestamp (not just array index) to ensure truly latest value
+                const sorted = [...this.topPositionData].sort((a, b) => (a.ts || a.time || 0) - (b.ts || b.time || 0));
+                const latest = sorted[sorted.length - 1];
                 
-                // Use internal API field names
-                this.currentTopPositionRatio = parseFloat(latest.ls_ratio_positions || 0);
+                // Use internal API field names - handle string "1.92000000" correctly
+                const ratioValue = latest.ls_ratio_positions;
+                this.currentTopPositionRatio = ratioValue ? parseFloat(ratioValue) : 0;
                 
                 // Calculate 24h change
-                if (this.topPositionData.length > 24) {
-                    const previous = this.topPositionData[this.topPositionData.length - 25];
+                if (sorted.length > 24) {
+                    const previous = sorted[sorted.length - 25];
                     const prevRatio = parseFloat(previous.ls_ratio_positions || 0);
                     this.topPositionRatioChange = prevRatio > 0 
                         ? ((this.currentTopPositionRatio - prevRatio) / prevRatio) * 100 
@@ -398,21 +413,15 @@ export function createLongShortRatioController() {
                 }
                 
                 console.log('✅ Top Position Ratio:', {
-                    current: this.currentTopPositionRatio,
+                    raw: ratioValue,
+                    parsed: this.currentTopPositionRatio,
+                    formatted: LongShortRatioUtils.formatRatio(this.currentTopPositionRatio),
                     change24h: this.topPositionRatioChange,
                     long: latest.long_positions_percent,
-                    short: latest.short_positions_percent
+                    short: latest.short_positions_percent,
+                    timestamp: latest.ts || latest.time
                 });
             }
-
-            // FASE 1: Use top account ratio as global ratio (since we now use internal API)
-            this.currentGlobalRatio = this.currentTopAccountRatio;
-            this.globalRatioChange = this.topAccountRatioChange;
-            
-            console.log('✅ Global Ratio (from Top Accounts):', {
-                current: this.currentGlobalRatio,
-                change24h: this.globalRatioChange
-            });
 
             // Market sentiment will be updated from analytics API via mapAnalyticsToState()
             // No fallback calculation needed - use analytics data only
@@ -602,6 +611,7 @@ export function createLongShortRatioController() {
         cleanup() {
             this.stopAutoRefresh();
             if (this.mainChartManager) this.mainChartManager.destroy();
+            if (this.positionsChartManager) this.positionsChartManager.destroy();
             if (this.comparisonChartManager) this.comparisonChartManager.destroy();
         }
     };

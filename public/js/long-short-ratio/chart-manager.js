@@ -28,9 +28,10 @@ export class ChartManager {
     }
 
     /**
-     * Render main chart (Long/Short Ratio)
+     * Render chart with ratio line + long/short percentages stacked bar
+     * Used for both Accounts and Positions charts
      */
-    renderMainChart(data, chartType = 'line', priceData = []) {
+    renderRatioDistributionChart(data, chartType = 'line', isPositions = false) {
         this.destroy();
 
         const canvas = document.getElementById(this.canvasId);
@@ -46,7 +47,7 @@ export class ChartManager {
         }
 
         if (!data || data.length === 0) {
-            console.warn('⚠️ No data available for main chart');
+            console.warn('⚠️ No data available for chart');
             return;
         }
 
@@ -54,44 +55,55 @@ export class ChartManager {
         setTimeout(() => {
             try {
                 const sorted = [...data].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
-                // Keep full timestamp (milliseconds) for accurate time display in tooltip
                 const labels = sorted.map(d => d.time || d.ts);
                 
-                // FASE 1: Extract ratio value from Internal API (top-accounts endpoint)
+                // Extract ratio and percentages (support both accounts and positions)
+                const ratioField = isPositions ? 'ls_ratio_positions' : 'ls_ratio_accounts';
+                const longPercentField = isPositions ? 'long_positions_percent' : 'long_accounts';
+                const shortPercentField = isPositions ? 'short_positions_percent' : 'short_accounts';
+                
                 const ratioValues = sorted.map(d => {
-                    return parseFloat(d.ls_ratio_accounts || 0);
+                    return parseFloat(d[ratioField] || 0);
                 });
                 
-                console.log('📊 Main Chart Rendering:', {
+                const longPercentages = sorted.map(d => {
+                    return parseFloat(d[longPercentField] || 0);
+                });
+                
+                const shortPercentages = sorted.map(d => {
+                    return parseFloat(d[shortPercentField] || 0);
+                });
+                
+                const chartLabel = isPositions ? 'Top Positions' : 'Top Accounts';
+                
+                console.log(`📊 ${chartLabel} Chart Rendering:`, {
                     dataPoints: ratioValues.length,
                     first: ratioValues[0],
-                    last: ratioValues[ratioValues.length - 1]
+                    last: ratioValues[ratioValues.length - 1],
+                    longAvg: longPercentages.reduce((a, b) => a + b, 0) / longPercentages.length,
+                    shortAvg: shortPercentages.reduce((a, b) => a + b, 0) / shortPercentages.length
                 });
 
-                // Prepare dataset based on chart type
-                let datasets;
+                // Prepare datasets: Ratio line (Y1) + Long/Short percentages stacked bar (Y2)
+                let datasets = [];
                 
-                if (chartType === 'bar') {
-                    // Bar chart with dynamic colors (green for > 1, red for < 1)
-                    const barColors = ratioValues.map(value => 
-                        value >= 1 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)'
-                    );
-                    const borderColors = ratioValues.map(value => 
-                        value >= 1 ? '#10b981' : '#ef4444'
-                    );
-                    
-                    datasets = [{
-                        label: 'Long/Short Ratio',
+                // 1. Ratio Line (primary Y-axis - left)
+                if (chartType === 'line') {
+                    datasets.push({
+                        label: `${chartLabel} Ratio`,
                         data: ratioValues,
-                        backgroundColor: barColors,
-                        borderColor: borderColors,
-                        borderWidth: 1.5,
-                        borderRadius: 4
-                    }];
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        yAxisID: 'y'
+                    });
                 } else if (chartType === 'area') {
-                    // Area chart with fill
-                    datasets = [{
-                        label: 'Long/Short Ratio',
+                    datasets.push({
+                        label: `${chartLabel} Ratio`,
                         data: ratioValues,
                         borderColor: '#3b82f6',
                         backgroundColor: 'rgba(59, 130, 246, 0.2)',
@@ -99,49 +111,57 @@ export class ChartManager {
                         fill: true,
                         tension: 0.4,
                         pointRadius: 0,
-                        pointHoverRadius: 4
-                    }];
+                        pointHoverRadius: 4,
+                        yAxisID: 'y'
+                    });
                 } else {
-                    // Line chart (default)
-                    datasets = [{
-                        label: 'Long/Short Ratio',
-                        data: ratioValues,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 4
-                    }];
-                }
-
-                // Add price overlay if available
-                if (priceData.length > 0) {
-                    const priceMap = new Map(priceData.map(p => [p.date, p.price]));
-                    const alignedPrices = labels.map(label => {
-                        // label is now timestamp in milliseconds
-                        const date = new Date(label);
-                        const dateStr = date.toISOString().split('T')[0];
-                        return priceMap.get(dateStr) || null;
-                    });
-
+                    const barColors = ratioValues.map(value => 
+                        value >= 1 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)'
+                    );
+                    const borderColors = ratioValues.map(value => 
+                        value >= 1 ? '#10b981' : '#ef4444'
+                    );
+                    
                     datasets.push({
-                        label: 'BTC Price',
-                        data: alignedPrices,
-                        borderColor: '#f59e0b',
-                        backgroundColor: 'transparent',
+                        label: `${chartLabel} Ratio`,
+                        data: ratioValues,
+                        backgroundColor: barColors,
+                        borderColor: borderColors,
                         borderWidth: 1.5,
-                        fill: false,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 3,
-                        yAxisID: 'y1',
-                        order: 2
+                        borderRadius: 4,
+                        yAxisID: 'y'
                     });
                 }
+                
+                // 2. Long/Short Percentages Stacked Bar (secondary Y-axis - right)
+                const longLabel = isPositions ? 'Long Positions' : 'Long Accounts';
+                const shortLabel = isPositions ? 'Short Positions' : 'Short Accounts';
+                
+                datasets.push({
+                    label: longLabel,
+                    type: 'bar',
+                    data: longPercentages,
+                    backgroundColor: 'rgba(16, 185, 129, 0.3)',
+                    borderColor: 'rgba(16, 185, 129, 0.5)',
+                    borderWidth: 0,
+                    yAxisID: 'y1',
+                    order: 2,
+                    stack: 'percentages'
+                });
+                
+                datasets.push({
+                    label: shortLabel,
+                    type: 'bar',
+                    data: shortPercentages,
+                    backgroundColor: 'rgba(239, 68, 68, 0.3)',
+                    borderColor: 'rgba(239, 68, 68, 0.5)',
+                    borderWidth: 0,
+                    yAxisID: 'y1',
+                    order: 2,
+                    stack: 'percentages'
+                });
 
-                const chartOptions = this.getMainChartOptions(priceData.length > 0);
+                const chartOptions = this.getMainChartOptions(true); // Enable dual-axis for percentages
 
                 this.chart = new Chart(ctx, {
                     type: chartType === 'bar' ? 'bar' : 'line',
@@ -152,12 +172,28 @@ export class ChartManager {
                     options: chartOptions
                 });
 
-                console.log('✅ Main chart rendered:', this.canvasId);
+                console.log(`✅ ${chartLabel} chart rendered:`, this.canvasId);
             } catch (error) {
-                console.error('❌ Error rendering main chart:', error);
+                console.error('❌ Error rendering chart:', error);
                 this.chart = null;
             }
         }, 50);
+    }
+
+    /**
+     * Render main chart (Long/Short Ratio) - Accounts
+     * @deprecated Use renderRatioDistributionChart(data, chartType, false) instead
+     */
+    renderMainChart(data, chartType = 'line', priceData = []) {
+        // Forward to new method for backward compatibility
+        this.renderRatioDistributionChart(data, chartType, false);
+    }
+
+    /**
+     * Render positions chart (Long/Short Ratio) - Positions
+     */
+    renderPositionsChart(data, chartType = 'line') {
+        this.renderRatioDistributionChart(data, chartType, true);
     }
 
     /**
@@ -352,7 +388,7 @@ export class ChartManager {
     /**
      * Get chart options for main chart
      */
-    getMainChartOptions(hasPriceOverlay = false) {
+    getMainChartOptions(hasPercentages = false) {
         return {
             responsive: true,
             maintainAspectRatio: false,
@@ -414,10 +450,19 @@ export class ChartManager {
                         label: (context) => {
                             const datasetLabel = context.dataset.label;
                             const value = context.parsed.y;
-                            if (datasetLabel.includes('Price')) {
-                                return `  ${datasetLabel}: ${LongShortRatioUtils.formatPriceUSD(value)}`;
+                            
+                            // Format percentages for Long/Short (both Accounts and Positions)
+                            if (datasetLabel.includes('Long Accounts') || datasetLabel.includes('Short Accounts') ||
+                                datasetLabel.includes('Long Positions') || datasetLabel.includes('Short Positions')) {
+                                return `  ${datasetLabel}: ${value.toFixed(2)}%`;
                             }
-                            return `  ${datasetLabel}: ${LongShortRatioUtils.formatRatio(value)}`;
+                            
+                            // Format ratio for Long/Short Ratio line
+                            if (datasetLabel.includes('Ratio')) {
+                                return `  ${datasetLabel}: ${LongShortRatioUtils.formatRatio(value)}`;
+                            }
+                            
+                            return `  ${datasetLabel}: ${value}`;
                         }
                     }
                 }
@@ -429,17 +474,37 @@ export class ChartManager {
                         font: { size: 10 },
                         maxRotation: 45,
                         minRotation: 45,
+                        maxTicksLimit: undefined, // Show all ticks
                         callback: function (value, index) {
-                            const totalLabels = this.chart.data.labels.length;
-                            const showEvery = Math.max(1, Math.ceil(totalLabels / 10));
-                            if (index % showEvery === 0) {
-                                const date = new Date(this.chart.data.labels[index]);
+                            const labels = this.chart.data.labels;
+                            const totalLabels = labels.length;
+                            
+                            if (totalLabels === 0 || index >= totalLabels) return '';
+                            
+                            const date = new Date(labels[index]);
+                            
+                            // Detect if hourly data (check time span between first and last)
+                            const firstDate = new Date(labels[0]);
+                            const lastDate = new Date(labels[totalLabels - 1]);
+                            const timeSpanDays = (lastDate - firstDate) / (1000 * 60 * 60 * 24);
+                            const isHourlyData = timeSpanDays < 7; // Less than 7 days = show time
+                            
+                            if (isHourlyData) {
+                                // Hourly view - show date + time: yyyy-mm-dd HH:mm
+                                const year = date.getFullYear();
+                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                const day = String(date.getDate());
+                                const hours = String(date.getHours()).padStart(2, '0');
+                                const minutes = String(date.getMinutes()).padStart(2, '0');
+                                return `${year}-${month}-${day} ${hours}:${minutes}`;
+                            } else {
+                                // Daily view - show full date: MMM dd, yyyy
                                 return date.toLocaleDateString('en-US', {
+                                    year: 'numeric',
                                     month: 'short',
                                     day: 'numeric'
                                 });
                             }
-                            return '';
                         }
                     },
                     grid: {
@@ -466,24 +531,26 @@ export class ChartManager {
                         drawBorder: false
                     }
                 },
-                ...(hasPriceOverlay && {
+                ...(hasPercentages && {
                     y1: {
                         type: 'linear',
                         display: true,
                         position: 'right',
                         title: {
                             display: true,
-                            text: 'BTC Price (USD)',
+                            text: 'Long/Short %',
                             color: '#475569',
                             font: { size: 11, weight: '500' }
                         },
                         ticks: {
-                            color: '#f59e0b',
+                            color: '#64748b',
                             font: { size: 11 },
-                            callback: (value) => LongShortRatioUtils.formatPriceUSD(value)
+                            callback: (value) => `${value.toFixed(1)}%`,
+                            max: 100,
+                            min: 0
                         },
                         grid: {
-                            display: false,
+                            display: false, // Hide grid for cleaner look
                             drawBorder: false
                         }
                     }
@@ -576,19 +643,39 @@ export class ChartManager {
                     ticks: {
                         color: '#64748b',
                         font: { size: 11 },
-                        maxRotation: 0,
-                        minRotation: 0,
+                        maxRotation: 45,
+                        minRotation: 45,
+                        maxTicksLimit: undefined, // Show all ticks
                         callback: function (value, index) {
-                            const totalLabels = this.chart.data.labels.length;
-                            const showEvery = Math.max(1, Math.ceil(totalLabels / 8));
-                            if (index % showEvery === 0) {
-                                const date = new Date(this.chart.data.labels[index]);
+                            const labels = this.chart.data.labels;
+                            const totalLabels = labels.length;
+                            
+                            if (totalLabels === 0 || index >= totalLabels) return '';
+                            
+                            const date = new Date(labels[index]);
+                            
+                            // Detect if hourly data (check time span between first and last)
+                            const firstDate = new Date(labels[0]);
+                            const lastDate = new Date(labels[totalLabels - 1]);
+                            const timeSpanDays = (lastDate - firstDate) / (1000 * 60 * 60 * 24);
+                            const isHourlyData = timeSpanDays < 7; // Less than 7 days = show time
+                            
+                            if (isHourlyData) {
+                                // Hourly view - show date + time: yyyy-mm-dd HH:mm
+                                const year = date.getFullYear();
+                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                const day = String(date.getDate());
+                                const hours = String(date.getHours()).padStart(2, '0');
+                                const minutes = String(date.getMinutes()).padStart(2, '0');
+                                return `${year}-${month}-${day} ${hours}:${minutes}`;
+                            } else {
+                                // Daily view - show full date: MMM dd, yyyy
                                 return date.toLocaleDateString('en-US', {
+                                    year: 'numeric',
                                     month: 'short',
                                     day: 'numeric'
                                 });
                             }
-                            return '';
                         }
                     },
                     grid: {
