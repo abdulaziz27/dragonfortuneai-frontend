@@ -24,7 +24,7 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <h1 class="mb-0">₿ Bitcoin: Open Interest</h1>
+                        <h1 class="mb-0">Open Interest</h1>
                         <span class="pulse-dot pulse-success"></span>
                     </div>
                     <p class="mb-0 text-secondary">
@@ -261,67 +261,6 @@
                                         </li>
                                     </template>
                                 </ul>
-                            </div>
-
-                            <!-- Scale Toggle (hidden) -->
-                            <div class="btn-group btn-group-sm me-3" role="group" style="display: none;">
-                                <button type="button" 
-                                        class="btn scale-toggle-btn"
-                                        :class="scaleType === 'linear' ? 'btn-primary' : 'btn-outline-secondary'"
-                                        @click="toggleScale('linear')"
-                                        title="Linear Scale - Equal intervals, good for absolute changes">
-                                    Linear
-                                </button>
-                                <button type="button" 
-                                        class="btn scale-toggle-btn"
-                                        :class="scaleType === 'logarithmic' ? 'btn-primary' : 'btn-outline-secondary'"
-                                        @click="toggleScale('logarithmic')"
-                                        title="Logarithmic Scale - Exponential intervals, good for percentage changes">
-                                    Log
-                                </button>
-                            </div>
-
-                            <!-- Chart Tools (hidden) -->
-                            <div class="btn-group btn-group-sm chart-tools" role="group" style="display: none;">
-                                <button type="button" class="btn btn-outline-secondary chart-tool-btn" @click="resetZoom()" title="Reset Zoom">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                                        <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                                    </svg>
-                                </button>
-                                
-                                <!-- Export Dropdown -->
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <button type="button" class="btn btn-outline-secondary dropdown-toggle chart-tool-btn" data-bs-toggle="dropdown" title="Export Chart">
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                                            <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
-                                        </svg>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-dark">
-                                        <li><a class="dropdown-item" href="#" @click.prevent="exportChart('png')">
-                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-2">
-                                                <path d="M4.502 9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM4 10.5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0z"/>
-                                                <path d="M14 2H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                                                <path d="M10.648 7.646a.5.5 0 0 1 .577-.093L15.002 9.5V13h-14v-1l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71z"/>
-                                            </svg>
-                                            Export sebagai PNG
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="#" @click.prevent="exportChart('svg')">
-                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-2">
-                                                <path d="M8.5 2a.5.5 0 0 0-1 0v5.793L5.354 5.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 7.793V2z"/>
-                                                <path d="M3 9.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5z"/>
-                                            </svg>
-                                            Export sebagai SVG
-                                        </a></li>
-                                    </ul>
-                                </div>
-                                
-                                <button type="button" class="btn btn-outline-secondary chart-tool-btn" @click="shareChart()" title="Bagikan Chart">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.499 2.499 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5z"/>
-                                    </svg>
-                                </button>
                             </div>
                         </div>
                     </div>
