@@ -102,8 +102,9 @@ export function createOpenInterestController() {
 
         /**
          * Load all data (OPTIMISTIC LOADING: history first, analytics in background)
+         * @param {boolean} isAutoRefresh - If true, don't show loading skeleton
          */
-        async loadData() {
+        async loadData(isAutoRefresh = false) {
             // Guard: Skip if already loading
             if (this.globalLoading && this.historyData.length > 0) {
                 console.log('⏭️ Skip load (already loading)');
@@ -115,7 +116,18 @@ export function createOpenInterestController() {
                 this.apiService.cancelAllRequests();
             }
 
-            this.globalLoading = true;
+            // Only show loading skeleton on initial load (hard refresh)
+            // Auto-refresh should be silent (no skeleton) since data already exists
+            const isInitialLoad = this.historyData.length === 0;
+            const shouldShowLoading = isInitialLoad && !isAutoRefresh;
+            
+            if (shouldShowLoading) {
+                this.globalLoading = true; // Show skeleton only on first load
+                console.log('🔄 Initial load - showing skeleton');
+            } else {
+                console.log('🔄 Auto-refresh - silent update (no skeleton)');
+            }
+
             this.errorCount = 0;
 
             try {
@@ -196,8 +208,12 @@ export function createOpenInterestController() {
                     this.stopAutoRefresh();
                 }
             } finally {
-                // Hide skeleton immediately after history data is loaded
-                this.globalLoading = false;
+                // Hide skeleton only if it was shown (initial load)
+                // Auto-refresh doesn't show skeleton, so don't set it here
+                if (shouldShowLoading) {
+                    this.globalLoading = false;
+                    console.log('✅ Initial load complete - skeleton hidden');
+                }
             }
         },
 
@@ -322,7 +338,8 @@ export function createOpenInterestController() {
                 }
 
                 console.log('🔄 Auto-refresh triggered');
-                this.loadData(); // This will load history and trigger analytics in background
+                // Pass isAutoRefresh=true to prevent loading skeleton during auto-refresh
+                this.loadData(true); // Silent update - no skeleton shown
 
                 // Also refresh analytics independently (non-blocking)
                 if (!this.analyticsLoading) {
