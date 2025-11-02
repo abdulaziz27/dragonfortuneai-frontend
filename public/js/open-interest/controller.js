@@ -83,8 +83,32 @@ export function createOpenInterestController() {
             this.apiService = new OpenInterestAPIService();
             this.chartManager = new ChartManager('openInterestMainChart');
 
-            // Load initial data
-            await this.loadData();
+            // STEP 1: Load cache data INSTANT (no loading skeleton)
+            const cacheLoaded = this.loadFromCache();
+            if (cacheLoaded) {
+                console.log('✅ Cache data loaded instantly - showing cached data');
+                // Render chart immediately with cached data
+                if (this.chartManager && this.historyData.length > 0) {
+                    setTimeout(() => {
+                        this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
+                    }, 50);
+                }
+                // globalLoading already false from loadFromCache (no skeleton shown)
+                
+                // STEP 2: Fetch fresh data from endpoints (background, no skeleton)
+                // Don't await - let it run in background while showing cache
+                this.loadData(true).catch(err => {
+                    console.warn('⚠️ Background fetch failed:', err);
+                });
+            } else {
+                // No cache available - show skeleton and load data normally
+                console.log('⚠️ No cache available - showing skeleton and loading data');
+                this.globalLoading = true; // Show skeleton for first load
+                this.loadData(false).catch(err => {
+                    console.warn('⚠️ Initial load failed:', err);
+                    this.globalLoading = false;
+                });
+            }
 
             // Start auto-refresh
             this.startAutoRefresh();
@@ -98,6 +122,86 @@ export function createOpenInterestController() {
                     this.startAutoRefresh();
                 }
             });
+        },
+
+        /**
+         * Get cache key based on current filters
+         */
+        getCacheKey() {
+            return `oi_dashboard_${this.selectedSymbol}_${this.selectedExchange}_${this.selectedInterval}_${this.globalPeriod}`;
+        },
+
+        /**
+         * Load data from cache (INSTANT display)
+         */
+        loadFromCache() {
+            try {
+                const cacheKey = this.getCacheKey();
+                const cached = localStorage.getItem(cacheKey);
+                
+                if (cached) {
+                    const data = JSON.parse(cached);
+                    
+                    // Check if cache is still valid (not older than 10 minutes)
+                    const now = Date.now();
+                    const cacheAge = now - (data.timestamp || 0);
+                    const maxAge = 10 * 60 * 1000; // 10 minutes
+                    
+                    if (cacheAge < maxAge && data.historyData && data.historyData.length > 0) {
+                        this.historyData = data.historyData;
+                        this.priceData = data.priceData || [];
+                        this.analyticsData = data.analyticsData || null;
+                        
+                        // Update state from cached analytics
+                        if (this.analyticsData) {
+                            this.mapAnalyticsToState();
+                        }
+                        
+                        // Update current values
+                        this.updateCurrentValues();
+                        
+                        console.log('✅ Loaded from cache:', {
+                            records: this.historyData.length,
+                            age: Math.round(cacheAge / 1000) + 's'
+                        });
+                        
+                        return true;
+                    } else {
+                        console.log('⚠️ Cache expired or invalid');
+                        localStorage.removeItem(cacheKey);
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ Error loading cache:', error);
+            }
+            
+            return false;
+        },
+
+        /**
+         * Save data to cache
+         */
+        saveToCache() {
+            try {
+                const cacheKey = this.getCacheKey();
+                const cacheData = {
+                    timestamp: Date.now(),
+                    historyData: this.historyData,
+                    priceData: this.priceData,
+                    analyticsData: this.analyticsData,
+                    filters: {
+                        symbol: this.selectedSymbol,
+                        exchange: this.selectedExchange,
+                        interval: this.selectedInterval,
+                        period: this.globalPeriod
+                    }
+                };
+                
+                localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+                console.log('💾 Data saved to cache:', cacheKey);
+            } catch (error) {
+                console.warn('⚠️ Error saving cache:', error);
+            }
         },
 
         /**
@@ -181,11 +285,16 @@ export function createOpenInterestController() {
 
                 // Fetch analytics in background (non-blocking, fire-and-forget)
                 // This will update: trend, volatilityLevel, minOI, maxOI
-                this.fetchAnalyticsData().catch(err => {
+                this.fetchAnalyticsData().then(() => {
+                    // Save to cache after analytics loaded
+                    this.saveToCache();
+                }).catch(err => {
                     console.warn('⚠️ Analytics fetch failed (will use defaults):', err);
                     // Set defaults if analytics fails
                     this.trend = 'stable';
                     this.volatilityLevel = 'moderate';
+                    // Save cache even if analytics failed
+                    this.saveToCache();
                 });
 
                 // Render chart with delay for safer cleanup
@@ -373,34 +482,59 @@ export function createOpenInterestController() {
         },
 
         /**
+         * Handle filter change with cache support
+         */
+        async handleFilterChange() {
+            // Try to load cache for new filter combination
+            const cacheLoaded = this.loadFromCache();
+            
+            if (cacheLoaded) {
+                console.log('✅ Cache loaded for new filter - showing cached data');
+                // Render chart immediately with cached data
+                if (this.chartManager && this.historyData.length > 0) {
+                    setTimeout(() => {
+                        this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
+                    }, 50);
+                }
+                // Fetch fresh data in background (no skeleton)
+                this.loadData(true).catch(err => {
+                    console.warn('⚠️ Background fetch failed:', err);
+                });
+            } else {
+                // No cache - load data normally (will show skeleton if needed)
+                await this.loadData();
+            }
+        },
+
+        /**
          * Filter handlers
          */
         setTimeRange(range) {
             if (this.globalPeriod === range) return;
             this.globalPeriod = range;
             console.log('📅 Time range changed:', range);
-            this.loadData();
+            this.handleFilterChange();
         },
 
         updateSymbol(symbol) {
             if (this.selectedSymbol === symbol) return;
             this.selectedSymbol = symbol;
             console.log('💱 Symbol changed:', symbol);
-            this.loadData();
+            this.handleFilterChange();
         },
 
         updateExchange(exchange) {
             if (this.selectedExchange === exchange) return;
             this.selectedExchange = exchange;
             console.log('🏦 Exchange changed:', exchange);
-            this.loadData();
+            this.handleFilterChange();
         },
 
         updateInterval(interval) {
             if (this.selectedInterval === interval) return;
             this.selectedInterval = interval;
             console.log('⏱️ Interval changed:', interval);
-            this.loadData();
+            this.handleFilterChange();
         },
 
         toggleChartType() {
