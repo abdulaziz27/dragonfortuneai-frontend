@@ -25,7 +25,8 @@
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <h1 class="mb-0">Open Interest</h1>
-                        <span class="pulse-dot pulse-success"></span>
+                        <span class="pulse-dot pulse-success" x-show="historyData.length > 0"></span>
+                        <span class="spinner-border spinner-border-sm text-primary" style="width: 16px; height: 16px;" x-show="historyData.length === 0" x-cloak></span>
                     </div>
                     <p class="mb-0 text-secondary">
                         Pantau perubahan open interest untuk melihat arus modal dan membaca kekuatan tren pasar.
@@ -72,25 +73,16 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Current OI</span>
-                        <span class="badge text-bg-primary">Latest</span>
+                        <span class="badge text-bg-primary" x-show="currentOI !== null && currentOI !== undefined">Latest</span>
+                        <span class="badge text-bg-secondary" x-show="currentOI === null || currentOI === undefined">Loading...</span>
                     </div>
-                    <template x-if="globalLoading">
-                        <div>
-                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 70%; height: 28px;"></div>
-                            <div class="small">
-                                <span class="skeleton skeleton-text" style="width: 60px; height: 16px;"></span>
-                                <span class="text-secondary ms-1">24h</span>
-                            </div>
+                    <div>
+                        <div class="h3 mb-1" x-text="currentOI !== null && currentOI !== undefined ? formatOI(currentOI) : '--'"></div>
+                        <div class="small" :class="currentOI !== null && currentOI !== undefined && oiChange >= 0 ? 'text-success' : (currentOI !== null && currentOI !== undefined ? 'text-danger' : 'text-secondary')">
+                            <span x-text="currentOI !== null && currentOI !== undefined ? formatChange(oiChange) : '--'"></span> 
+                            <span class="text-secondary ms-1">24h</span>
                         </div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div>
-                            <div class="h3 mb-1" x-text="formatOI(currentOI)"></div>
-                            <div class="small" :class="oiChange >= 0 ? 'text-success' : 'text-danger'">
-                                <span x-text="formatChange(oiChange)"></span> 24h
-                            </div>
-                        </div>
-                    </template>
+                    </div>
                 </div>
             </div>
 
@@ -99,18 +91,11 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Min OI</span>
-                        <span class="badge text-bg-success">Low</span>
+                        <span class="badge" :class="minOI ? 'text-bg-success' : 'text-bg-secondary'" x-text="minOI ? 'Low' : 'Loading...'"></span>
                     </div>
-                    <template x-if="globalLoading || analyticsLoading">
-                        <div>
-                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading && !analyticsLoading">
-                        <div>
-                            <div class="h3 mb-1" x-text="minOI ? formatOI(minOI) : '--'"></div>
-                        </div>
-                    </template>
+                    <div>
+                        <div class="h3 mb-1" x-text="minOI ? formatOI(minOI) : '--'"></div>
+                    </div>
                 </div>
             </div>
 
@@ -119,18 +104,11 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Max OI</span>
-                        <span class="badge text-bg-danger">High</span>
+                        <span class="badge" :class="maxOI ? 'text-bg-danger' : 'text-bg-secondary'" x-text="maxOI ? 'High' : 'Loading...'"></span>
                     </div>
-                    <template x-if="globalLoading || analyticsLoading">
-                        <div>
-                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading && !analyticsLoading">
-                        <div>
-                            <div class="h3 mb-1 text-danger" x-text="maxOI ? formatOI(maxOI) : '--'"></div>
-                        </div>
-                    </template>
+                    <div>
+                        <div class="h3 mb-1" :class="maxOI ? 'text-danger' : ''" x-text="maxOI ? formatOI(maxOI) : '--'"></div>
+                    </div>
                 </div>
             </div>
 
@@ -139,23 +117,11 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Trend</span>
-                        <template x-if="globalLoading || analyticsLoading">
-                            <span class="badge skeleton skeleton-badge" style="width: 80px; height: 22px;"></span>
-                        </template>
-                        <template x-if="!globalLoading && !analyticsLoading">
-                            <span class="badge" :class="getTrendBadgeClass(trend)" x-text="trend || 'stable'"></span>
-                        </template>
+                        <span class="badge" :class="trend && trend !== 'stable' ? getTrendBadgeClass(trend) : 'text-bg-secondary'" x-text="trend ? (trend === 'stable' ? 'stable' : trend) : 'Loading...'"></span>
                     </div>
-                    <template x-if="globalLoading || analyticsLoading">
-                        <div>
-                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 60%; height: 28px;"></div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading && !analyticsLoading">
-                        <div>
-                            <div class="h3 mb-1" :class="getTrendColorClass(trend)" x-text="trend || '--'"></div>
-                        </div>
-                    </template>
+                    <div>
+                        <div class="h3 mb-1" :class="trend && trend !== 'stable' ? getTrendColorClass(trend) : ''" x-text="trend || '--'"></div>
+                    </div>
                 </div>
             </div>
 
@@ -164,24 +130,12 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Volatility</span>
-                        <template x-if="globalLoading || analyticsLoading">
-                            <span class="badge skeleton skeleton-badge" style="width: 80px; height: 22px;"></span>
-                        </template>
-                        <template x-if="!globalLoading && !analyticsLoading">
-                            <span class="badge" :class="getVolatilityBadgeClass(volatilityLevel)" x-text="volatilityLevel || 'moderate'"></span>
-                        </template>
+                        <span class="badge" :class="volatilityLevel ? getVolatilityBadgeClass(volatilityLevel) : 'text-bg-secondary'" x-text="volatilityLevel || 'Loading...'"></span>
                     </div>
-                    <template x-if="globalLoading || analyticsLoading">
-                        <div>
-                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 60%; height: 28px;"></div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading && !analyticsLoading">
-                        <div>
-                            <div class="h3 mb-1" x-text="volatilityLevel || '--'"></div>
-                            <div class="small text-secondary" x-text="dataPoints > 0 ? dataPoints + ' data points' : ''"></div>
-                        </div>
-                    </template>
+                    <div>
+                        <div class="h3 mb-1" x-text="volatilityLevel || '--'"></div>
+                        <div class="small text-secondary" x-text="dataPoints > 0 ? dataPoints + ' data points' : ''"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -194,18 +148,10 @@
                         <div class="d-flex align-items-center gap-3">
                             <h5 class="mb-0">Open Interest Chart</h5>
                             <div class="chart-info">
-                                <template x-if="globalLoading">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="current-value skeleton skeleton-text" style="width: 120px; height: 22px;"></span>
-                                        <span class="change-badge skeleton skeleton-pill" style="width: 80px; height: 24px;"></span>
-                                    </div>
-                                </template>
-                                <template x-if="!globalLoading">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="current-value" x-text="formatOI(currentOI)"></span>
-                                        <span class="change-badge" :class="oiChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(oiChange)"></span>
-                                    </div>
-                                </template>
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="current-value" x-text="currentOI !== null && currentOI !== undefined ? formatOI(currentOI) : '--'"></span>
+                                    <span class="change-badge" :class="currentOI !== null && currentOI !== undefined && oiChange >= 0 ? 'positive' : (currentOI !== null && currentOI !== undefined ? 'negative' : '')" x-text="currentOI !== null && currentOI !== undefined ? formatChange(oiChange) : '--'"></span>
+                                </div>
                             </div>
                         </div>
                         <div class="chart-controls">

@@ -105,12 +105,12 @@ export function createOpenInterestController() {
                     console.warn('⚠️ Background fetch failed:', err);
                 });
             } else {
-                // No cache available - show skeleton and load data normally
-                console.log('⚠️ No cache available - showing skeleton and loading data');
-                this.globalLoading = true; // Show skeleton for first load
-                this.loadData(false).catch(err => {
+                // No cache available - optimistic UI (no skeleton, show placeholder values)
+                console.log('⚠️ No cache available - loading data with optimistic UI (no skeleton)');
+                // Don't set globalLoading = true - show layout immediately with placeholder values
+                // Data will appear seamlessly after fetch completes
+                this.loadData(true).catch(err => {
                     console.warn('⚠️ Initial load failed:', err);
-                    this.globalLoading = false;
                 });
             }
 
