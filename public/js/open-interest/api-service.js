@@ -28,20 +28,37 @@ export class OpenInterestAPIService {
         const url = `${this.baseUrl}/api/open-interest/history?symbol=${symbol}&exchange=${exchange}&interval=${interval}&limit=${limit}&with_price=${with_price}`;
 
         console.log('📡 Fetching OI history:', url);
+        
+        const startTime = Date.now();
 
         try {
+            // Add timeout (5 seconds) to prevent hanging requests
+            const timeoutId = setTimeout(() => {
+                if (this.historyAbortController) {
+                    this.historyAbortController.abort();
+                }
+            }, 5000);
+
             const response = await fetch(url, {
                 signal: this.historyAbortController.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
-            console.log('✅ OI history data received:', data?.length || 0, 'records');
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ OI history data received:', data?.length || 0, 'records', `(${fetchTime}ms)`);
 
-            return this.transformHistoryData(data);
+            // Transform data efficiently
+            const transformed = this.transformHistoryData(data);
+            const totalTime = Date.now() - startTime;
+            console.log('⏱️ Total history fetch time:', totalTime + 'ms');
+
+            return transformed;
         } catch (error) {
             if (error.name === 'AbortError') {
                 console.log('⏭️ OI history request cancelled');
@@ -67,18 +84,30 @@ export class OpenInterestAPIService {
         const url = `${this.baseUrl}/api/open-interest/analytics?symbol=${symbol}&exchange=${exchange}&interval=${interval}&limit=${limit}`;
 
         console.log('📡 Fetching OI analytics:', url);
+        
+        const startTime = Date.now();
 
         try {
+            // Add timeout (5 seconds) to prevent hanging requests
+            const timeoutId = setTimeout(() => {
+                if (this.analyticsAbortController) {
+                    this.analyticsAbortController.abort();
+                }
+            }, 5000);
+
             const response = await fetch(url, {
                 signal: this.analyticsAbortController.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
-            console.log('✅ OI analytics data received:', data);
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ OI analytics data received:', data, `(${fetchTime}ms)`);
 
             // Return first item if array, otherwise return as-is
             return Array.isArray(data) ? (data[0] || null) : data;
@@ -180,7 +209,7 @@ export class OpenInterestAPIService {
     }
 
     /**
-     * Filter data by date range (client-side)
+     * Filter data by date range (client-side) - Optimized for large datasets
      */
     filterByDateRange(data, startDate, endDate) {
         if (!Array.isArray(data) || data.length === 0) return data;
@@ -188,16 +217,26 @@ export class OpenInterestAPIService {
         const startTs = startDate.getTime();
         const endTs = endDate.getTime();
 
-        const filtered = data.filter(item => {
+        // Optimized filter - single pass, early exit conditions
+        const filtered = [];
+        for (let i = 0; i < data.length; i++) {
+            const item = data[i];
             const ts = item.ts || item.time || 0;
-            return ts >= startTs && ts <= endTs;
-        });
+            
+            // Early exit if we're past the end date (data should be sorted by timestamp)
+            if (ts > endTs) break;
+            
+            if (ts >= startTs && ts <= endTs) {
+                filtered.push(item);
+            }
+        }
 
         console.log('📅 Date Range Filter:', {
             startDate: startDate.toISOString(),
             endDate: endDate.toISOString(),
             beforeFilter: data.length,
-            afterFilter: filtered.length
+            afterFilter: filtered.length,
+            filteredPercent: ((filtered.length / data.length) * 100).toFixed(1) + '%'
         });
 
         return filtered;

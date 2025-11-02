@@ -242,6 +242,10 @@ export function createOpenInterestController() {
 
             this.errorCount = 0;
 
+            // Performance monitoring
+            const loadStartTime = Date.now();
+            console.log('⏱️ loadData() started at:', new Date().toISOString());
+
             try {
                 const dateRange = this.getDateRange();
                 const limit = OpenInterestUtils.calculateLimit(
@@ -273,6 +277,7 @@ export function createOpenInterestController() {
                 }
 
                 // Apply client-side date range filtering
+                const filterStartTime = Date.now();
                 let filteredData = historyData;
                 if (this.globalPeriod !== 'all') {
                     filteredData = this.apiService.filterByDateRange(
@@ -281,14 +286,21 @@ export function createOpenInterestController() {
                         dateRange.endDate
                     );
                 }
+                const filterTime = Date.now() - filterStartTime;
+                console.log('⏱️ Client-side filter time:', filterTime + 'ms');
 
+                // Transform price data (optimized)
+                const transformStartTime = Date.now();
                 this.historyData = filteredData;
                 this.priceData = filteredData.map(d => ({ ts: d.ts, price: d.price }));
+                const transformTime = Date.now() - transformStartTime;
+                console.log('⏱️ Data transform time:', transformTime + 'ms');
+
                 this.errorCount = 0; // Reset on success
 
                 console.log('✅ History data loaded:', this.historyData.length, 'records');
 
-                // Update current values from history
+                // Update current values from history (immediate)
                 this.updateCurrentValues();
 
                 // Fetch analytics in background (non-blocking, fire-and-forget)
@@ -306,16 +318,28 @@ export function createOpenInterestController() {
                     this.saveToCache();
                 });
 
-                // Render chart with delay for safer cleanup
-                setTimeout(() => {
-                    try {
+                // Render chart immediately (no delay needed for first load)
+                // Delay only needed for updates when chart already exists
+                const chartRenderStart = Date.now();
+                try {
+                    if (this.chartManager && this.historyData.length > 0) {
+                        this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
+                        const chartRenderTime = Date.now() - chartRenderStart;
+                        console.log('⏱️ Chart render time:', chartRenderTime + 'ms');
+                    }
+                } catch (error) {
+                    console.error('❌ Error rendering chart:', error);
+                    // Fallback: try with small delay if immediate render fails
+                    setTimeout(() => {
                         if (this.chartManager && this.historyData.length > 0) {
                             this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
                         }
-                    } catch (error) {
-                        console.error('❌ Error rendering chart:', error);
-                    }
-                }, 100);
+                    }, 50);
+                }
+
+                // Log total load time
+                const totalLoadTime = Date.now() - loadStartTime;
+                console.log('⏱️ Total loadData() time:', totalLoadTime + 'ms');
 
             } catch (error) {
                 console.error('❌ Error loading data:', error);
