@@ -362,13 +362,8 @@
                                 </svg>
                                 Open Interest naik bersamaan dengan harga naik menunjukkan kelanjutan trend yang kuat
                             </small>
-                            <small class="text-muted" x-data="{ source: 'Loading...' }" x-init="
-                                fetch('/api/cryptoquant/open-interest?start_date=' + new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0] + '&end_date=' + new Date().toISOString().split('T')[0])
-                                    .then(r => r.json())
-                                    .then(d => source = d.meta?.source || 'Unknown')
-                                    .catch(() => source = 'Error')
-                            ">
-                                <span class="badge" :class="source.includes('CryptoQuant') ? 'text-bg-success' : 'text-bg-warning'" x-text="source">Loading...</span>
+                            <small class="text-muted">
+                                <span class="badge text-bg-success">Internal API</span>
                             </small>
                         </div>
                     </div>
@@ -376,6 +371,8 @@
             </div>
         </div>
 
+        {{-- FASE 2: Section-section tambahan di bawah ini akan diaktifkan nanti --}}
+        {{-- 
         <!-- EXCHANGE DOMINANCE HEATMAP SECTION -->
         <div class="row g-3">
             <div class="col-12">
@@ -827,6 +824,8 @@
                 </div>
             </div>
         </div>
+        --}}
+
     </div>
 @endsection
 
@@ -851,8 +850,8 @@
     <!-- Open Interest Modular Controller -->
     <script type="module" src="{{ asset('js/open-interest-controller.js') }}"></script>
     
-    <!-- Exchange Dominance Heatmap Controller -->
-    <script src="{{ asset('js/laevitas-heatmap.js') }}"></script>
+    {{-- FASE 2: Heatmap controller akan diaktifkan nanti --}}
+    {{-- <script src="{{ asset('js/laevitas-heatmap.js') }}"></script> --}}
 
     <style>
         /* Skeleton placeholders */
@@ -2868,7 +2867,5 @@
                 border-color: rgba(59, 130, 246, 0.3) !important;
             }
         }
-    </style>
-@endsection
     </style>
 @endsection
