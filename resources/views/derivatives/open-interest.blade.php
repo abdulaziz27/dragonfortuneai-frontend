@@ -65,33 +65,6 @@
 
         <!-- Summary Cards Row -->
         <div class="row g-3">
-            <!-- Bitcoin Price USD -->
-            <div class="col-md-2">
-                <div class="df-panel p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Price (USD)</span>
-                        <span class="badge text-bg-warning">Live</span>
-                    </div>
-                    <template x-if="globalLoading">
-                        <div>
-                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 80%; height: 28px;"></div>
-                            <div class="small">
-                                <span class="skeleton skeleton-text" style="width: 60px; height: 16px;"></span>
-                                <span class="text-secondary ms-1">24h</span>
-                            </div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div>
-                            <div class="h3 mb-1 text-warning" x-text="formatPrice(currentPrice)"></div>
-                            <div class="small" :class="priceChange >= 0 ? 'text-success' : 'text-danger'">
-                                <span x-text="formatChange(priceChange)"></span> 24h
-                            </div>
-                        </div>
-                    </template>
-                </div>
-            </div>
-
             <!-- Current Open Interest -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
