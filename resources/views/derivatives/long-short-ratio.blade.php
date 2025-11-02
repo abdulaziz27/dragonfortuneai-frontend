@@ -16,7 +16,7 @@
         - Ratio 0.8-1.2: Pasar seimbang → Kelanjutan trend yang sehat
     --}}
 
-    <div class="d-flex flex-column h-100 gap-3" x-data="longShortRatioHybridController()">
+    <div class="d-flex flex-column h-100 gap-3" x-data="longShortRatioController()">
         <!-- Page Header -->
         <div class="derivatives-header">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
@@ -35,18 +35,15 @@
                     <!-- Exchange Selector -->
                     <select class="form-select" style="width: 160px;" x-model="selectedExchange" @change="updateExchange()">
                         <option value="Binance">Binance</option>
-                        <option value="OKX">OKX</option>
                         <option value="Bybit">Bybit</option>
-                        <option value="BitMEX">BitMEX</option>
-                        <option value="Bitget">Bitget</option>
                     </select>
 
                     <!-- Symbol/Pair Selector -->
                     <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="updateSymbol()">
                         <option value="BTCUSDT">BTC/USDT</option>
                         <option value="ETHUSDT">ETH/USDT</option>
+                        <option value="BNBUSDT">BNB/USDT</option>
                         <option value="SOLUSDT">SOL/USDT</option>
-                        <!-- <option value="ADAUSDT">ADA/USDT</option> -->
                     </select>
 
 
@@ -61,24 +58,6 @@
 
         <!-- Summary Cards Row -->
         <div class="row g-3">
-            <!-- Bitcoin Price USD -->
-            <div class="col-md-2">
-                <div class="df-panel p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">₿ BTC/USD</span>
-                        <span class="badge text-bg-warning">Live</span>
-                    </div>
-                    <template x-if="globalLoading">
-                        <div>
-                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 80%; height: 28px;"></div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div class="h3 mb-1 text-warning" x-text="formatPriceUSD(currentPrice)"></div>
-                    </template>
-                </div>
-            </div>
-
             <!-- Global Account Ratio -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
@@ -127,40 +106,6 @@
                         <div class="h3 mb-1" x-text="formatRatio(currentTopPositionRatio)"></div>
                     </template>
                     <div class="small text-secondary">Real-time</div>
-                </div>
-            </div>
-
-            <!-- Net Position Flow -->
-            <div class="col-md-2">
-                <div class="df-panel p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Net Position</span>
-                        <span class="badge text-bg-info">Flow</span>
-                    </div>
-                    <div class="row g-1">
-                        <div class="col-6">
-                            <div class="text-center">
-                                <template x-if="globalLoading">
-                                    <div class="h6 mb-1 skeleton skeleton-text" style="width: 60px; height: 18px;"></div>
-                                </template>
-                                <template x-if="!globalLoading">
-                                    <div class="h6 mb-0" :class="currentNetLongChange >= 0 ? 'text-success' : 'text-danger'" x-text="formatChange(currentNetLongChange)"></div>
-                                </template>
-                                <div class="small text-secondary">Long</div>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="text-center">
-                                <template x-if="globalLoading">
-                                    <div class="h6 mb-1 skeleton skeleton-text" style="width: 60px; height: 18px;"></div>
-                                </template>
-                                <template x-if="!globalLoading">
-                                    <div class="h6 mb-0" :class="currentNetShortChange >= 0 ? 'text-danger' : 'text-success'" x-text="formatChange(currentNetShortChange)"></div>
-                                </template>
-                                <div class="small text-secondary">Short</div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -265,7 +210,7 @@
                                     </svg>
                                     <span x-text="chartIntervals.find(i => i.value === selectedInterval)?.label || '1D'"></span>
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-dark">
+                                <ul class="dropdown-menu">
                                     <template x-for="interval in chartIntervals" :key="interval.value">
                                         <li>
                                             <a class="dropdown-item" 
@@ -320,13 +265,8 @@
                                 </svg>
                                 Ratio > 2.0 menunjukkan long crowded, ratio < 0.5 menunjukkan short crowded - peluang contrarian
                             </small>
-                            <small class="text-muted" x-data="{ source: 'Loading...' }" x-init="
-                                fetch('/api/coinglass/global-account-ratio?exchange=Binance&symbol=BTCUSDT&interval=1h&limit=1')
-                                    .then(r => r.json())
-                                    .then(d => source = d.source || 'Unknown')
-                                    .catch(() => source = 'Error')
-                            ">
-                                <span class="badge" :class="source.includes('coinglass') ? 'text-bg-success' : 'text-bg-warning'" x-text="source">Loading...</span>
+                            <small class="text-muted">
+                                <span class="badge text-bg-primary">Internal API v2</span>
                             </small>
                         </div>
                     </div>
@@ -340,28 +280,12 @@
                 <div class="tradingview-chart-container">
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0">📊 Ratio Comparison Chart</h5>
+                            <h5 class="mb-0">Ratio Comparison Chart</h5>
                             <div class="chart-info">
-                                <span class="small text-secondary">Global vs Top Account vs Top Position</span>
+                                <span class="small text-secondary">Top Account vs Top Position</span>
                             </div>
                         </div>
-                        <div class="chart-controls">
-                            <!-- Legend Info -->
-                            <div class="d-flex gap-3 align-items-center">
-                                <div class="d-flex align-items-center gap-1">
-                                    <div style="width: 12px; height: 2px; background-color: #3b82f6;"></div>
-                                    <span class="small text-secondary">Global Account</span>
-                                </div>
-                                <div class="d-flex align-items-center gap-1">
-                                    <div style="width: 12px; height: 2px; background-color: #10b981;"></div>
-                                    <span class="small text-secondary">Top Account</span>
-                                </div>
-                                <div class="d-flex align-items-center gap-1">
-                                    <div style="width: 12px; height: 2px; background-color: #f59e0b;"></div>
-                                    <span class="small text-secondary">Top Position</span>
-                                </div>
-                            </div>
-                        </div>
+                        
                     </div>
                     <div class="chart-body">
                         <canvas id="longShortRatioComparisonChart"></canvas>
@@ -372,7 +296,7 @@
                                 <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="margin-right: 4px;">
                                     <path d="M6 2L3 6h2v4h2V6h2L6 2z" fill="currentColor"/>
                                 </svg>
-                                Divergensi antara Global, Top Account, dan Top Position ratio dapat mengindikasikan perubahan sentimen
+                                Divergensi antara Top Account, dan Top Position ratio dapat mengindikasikan perubahan sentimen
                             </small>
                             <small class="text-muted">
                                 <span class="badge text-bg-info">Multi-Ratio Analysis</span>
@@ -383,107 +307,9 @@
             </div>
         </div>
 
-        <!-- TAKER BUY/SELL ANALYSIS SECTION -->
-        <div class="row g-3">
-            <div class="col-md-6">
-                <div class="df-panel p-3 h-100">
-                    <h5 class="mb-3">🔄 Taker Buy/Sell Ratio</h5>
-                    <div x-show="takerBuySellData" class="taker-analysis">
-                        <!-- Overall Market -->
-                        <div class="mb-3 p-3 rounded" style="background: rgba(59, 130, 246, 0.1);">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="fw-semibold">Overall Market</span>
-                                <span class="badge text-bg-primary" x-text="takerBuySellData?.symbol || 'BTC'">BTC</span>
-                            </div>
-                            <div class="row g-2">
-                                <div class="col-6">
-                                    <div class="text-center">
-                                        <div class="h4 text-success mb-1" x-text="takerBuySellData?.buy_ratio?.toFixed(1) + '%' || '--'">--</div>
-                                        <div class="small text-secondary">Buy Ratio</div>
-                                    </div>
-                                </div>
-                                <div class="col-6">
-                                    <div class="text-center">
-                                        <div class="h4 text-danger mb-1" x-text="takerBuySellData?.sell_ratio?.toFixed(1) + '%' || '--'">--</div>
-                                        <div class="small text-secondary">Sell Ratio</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Top Exchanges -->
-                        <div class="exchange-breakdown">
-                            <h6 class="mb-2">Top Exchanges</h6>
-                            <template x-for="exchange in (takerBuySellData?.exchange_list || []).slice(0, 5)" :key="exchange.exchange">
-                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                    <span class="fw-medium" x-text="exchange.exchange">--</span>
-                                    <div class="d-flex gap-2">
-                                        <span class="badge" :class="exchange.buy_ratio > 50 ? 'text-bg-success' : 'text-bg-secondary'" x-text="exchange.buy_ratio?.toFixed(1) + '%'">--</span>
-                                        <span class="small text-secondary">vs</span>
-                                        <span class="badge" :class="exchange.sell_ratio > 50 ? 'text-bg-danger' : 'text-bg-secondary'" x-text="exchange.sell_ratio?.toFixed(1) + '%'">--</span>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                    <div x-show="!takerBuySellData" class="text-center py-4">
-                        <div class="spinner-border text-primary mb-2"></div>
-                        <div class="text-secondary">Loading taker data...</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="df-panel p-3 h-100">
-                    <h5 class="mb-3">📈 Ratio Analysis</h5>
-                    <div class="analysis-grid">
-                        <!-- Current Ratios -->
-                        <div class="mb-3">
-                            <h6 class="text-secondary mb-2">Current Ratios</h6>
-                            <div class="row g-2">
-                                <div class="col-4">
-                                    <div class="text-center p-2 rounded" style="background: rgba(59, 130, 246, 0.1);">
-                                        <div class="fw-bold" x-text="formatRatio(currentGlobalRatio)">--</div>
-                                        <div class="small text-secondary">Global</div>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="text-center p-2 rounded" style="background: rgba(16, 185, 129, 0.1);">
-                                        <div class="fw-bold" x-text="formatRatio(currentTopAccountRatio)">--</div>
-                                        <div class="small text-secondary">Top Acc</div>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="text-center p-2 rounded" style="background: rgba(245, 158, 11, 0.1);">
-                                        <div class="fw-bold" x-text="formatRatio(currentTopPositionRatio)">--</div>
-                                        <div class="small text-secondary">Top Pos</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Interpretation -->
-                        <div class="interpretation-box p-3 rounded" style="background: rgba(139, 92, 246, 0.1);">
-                            <h6 class="text-secondary mb-2">📊 Interpretasi</h6>
-                            <div class="small">
-                                <div class="mb-2">
-                                    <strong>Ratio > 2.0:</strong> Long crowded - Potensi koreksi
-                                </div>
-                                <div class="mb-2">
-                                    <strong>Ratio < 0.5:</strong> Short crowded - Potensi rally
-                                </div>
-                                <div>
-                                    <strong>Ratio 0.8-1.2:</strong> Balanced - Trend continuation
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- EXCHANGE BUY/SELL PRESSURE RANKING -->
-        <div class="row g-3">
+        <!-- HIDDEN: External API (Coinglass) - Data not reliable or available -->
+        <div class="row g-3" style="display: none;">
             <div class="col-12">
                 <div class="heatmap-container">
                     <div class="heatmap-header">
@@ -774,8 +600,8 @@
         });
     </script>
 
-    <!-- Long/Short Ratio Hybrid Controller -->
-    <script src="{{ asset('js/long-short-ratio-hybrid-controller.js') }}"></script>
+    <!-- Long/Short Ratio Controller (Modular) -->
+    <script type="module" src="{{ asset('js/long-short-ratio-controller.js') }}"></script>
     
     <!-- Open Interest Internal API Handler -->
     <script src="{{ asset('js/open-interest-internal-api.js') }}"></script>
@@ -811,11 +637,11 @@
         }
         /* Light Theme Chart Container */
         .tradingview-chart-container {
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            background: #ffffff;
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
 
         .chart-header {
@@ -866,7 +692,7 @@
         }
 
         .chart-controls .btn-group {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(241, 245, 249, 0.8);
             border-radius: 6px;
             padding: 2px;
         }
@@ -874,19 +700,19 @@
         .chart-controls .btn {
             border: none;
             padding: 6px 12px;
-            color: #94a3b8;
+            color: #64748b;
             background: transparent;
             transition: all 0.2s;
         }
 
         .chart-controls .btn:hover {
-            color: #fff;
-            background: rgba(255, 255, 255, 0.05);
+            color: #1e293b;
+            background: rgba(241, 245, 249, 0.8);
         }
 
         .chart-controls .btn-primary {
             background: #3b82f6;
-            color: #fff;
+            color: #ffffff;
         }
 
         .chart-body {
@@ -947,79 +773,36 @@
         /* Professional Time Range Controls */
         .time-range-selector {
             display: flex;
-            gap: 0.125rem;
-            background: linear-gradient(135deg, 
-                rgba(30, 41, 59, 0.8) 0%, 
-                rgba(51, 65, 85, 0.8) 100%);
-            border: 1px solid rgba(59, 130, 246, 0.2);
+            gap: 6px;
+            background: rgba(241, 245, 249, 0.8);
             border-radius: 8px;
             padding: 0.25rem;
-            box-shadow: 
-                0 4px 12px rgba(0, 0, 0, 0.2),
-                inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         .time-range-btn {
-            padding: 0.5rem 0.875rem !important;
+            padding: 6px 14px !important;
             font-size: 0.75rem !important;
             font-weight: 600 !important;
             border: none !important;
             border-radius: 6px !important;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            transition: all 0.2s ease !important;
             min-width: 44px;
-            position: relative;
-            overflow: hidden;
-            color: #94a3b8 !important;
+            color: #64748b !important;
             background: transparent !important;
         }
 
-        .time-range-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.1) 0%, 
-                rgba(139, 92, 246, 0.1) 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
         .time-range-btn:hover {
-            color: #e2e8f0 !important;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.2) !important;
-        }
-
-        .time-range-btn:hover::before {
-            opacity: 1;
+            color: #1e293b !important;
+            background: rgba(241, 245, 249, 0.5) !important;
         }
 
         .time-range-btn.btn-primary {
-            background: linear-gradient(135deg, 
-                #3b82f6 0%, 
-                #2563eb 100%) !important;
-            color: white !important;
-            box-shadow: 
-                0 4px 12px rgba(59, 130, 246, 0.4),
-                0 2px 4px rgba(59, 130, 246, 0.3) !important;
-            transform: translateY(-1px);
-        }
-
-        .time-range-btn.btn-primary::before {
-            background: linear-gradient(135deg, 
-                rgba(255, 255, 255, 0.1) 0%, 
-                rgba(255, 255, 255, 0.05) 100%);
-            opacity: 1;
+            background: #3b82f6 !important;
+            color: #ffffff !important;
         }
 
         .time-range-btn.btn-primary:hover {
-            box-shadow: 
-                0 6px 16px rgba(59, 130, 246, 0.5),
-                0 3px 6px rgba(59, 130, 246, 0.4) !important;
-            transform: translateY(-2px);
+            background: #2563eb !important;
         }
 
         .scale-toggle-btn {
@@ -1037,132 +820,45 @@
         }
 
         .chart-controls .btn-group {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(241, 245, 249, 0.8);
             border-radius: 6px;
             padding: 2px;
         }
 
         .chart-controls .btn-outline-secondary {
-            border-color: rgba(148, 163, 184, 0.3) !important;
-            color: #94a3b8 !important;
+            border-color: rgba(226, 232, 240, 0.8) !important;
+            color: #64748b !important;
+            background: rgba(241, 245, 249, 0.5) !important;
         }
 
         .chart-controls .btn-outline-secondary:hover {
             background: rgba(59, 130, 246, 0.1) !important;
-            border-color: rgba(59, 130, 246, 0.4) !important;
+            border-color: rgba(59, 130, 246, 0.3) !important;
             color: #3b82f6 !important;
         }
 
-        /* Enhanced Chart Tools */
-        .chart-tools {
-            background: linear-gradient(135deg, 
-                rgba(30, 41, 59, 0.6) 0%, 
-                rgba(51, 65, 85, 0.6) 100%);
-            border-radius: 8px;
-            padding: 0.25rem;
-            border: 1px solid rgba(59, 130, 246, 0.15);
-        }
-
-        .chart-tool-btn {
-            border: none !important;
-            background: transparent !important;
-            color: #94a3b8 !important;
-            padding: 0.5rem 0.75rem !important;
-            border-radius: 6px !important;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .chart-tool-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.1) 0%, 
-                rgba(139, 92, 246, 0.1) 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .chart-tool-btn:hover {
-            color: #e2e8f0 !important;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.2) !important;
-        }
-
-        .chart-tool-btn:hover::before {
-            opacity: 1;
-        }
-
-        .chart-tool-btn:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
-        }
-
         /* Dropdown Menu Styling */
-        .dropdown-menu-dark {
-            background: linear-gradient(135deg, 
-                rgba(15, 23, 42, 0.95) 0%, 
-                rgba(30, 41, 59, 0.95) 100%) !important;
-            border: 1px solid rgba(59, 130, 246, 0.2) !important;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
-            backdrop-filter: blur(12px);
+        .dropdown-menu {
+            background: #ffffff !important;
+            border: 1px solid rgba(226, 232, 240, 0.8) !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1) !important;
         }
 
-        .dropdown-menu-dark .dropdown-item {
-            color: #e2e8f0 !important;
+        .dropdown-menu .dropdown-item {
+            color: #1e293b !important;
             transition: all 0.2s ease !important;
             border-radius: 4px !important;
             margin: 0.125rem !important;
         }
 
-        .dropdown-menu-dark .dropdown-item:hover {
-            background: rgba(59, 130, 246, 0.15) !important;
-            color: #60a5fa !important;
+        .dropdown-menu .dropdown-item:hover {
+            background: rgba(59, 130, 246, 0.1) !important;
+            color: #3b82f6 !important;
         }
 
-        /* Professional Chart Container - CryptoQuant Level */
-        .tradingview-chart-container {
-            background: linear-gradient(135deg, 
-                rgba(15, 23, 42, 0.98) 0%, 
-                rgba(30, 41, 59, 0.98) 50%,
-                rgba(15, 23, 42, 0.98) 100%);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(59, 130, 246, 0.25);
-            box-shadow: 
-                0 10px 40px rgba(0, 0, 0, 0.4),
-                0 4px 16px rgba(59, 130, 246, 0.1),
-                inset 0 1px 0 rgba(255, 255, 255, 0.08);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .tradingview-chart-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(59, 130, 246, 0.5) 50%, 
-                transparent 100%);
-            z-index: 1;
-        }
-
-        .tradingview-chart-container:hover {
-            box-shadow: 
-                0 16px 48px rgba(0, 0, 0, 0.5),
-                0 6px 20px rgba(59, 130, 246, 0.15),
-                inset 0 1px 0 rgba(255, 255, 255, 0.12);
-            border-color: rgba(59, 130, 246, 0.4);
-            transform: translateY(-1px);
+        .dropdown-menu .dropdown-item.active {
+            background: #3b82f6 !important;
+            color: #fff !important;
         }
 
         .chart-header {
@@ -1187,47 +883,11 @@
                 transparent 100%);
         }
 
-        .chart-header h5 {
-            color: #f1f5f9;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-            font-weight: 600;
-            letter-spacing: 0.025em;
-        }
-
-        .current-value {
-            color: #60a5fa;
-            text-shadow: 0 0 12px rgba(96, 165, 250, 0.4);
-            font-weight: 700;
-            letter-spacing: -0.025em;
-        }
-
-        .chart-body {
-            background: linear-gradient(135deg, 
-                rgba(15, 23, 42, 0.9) 0%, 
-                rgba(30, 41, 59, 0.85) 50%,
-                rgba(15, 23, 42, 0.9) 100%);
-            position: relative;
-        }
-
-        .chart-body::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: radial-gradient(circle at 50% 50%, 
-                rgba(59, 130, 246, 0.03) 0%, 
-                transparent 70%);
-            pointer-events: none;
-        }
 
         .chart-footer {
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.04) 0%, 
-                rgba(139, 92, 246, 0.03) 100%);
-            border-top: 1px solid rgba(59, 130, 246, 0.2);
-            position: relative;
+            padding: 12px 20px;
+            border-top: 1px solid rgba(0, 0, 0, 0.08);
+            background: rgba(59, 130, 246, 0.02);
         }
 
         .chart-footer::before {
@@ -1442,19 +1102,7 @@
             }
         }
 
-        /* Dark mode enhancements */
-        @media (prefers-color-scheme: dark) {
-            .tradingview-chart-container {
-                box-shadow: 
-                    0 12px 48px rgba(0, 0, 0, 0.6),
-                    0 4px 16px rgba(59, 130, 246, 0.1),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-            }
-
-            .chart-footer-text {
-                color: #94a3b8 !important;
-            }
-        }
+        /* Light theme only - no dark mode */
 
         /* ===== EXCHANGE DOMINANCE HEATMAP STYLES ===== */
         
@@ -2763,39 +2411,19 @@
             padding: 0.5rem 0.75rem !important;
             min-width: 70px;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            border: 1px solid rgba(59, 130, 246, 0.2) !important;
-            background: linear-gradient(135deg, 
-                rgba(30, 41, 59, 0.6) 0%, 
-                rgba(51, 65, 85, 0.6) 100%) !important;
-            color: #94a3b8 !important;
+            border: 1px solid rgba(59, 130, 246, 0.15) !important;
+            background: rgba(241, 245, 249, 0.8) !important;
+            color: #64748b !important;
         }
 
         .interval-dropdown-btn:hover {
-            color: #e2e8f0 !important;
-            border-color: rgba(59, 130, 246, 0.4) !important;
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.1) 0%, 
-                rgba(139, 92, 246, 0.1) 100%) !important;
+            color: #1e293b !important;
+            border-color: rgba(59, 130, 246, 0.3) !important;
+            background: rgba(241, 245, 249, 1) !important;
         }
 
         .interval-dropdown-btn:focus {
             box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25) !important;
-        }
-
-        /* Light mode interval dropdown */
-        @media (prefers-color-scheme: light) {
-            .interval-dropdown-btn {
-                background: linear-gradient(135deg, 
-                    rgba(241, 245, 249, 0.8) 0%, 
-                    rgba(226, 232, 240, 0.8) 100%) !important;
-                border: 1px solid rgba(59, 130, 246, 0.15) !important;
-                color: #64748b !important;
-            }
-
-            .interval-dropdown-btn:hover {
-                color: #1e293b !important;
-                border-color: rgba(59, 130, 246, 0.3) !important;
-            }
         }
     </style>
 @endsection
