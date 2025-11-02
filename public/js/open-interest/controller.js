@@ -180,7 +180,7 @@ export function createOpenInterestController() {
                 setTimeout(() => {
                     try {
                         if (this.chartManager && this.historyData.length > 0) {
-                            this.chartManager.renderChart(this.historyData, this.priceData);
+                            this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
                         }
                     } catch (error) {
                         console.error('❌ Error rendering chart:', error);
@@ -387,11 +387,11 @@ export function createOpenInterestController() {
         },
 
         toggleChartType() {
-            this.chartType = this.chartType === 'line' ? 'area' : 'line';
+            this.chartType = this.chartType === 'line' ? 'bar' : 'line';
             console.log('📊 Chart type toggled:', this.chartType);
             // Render chart with new type
             if (this.chartManager && this.historyData.length > 0) {
-                this.chartManager.renderChart(this.historyData, this.priceData);
+                this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
             }
         },
 

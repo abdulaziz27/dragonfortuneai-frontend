@@ -29,8 +29,11 @@ export class ChartManager {
 
     /**
      * Render dual-axis chart (OI + Price overlay)
+     * @param {Array} data - OI history data
+     * @param {Array} priceData - Price data (optional)
+     * @param {string} chartType - 'line' or 'bar' (default: 'line')
      */
-    renderChart(data, priceData = []) {
+    renderChart(data, priceData = [], chartType = 'line') {
         this.destroy();
 
         const canvas = document.getElementById(this.canvasId);
@@ -67,15 +70,30 @@ export class ChartManager {
                 const hasPrice = priceValues.some(p => p !== null);
 
                 console.log('📊 Rendering OI chart:', {
+                    chartType,
                     dataPoints: oiValues.length,
                     hasPrice,
                     oiRange: [Math.min(...oiValues), Math.max(...oiValues)],
                     priceRange: hasPrice ? [Math.min(...priceValues.filter(p => p !== null)), Math.max(...priceValues.filter(p => p !== null))] : null
                 });
 
-                // Prepare datasets
-                const datasets = [
-                    {
+                // Prepare datasets based on chart type
+                const datasets = [];
+
+                // OI Dataset
+                if (chartType === 'bar') {
+                    datasets.push({
+                        label: 'Open Interest',
+                        data: oiValues,
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: '#3b82f6',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        yAxisID: 'y'
+                    });
+                } else {
+                    // Line chart
+                    datasets.push({
                         label: 'Open Interest',
                         data: oiValues,
                         borderColor: '#3b82f6',
@@ -86,12 +104,13 @@ export class ChartManager {
                         pointRadius: 0,
                         pointHoverRadius: 4,
                         yAxisID: 'y'
-                    }
-                ];
+                    });
+                }
 
-                // Add price overlay if available
+                // Add price overlay if available (always as line)
                 if (hasPrice) {
                     datasets.push({
+                        type: 'line', // Force line even if main chart is bar
                         label: 'Price (USD)',
                         data: priceValues,
                         borderColor: '#f59e0b',
@@ -108,7 +127,7 @@ export class ChartManager {
                 const chartOptions = this.getChartOptions(hasPrice);
 
                 this.chart = new Chart(ctx, {
-                    type: 'line',
+                    type: chartType === 'bar' ? 'bar' : 'line',
                     data: {
                         labels: labels,
                         datasets: datasets
@@ -127,8 +146,8 @@ export class ChartManager {
     /**
      * Update chart (destroy and recreate for stability)
      */
-    updateChart(data, priceData = []) {
-        this.renderChart(data, priceData);
+    updateChart(data, priceData = [], chartType = 'line') {
+        this.renderChart(data, priceData, chartType);
     }
 
     /**

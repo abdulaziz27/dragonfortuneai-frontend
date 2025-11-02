@@ -225,15 +225,17 @@
                             <div class="btn-group btn-group-sm me-3" role="group">
                                 <button type="button" class="btn" :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType()">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <path d="M2 12l3-3 3 3 6-6"/>
+                                        <path d="M2 12l3-3 3 3 6-6" stroke="currentColor" stroke-width="1.5" fill="none"/>
                                     </svg>
                                     Line
                                 </button>
-                                <button type="button" class="btn" :class="chartType === 'area' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType()">
+                                <button type="button" class="btn" :class="chartType === 'bar' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType()">
                                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <path d="M2 12 L5 9 L8 12 L14 6 L14 14 L2 14 Z" opacity="0.3"/>
+                                        <rect x="2" y="6" width="3" height="8"/>
+                                        <rect x="6" y="4" width="3" height="10"/>
+                                        <rect x="10" y="8" width="3" height="6"/>
                                     </svg>
-                                    Area
+                                    Bar
                                 </button>
                             </div>
 
