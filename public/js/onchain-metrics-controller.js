@@ -678,7 +678,7 @@ function onchainMetricsController() {
         renderMvrvChart(dataset) {
             const ctx = this.$refs.mvrvChart?.getContext("2d");
             if (!ctx) return;
-            if (!dataset?.labels?.length) {
+            if (!dataset?.labels?.length || !dataset?.data?.length) {
                 this.destroyChart("mvrv");
                 return;
             }
@@ -707,7 +707,7 @@ function onchainMetricsController() {
         renderSoprChart(chartData) {
             const ctx = this.$refs.soprChart?.getContext("2d");
             if (!ctx) return;
-            if (!chartData?.labels?.length) {
+            if (!chartData?.labels?.length || !chartData?.datasets?.length) {
                 this.destroyChart("sopr");
                 return;
             }
@@ -733,7 +733,7 @@ function onchainMetricsController() {
         renderExchangeFlowChart(labels, datasets) {
             const ctx = this.$refs.exchangeFlowChart?.getContext("2d");
             if (!ctx) return;
-            if (!labels?.length) {
+            if (!labels?.length || !datasets?.length) {
                 this.destroyChart("exchangeFlows");
                 return;
             }
@@ -782,7 +782,7 @@ function onchainMetricsController() {
         renderTransactionsChart(dataset) {
             const ctx = this.$refs.transactionsChart?.getContext("2d");
             if (!ctx) return;
-            if (!dataset?.labels?.length) {
+            if (!dataset?.labels?.length || !dataset?.data?.length) {
                 this.destroyChart("transactions");
                 return;
             }
@@ -811,7 +811,7 @@ function onchainMetricsController() {
         renderPriceChart(dataset) {
             const ctx = this.$refs.priceChart?.getContext("2d");
             if (!ctx) return;
-            if (!dataset?.labels?.length) {
+            if (!dataset?.labels?.length || !dataset?.data?.length) {
                 this.destroyChart("price");
                 return;
             }
