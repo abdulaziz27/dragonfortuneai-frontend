@@ -471,19 +471,6 @@
 
     @livewireScripts
 
-    {{-- OnChain Shared State Management --}}
-    <script src="{{ asset('js/onchain-shared-state.js') }}"></script>
-    
-    {{-- OnChain Cache Helper --}}
-    <script src="{{ asset('js/onchain-cache-helper.js') }}"></script>
-    
-    {{-- OnChain Error Handler --}}
-    <script src="{{ asset('js/onchain-error-handler.js') }}"></script>
-    
-    {{-- OnChain Chart Optimizer --}}
-    <script src="{{ asset('js/onchain-chart-optimizer.js') }}"></script>
-
-
     {{-- Additional Scripts from Views --}}
     @yield('scripts')
 </body>
