@@ -413,7 +413,7 @@ export class FundingRateAPIService {
     /**
      * Fetch exchanges comparison data
      */
-    async fetchExchanges(symbol, limit = 50) {
+    async fetchExchanges(symbol, interval, limit = 50) {
         // Abort previous exchanges request if exists (separate from history and analytics)
         if (this.exchangesAbortController) {
             this.exchangesAbortController.abort();
@@ -422,6 +422,7 @@ export class FundingRateAPIService {
 
         const url = `${this.baseUrl}/api/funding-rate/exchanges?` +
             `symbol=${symbol}&` +
+            `interval=${interval}&` +
             `limit=${limit}`;
 
         console.log('📡 Fetching exchanges data:', url);

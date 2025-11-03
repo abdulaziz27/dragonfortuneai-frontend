@@ -877,7 +877,7 @@ export function createFundingRateController() {
             try {
                 console.log('📡 Fetching exchanges comparison data...');
 
-                const data = await this.apiService.fetchExchanges(this.selectedSymbol, 50);
+                const data = await this.apiService.fetchExchanges(this.selectedSymbol, this.selectedInterval, 50);
 
                 // Handle cancelled requests
                 if (data === null) {
@@ -885,7 +885,7 @@ export function createFundingRateController() {
                     return;
                 }
 
-                // Map selectedInterval to margin_type format (support full set)
+                // Backend now supports interval param; keep defensive filter if mixed data
                 const intervalMap = {
                     '1m': '1m',
                     '5m': '5m',
@@ -896,9 +896,9 @@ export function createFundingRateController() {
                     '1w': '1w'
                 };
                 const targetMarginType = intervalMap[this.selectedInterval] || this.selectedInterval;
-
-                // Filter by margin_type matching selectedInterval
-                const filteredByInterval = data.filter(item => item.margin_type === targetMarginType);
+                const filteredByInterval = Array.isArray(data)
+                    ? data.filter(item => (item.margin_type || '').toLowerCase() === targetMarginType)
+                    : [];
 
                 // Group by exchange, take the one with latest (highest) next_funding_time
                 const exchangeMap = new Map();
