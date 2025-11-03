@@ -42,6 +42,8 @@ export class FundingRateAPIService {
             `limit=${requestLimit}`;
 
         console.log('📡 Fetching funding rate data:', url);
+        
+        const startTime = Date.now();
         if (dateRange) {
             console.log('📅 Date Range Filter:', {
                 startDate: dateRange.startDate.toISOString(),
@@ -49,13 +51,30 @@ export class FundingRateAPIService {
             });
         }
 
+        let timeoutId = null;
         try {
+            // Add timeout (30 seconds) to prevent hanging requests
+            // API can be slow, so we need longer timeout
+            const timeoutDuration = 30000; // 30 seconds
+            timeoutId = setTimeout(() => {
+                if (this.abortController) {
+                    console.warn('⏱️ Request timeout after', timeoutDuration / 1000, 'seconds');
+                    this.abortController.abort();
+                }
+            }, timeoutDuration);
+
             const response = await fetch(url, {
                 signal: this.abortController.signal,
                 headers: {
                     'Accept': 'application/json'
                 }
             });
+
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -67,30 +86,21 @@ export class FundingRateAPIService {
             
             // ⚠️ WORKAROUND: Backend doesn't filter by interval parameter
             // Filter data client-side based on margin_type matching requested interval
+            const filterStartTime = Date.now();
             let filteredData = this.filterByInterval(data, interval);
+            const filterTime = Date.now() - filterStartTime;
             
-            // Debug: Show margin_type distribution
-            if (data.length > 0) {
-                const marginTypeCounts = {};
-                data.forEach(item => {
-                    const mt = item.margin_type || 'unknown';
-                    marginTypeCounts[mt] = (marginTypeCounts[mt] || 0) + 1;
-                });
-                console.log('📊 Margin Type Distribution:', marginTypeCounts);
+            // Only log if filtering actually reduced data (optimize logging for performance)
+            if (filteredData.length < data.length && filterTime > 10) {
+                console.log(`📊 Filtered ${data.length} → ${filteredData.length} records for interval=${interval} (${filterTime}ms)`);
             }
             
-            if (filteredData.length < data.length) {
-                console.log(`⚠️ Backend returned mixed margin_type data. Filtered ${data.length} → ${filteredData.length} records for interval=${interval}`);
-                console.log(`✅ Using only records with margin_type="${interval}"`);
-            } else {
-                console.log(`✅ All ${filteredData.length} records match interval=${interval}`);
-            }
-            
-            // Filter by date range if provided
+            // Filter by date range if provided (optimized - only log if significant reduction)
             if (dateRange && dateRange.startDate && dateRange.endDate) {
                 const beforeDateFilter = filteredData.length;
                 filteredData = this.filterByDateRange(filteredData, dateRange.startDate, dateRange.endDate);
-                if (filteredData.length < beforeDateFilter) {
+                // Only log if significant reduction (optimize logging)
+                if (filteredData.length < beforeDateFilter && (beforeDateFilter - filteredData.length) > 10) {
                     console.log(`📅 Date Range Filter: ${beforeDateFilter} → ${filteredData.length} records`);
                 }
             }
@@ -99,35 +109,34 @@ export class FundingRateAPIService {
             // Backend might return data in descending order, need ascending for chart
             const sortedFilteredData = [...filteredData].sort((a, b) => a.ts - b.ts);
             
-            // Transform and show samples
+            // Transform data (optimized - minimal logging for performance)
             const transformed = this.transformHistoryData(sortedFilteredData);
             
-            // Debug: Show transformation samples
-            if (transformed.length > 0) {
-                console.log('📊 API Response Sample:', {
-                    ts: data[0].ts,
-                    funding_rate: data[0].funding_rate,
-                    raw_timestamp: new Date(data[0].ts).toISOString()
-                });
-                console.log('✨ Transformed Sample:', {
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ Funding rate data received:', transformed.length, 'records', `(${fetchTime}ms)`);
+            
+            // Only log samples if we have data and in debug mode (reduce logging overhead)
+            if (transformed.length > 0 && transformed.length <= 200) {
+                // Only show detailed logs for small datasets (initial load)
+                console.log('📊 Transformed Sample:', {
                     date: transformed[0].date,
                     value: transformed[0].value,
-                    exchange: transformed[0].exchange
+                    count: transformed.length
                 });
-                
-                // Show date range
-                if (transformed.length > 1) {
-                    console.log('📅 Data Range:', {
-                        from: new Date(transformed[0].date).toLocaleString(),
-                        to: new Date(transformed[transformed.length - 1].date).toLocaleString(),
-                        count: transformed.length
-                    });
-                }
             }
+            
+            const totalTime = Date.now() - startTime;
+            console.log('⏱️ Total history fetch time:', totalTime + 'ms');
             
             return transformed;
 
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
             if (error.name === 'AbortError') {
                 console.log('🚫 Request cancelled (newer request started)');
                 return null; // Return null for cancelled requests
@@ -334,8 +343,20 @@ export class FundingRateAPIService {
             `limit=${limit}`;
 
         console.log('📡 Fetching analytics data:', url);
-
+        
+        const startTime = Date.now();
+        
+        let timeoutId = null;
         try {
+            // Add timeout (15 seconds) to prevent hanging requests
+            const timeoutDuration = 15000; // 15 seconds
+            timeoutId = setTimeout(() => {
+                if (this.analyticsAbortController) {
+                    console.warn('⏱️ Analytics request timeout after', timeoutDuration / 1000, 'seconds');
+                    this.analyticsAbortController.abort();
+                }
+            }, timeoutDuration);
+
             const response = await fetch(url, {
                 signal: this.analyticsAbortController.signal,
                 headers: {
@@ -343,13 +364,20 @@ export class FundingRateAPIService {
                 }
             });
 
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
             
-            console.log('✅ Analytics data received:', data);
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ Analytics data received:', data, `(${fetchTime}ms)`);
 
             return {
                 // Bias data
@@ -365,6 +393,12 @@ export class FundingRateAPIService {
                 latestTimestamp: data.latest_timestamp || null
             };
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
             if (error.name === 'AbortError') {
                 console.log('🚫 Analytics request was cancelled');
                 return null;
@@ -391,14 +425,29 @@ export class FundingRateAPIService {
             `limit=${limit}`;
 
         console.log('📡 Fetching exchanges data:', url);
-
+        
+        let timeoutId = null;
         try {
+            // Add timeout (15 seconds)
+            const timeoutDuration = 15000;
+            timeoutId = setTimeout(() => {
+                if (this.exchangesAbortController) {
+                    this.exchangesAbortController.abort();
+                }
+            }, timeoutDuration);
+
             const response = await fetch(url, {
                 signal: this.exchangesAbortController.signal,
                 headers: {
                     'Accept': 'application/json'
                 }
             });
+            
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -410,6 +459,12 @@ export class FundingRateAPIService {
 
             return data;
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
             if (error.name === 'AbortError') {
                 console.log('🚫 Exchanges request was cancelled');
                 return null;
@@ -434,6 +489,20 @@ export class FundingRateAPIService {
         if (this.exchangesAbortController) {
             this.exchangesAbortController.abort();
             this.exchangesAbortController = null;
+        }
+    }
+
+    /**
+     * Cancel all pending requests (alias for cancelRequest for consistency)
+     */
+    cancelAllRequests() {
+        try {
+            this.cancelRequest();
+        } catch (error) {
+            // Ignore errors from abort (expected behavior)
+            if (error.name !== 'AbortError') {
+                console.warn('⚠️ Error canceling requests:', error);
+            }
         }
     }
 }

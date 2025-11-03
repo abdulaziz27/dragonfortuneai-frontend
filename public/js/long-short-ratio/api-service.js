@@ -38,24 +38,49 @@ export class LongShortRatioAPIService {
             `limit=${limit || 1000}`;
 
         console.log('📡 Fetching overview:', url);
+        
+        const startTime = Date.now();
+        let timeoutId = null;
 
         try {
+            // Add timeout (30 seconds) to prevent hanging requests
+            const timeoutDuration = 30000; // 30 seconds
+            timeoutId = setTimeout(() => {
+                if (this.overviewAbortController) {
+                    console.warn('⏱️ Overview request timeout after', timeoutDuration / 1000, 'seconds');
+                    this.overviewAbortController.abort();
+                }
+            }, timeoutDuration);
+
             const response = await fetch(url, {
                 signal: this.overviewAbortController.signal,
                 headers: { 'Accept': 'application/json' }
             });
+
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
-            console.log('✅ Overview data received:', data);
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ Overview data received:', data, `(${fetchTime}ms)`);
             return data;
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
             if (error.name === 'AbortError') {
                 console.log('🛑 Overview request aborted');
-                throw error;
+                return null;
             }
             console.error('❌ Error fetching overview:', error);
             throw error;
@@ -81,25 +106,50 @@ export class LongShortRatioAPIService {
             `limit=${limit || 1000}`;
 
         console.log('📡 Fetching analytics:', url);
+        
+        const startTime = Date.now();
+        let timeoutId = null;
 
         try {
+            // Add timeout (15 seconds) to prevent hanging requests
+            const timeoutDuration = 15000; // 15 seconds
+            timeoutId = setTimeout(() => {
+                if (this.analyticsAbortController) {
+                    console.warn('⏱️ Analytics request timeout after', timeoutDuration / 1000, 'seconds');
+                    this.analyticsAbortController.abort();
+                }
+            }, timeoutDuration);
+
             const response = await fetch(url, {
                 signal: this.analyticsAbortController.signal,
                 headers: { 'Accept': 'application/json' }
             });
+
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
-            console.log('✅ Analytics data received:', data);
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ Analytics data received:', data, `(${fetchTime}ms)`);
             // API returns array, get first item
             return data && data.length > 0 ? data[0] : null;
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
             if (error.name === 'AbortError') {
                 console.log('🛑 Analytics request aborted');
-                throw error;
+                return null;
             }
             console.error('❌ Error fetching analytics:', error);
             throw error;
@@ -124,19 +174,38 @@ export class LongShortRatioAPIService {
             `limit=${limit || 5000}`;
 
         console.log('📡 Fetching top accounts:', url);
+        
+        const startTime = Date.now();
+        let timeoutId = null;
 
         try {
+            // Add timeout (30 seconds) to prevent hanging requests
+            const timeoutDuration = 30000; // 30 seconds
+            timeoutId = setTimeout(() => {
+                if (this.topAccountsAbortController) {
+                    console.warn('⏱️ Top accounts request timeout after', timeoutDuration / 1000, 'seconds');
+                    this.topAccountsAbortController.abort();
+                }
+            }, timeoutDuration);
+
             const response = await fetch(url, {
                 signal: this.topAccountsAbortController.signal,
                 headers: { 'Accept': 'application/json' }
             });
+
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             let data = await response.json();
-            console.log('✅ Top accounts data received:', data.length, 'records');
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ Top accounts data received:', data.length, 'records', `(${fetchTime}ms)`);
             
             // Filter by date range if provided (client-side filtering)
             if (dateRange && dateRange.startDate && dateRange.endDate) {
@@ -148,9 +217,15 @@ export class LongShortRatioAPIService {
             // Transform data: convert ts to time (milliseconds)
             return this.transformTopAccountsData(data);
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
             if (error.name === 'AbortError') {
                 console.log('🛑 Top accounts request aborted');
-                throw error;
+                return null;
             }
             console.error('❌ Error fetching top accounts:', error);
             throw error;
@@ -175,19 +250,38 @@ export class LongShortRatioAPIService {
             `limit=${limit || 5000}`;
 
         console.log('📡 Fetching top positions:', url);
+        
+        const startTime = Date.now();
+        let timeoutId = null;
 
         try {
+            // Add timeout (30 seconds) to prevent hanging requests
+            const timeoutDuration = 30000; // 30 seconds
+            timeoutId = setTimeout(() => {
+                if (this.topPositionsAbortController) {
+                    console.warn('⏱️ Top positions request timeout after', timeoutDuration / 1000, 'seconds');
+                    this.topPositionsAbortController.abort();
+                }
+            }, timeoutDuration);
+
             const response = await fetch(url, {
                 signal: this.topPositionsAbortController.signal,
                 headers: { 'Accept': 'application/json' }
             });
+
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             let data = await response.json();
-            console.log('✅ Top positions data received:', data.length, 'records');
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ Top positions data received:', data.length, 'records', `(${fetchTime}ms)`);
             
             // Filter by date range if provided (client-side filtering)
             if (dateRange && dateRange.startDate && dateRange.endDate) {
@@ -199,9 +293,15 @@ export class LongShortRatioAPIService {
             // Transform data: convert ts to time (milliseconds)
             return this.transformTopPositionsData(data);
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
             if (error.name === 'AbortError') {
                 console.log('🛑 Top positions request aborted');
-                throw error;
+                return null;
             }
             console.error('❌ Error fetching top positions:', error);
             throw error;

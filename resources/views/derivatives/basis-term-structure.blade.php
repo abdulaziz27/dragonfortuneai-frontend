@@ -2,6 +2,21 @@
 
 @section('title', 'Basis & Term Structure | DragonFortune')
 
+@push('head')
+    <!-- Resource Hints for Faster API Loading (Critical for Hard Refresh) -->
+    <link rel="dns-prefetch" href="{{ config('app.api_urls.internal') }}">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="{{ config('app.api_urls.internal') }}" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    
+    <!-- Preload critical resources for faster initial load -->
+    <link rel="preload" href="{{ asset('js/basis-term-structure-controller.js') }}" as="script" type="module">
+    
+    <!-- Prefetch API endpoints (will fetch in background during hard refresh) -->
+    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/basis/history?exchange=Binance&spot_pair=BTC/USDT&futures_symbol=BTCUSDT&interval=1h&limit=100" as="fetch" crossorigin="anonymous">
+    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/basis/analytics?exchange=Binance&spot_pair=BTC/USDT&futures_symbol=BTCUSDT&interval=1h&limit=100" as="fetch" crossorigin="anonymous">
+@endpush
+
 @section('content')
     {{--
         Basis & Term Structure Dashboard
@@ -21,7 +36,8 @@
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <h1 class="mb-0">Basis & Term Structure</h1>
-                        <span class="pulse-dot pulse-success"></span>
+                        <span class="pulse-dot pulse-success" x-show="rawData.length > 0"></span>
+                        <span class="spinner-border spinner-border-sm text-primary" style="width: 16px; height: 16px;" x-show="rawData.length === 0" x-cloak></span>
                     </div>
                     <p class="mb-0 text-secondary">
                         Pantau basis (selisih harga futures vs spot) dan struktur term untuk mengidentifikasi peluang arbitrase dan memahami kondisi pasar futures.
@@ -76,54 +92,50 @@
             <!-- Current Basis (from History API - latest data point) -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
-                    <div class="small text-secondary mb-2">Current Basis</div>
-                    <template x-if="globalLoading || analyticsLoading">
-                        <div class="h3 mb-0 skeleton skeleton-text" style="width: 70%; height: 28px;"></div>
-                    </template>
-                    <template x-if="!globalLoading && !analyticsLoading">
-                        <div class="h3 mb-0" 
-                             :class="currentBasis !== null && currentBasis >= 0 ? 'text-success' : 'text-danger'"
-                             x-text="formatBasis(currentBasis)"></div>
-                    </template>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary">Current Basis</span>
+                        <span class="badge text-bg-primary" x-show="currentBasis !== null && currentBasis !== undefined">Latest</span>
+                        <span class="badge text-bg-secondary" x-show="currentBasis === null || currentBasis === undefined">Loading...</span>
                     </div>
-                    </div>
+                    <div class="h3 mb-0" 
+                         :class="currentBasis !== null && currentBasis !== undefined && currentBasis >= 0 ? 'text-success' : (currentBasis !== null && currentBasis !== undefined ? 'text-danger' : '')"
+                         x-text="currentBasis !== null && currentBasis !== undefined ? formatBasis(currentBasis) : '--'"></div>
+                </div>
+            </div>
 
             <!-- Average Basis (from Analytics API) -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
-                    <div class="small text-secondary mb-2">Avg Basis</div>
-                    <template x-if="globalLoading || analyticsLoading">
-                        <div class="h3 mb-0 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
-                    </template>
-                    <template x-if="!globalLoading && !analyticsLoading">
-                        <div class="h3 mb-0" x-text="formatBasis(avgBasis)"></div>
-                    </template>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary">Avg Basis</span>
+                        <span class="badge text-bg-info" x-show="avgBasis !== null && avgBasis !== undefined">Avg</span>
+                        <span class="badge text-bg-secondary" x-show="avgBasis === null || avgBasis === undefined">Loading...</span>
+                    </div>
+                    <div class="h3 mb-0" x-text="avgBasis !== null && avgBasis !== undefined ? formatBasis(avgBasis) : '--'"></div>
                 </div>
             </div>
 
             <!-- Basis Annualized (from Analytics API) -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
-                    <div class="small text-secondary mb-2">Basis Annualized</div>
-                    <template x-if="globalLoading || analyticsLoading">
-                        <div class="h3 mb-0 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
-                    </template>
-                    <template x-if="!globalLoading && !analyticsLoading">
-                        <div class="h3 mb-0" x-text="formatBasisAnnualized(basisAnnualized)"></div>
-                    </template>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary">Basis Annualized</span>
+                        <span class="badge text-bg-info" x-show="basisAnnualized !== null && basisAnnualized !== undefined">Annual</span>
+                        <span class="badge text-bg-secondary" x-show="basisAnnualized === null || basisAnnualized === undefined">Loading...</span>
+                    </div>
+                    <div class="h3 mb-0" x-text="basisAnnualized !== null && basisAnnualized !== undefined ? formatBasisAnnualized(basisAnnualized) : '--'"></div>
                 </div>
             </div>
 
             <!-- Volatility (from Analytics API) -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
-                    <div class="small text-secondary mb-2">Volatility</div>
-                    <template x-if="globalLoading || analyticsLoading">
-                        <div class="h3 mb-0 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
-                    </template>
-                    <template x-if="!globalLoading && !analyticsLoading">
-                        <div class="h3 mb-0" x-text="basisVolatility !== null && basisVolatility !== undefined ? formatBasis(basisVolatility) : '--'"></div>
-                    </template>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary">Volatility</span>
+                        <span class="badge text-bg-warning" x-show="basisVolatility !== null && basisVolatility !== undefined">Vol</span>
+                        <span class="badge text-bg-secondary" x-show="basisVolatility === null || basisVolatility === undefined">Loading...</span>
+                    </div>
+                    <div class="h3 mb-0" x-text="basisVolatility !== null && basisVolatility !== undefined ? formatBasis(basisVolatility) : '--'"></div>
                 </div>
             </div>
 
@@ -132,40 +144,22 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Market Structure</span>
-                        <template x-if="globalLoading || analyticsLoading">
-                            <span class="badge skeleton skeleton-badge" style="width: 70px; height: 20px;"></span>
-                        </template>
-                        <template x-if="!globalLoading && !analyticsLoading">
-                            <span class="badge" :class="getMarketStructureBadgeClass()" x-text="formatMarketStructure(marketStructure)"></span>
-                        </template>
+                        <span class="badge" :class="getMarketStructureBadgeClass()" x-show="marketStructure !== null && marketStructure !== undefined" x-text="formatMarketStructure(marketStructure)"></span>
+                        <span class="badge text-bg-secondary" x-show="marketStructure === null || marketStructure === undefined">Loading...</span>
                     </div>
-                    <template x-if="globalLoading || analyticsLoading">
-                        <div class="h4 mb-0 skeleton skeleton-text" style="width: 60%; height: 22px;"></div>
-                    </template>
-                    <template x-if="!globalLoading && !analyticsLoading">
-                        <div class="h4 mb-0" x-text="formatMarketStructure(marketStructure)"></div>
-                    </template>
+                    <div class="h4 mb-0" x-text="marketStructure !== null && marketStructure !== undefined ? formatMarketStructure(marketStructure) : '--'"></div>
+                    </div>
                 </div>
-            </div>
 
             <!-- Trend (from Analytics API) -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Trend</span>
-                        <template x-if="globalLoading || analyticsLoading">
-                            <span class="badge skeleton skeleton-badge" style="width: 70px; height: 20px;"></span>
-                        </template>
-                        <template x-if="!globalLoading && !analyticsLoading">
-                            <span class="badge" :class="getTrendBadgeClass()" x-text="formatTrend(trend)"></span>
-                        </template>
+                        <span class="badge" :class="getTrendBadgeClass()" x-show="trend !== null && trend !== undefined" x-text="formatTrend(trend)"></span>
+                        <span class="badge text-bg-secondary" x-show="trend === null || trend === undefined">Loading...</span>
                     </div>
-                    <template x-if="globalLoading || analyticsLoading">
-                        <div class="h4 mb-0 skeleton skeleton-text" style="width: 60%; height: 22px;"></div>
-                    </template>
-                    <template x-if="!globalLoading && !analyticsLoading">
-                        <div class="h4 mb-0" :class="getTrendColorClass()" x-text="formatTrend(trend)"></div>
-                    </template>
+                    <div class="h4 mb-0" :class="getTrendColorClass()" x-text="trend !== null && trend !== undefined ? formatTrend(trend) : '--'"></div>
                 </div>
             </div>
         </div>
@@ -178,16 +172,9 @@
                         <div class="d-flex align-items-center gap-3">
                             <h5 class="mb-0">Basis History</h5>
                             <div class="chart-info">
-                                <template x-if="globalLoading || analyticsLoading">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="current-value skeleton skeleton-text" style="width: 120px; height: 22px;"></span>
-                                    </div>
-                                </template>
-                                <template x-if="!globalLoading && !analyticsLoading">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="current-value" x-text="formatBasis(currentBasis)"></span>
-                                    </div>
-                                </template>
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="current-value" x-text="currentBasis !== null && currentBasis !== undefined ? formatBasis(currentBasis) : '--'"></span>
+                                </div>
                             </div>
                         </div>
                         <div class="chart-controls">
@@ -276,14 +263,7 @@
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
                             <h5 class="mb-0">Term Structure</h5>
-                            <!-- <div class="chart-info">
-                                <template x-if="termStructureLoading">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="current-value skeleton skeleton-text" style="width: 120px; height: 22px;"></span>
                                 </div>
-                                </template>
-                            </div> -->
-                            </div>
                         <div class="chart-controls">
                             <div class="d-flex flex-wrap align-items-center gap-3">
                                 <!-- Symbol Selector for Term Structure (BTC, ETH) -->
@@ -324,25 +304,42 @@
 @endsection
 
 @section('scripts')
-    <!-- Chart.js with Date Adapter and Plugins -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <!-- Chart.js with Date Adapter and Plugins - Load async for faster initial render -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" defer></script>
 
-    <!-- Wait for Chart.js to load -->
+    <!-- Initialize Chart.js ready promise immediately (non-blocking) -->
     <script>
+        // Create promise immediately (non-blocking)
         window.chartJsReady = new Promise((resolve) => {
+            // Check if Chart.js already loaded (from cache or previous load)
             if (typeof Chart !== 'undefined') {
-                console.log('✅ Chart.js loaded');
+                console.log('✅ Chart.js already loaded');
                 resolve();
-            } else {
-                setTimeout(() => resolve(), 100);
+                return;
             }
+            
+            // Wait for Chart.js to load (with fallback timeout)
+            let checkCount = 0;
+            const checkInterval = setInterval(() => {
+                checkCount++;
+                if (typeof Chart !== 'undefined') {
+                    console.log('✅ Chart.js loaded (after', checkCount * 50, 'ms)');
+                    clearInterval(checkInterval);
+                    resolve();
+                } else if (checkCount > 40) {
+                    // Timeout after 2 seconds - resolve anyway
+                    console.warn('⚠️ Chart.js load timeout, resolving anyway');
+                    clearInterval(checkInterval);
+                    resolve();
+                }
+            }, 50);
         });
     </script>
 
-    <!-- Basis Term Structure Controller (Modular ES6) -->
-    <script type="module" src="{{ asset('js/basis-term-structure-controller.js') }}"></script>
+    <!-- Basis Term Structure Controller - Load with defer for non-blocking -->
+    <script type="module" src="{{ asset('js/basis-term-structure-controller.js') }}" defer></script>
 
     <style>
         /* Skeleton placeholders */

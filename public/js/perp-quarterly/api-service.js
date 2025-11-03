@@ -38,6 +38,8 @@ export class PerpQuarterlyAPIService {
             `limit=${requestLimit}`;
 
         console.log('📡 Fetching perp-quarterly spread data:', url);
+        
+        const startTime = Date.now();
         if (dateRange) {
             console.log('📅 Date Range Filter:', {
                 startDate: dateRange.startDate.toISOString(),
@@ -45,7 +47,17 @@ export class PerpQuarterlyAPIService {
             });
         }
 
+        let timeoutId = null;
         try {
+            // Add timeout (30 seconds) to prevent hanging requests
+            const timeoutDuration = 30000; // 30 seconds
+            timeoutId = setTimeout(() => {
+                if (this.abortController) {
+                    console.warn('⏱️ History request timeout after', timeoutDuration / 1000, 'seconds');
+                    this.abortController.abort();
+                }
+            }, timeoutDuration);
+
             const response = await fetch(url, {
                 signal: this.abortController.signal,
                 headers: {
@@ -53,13 +65,20 @@ export class PerpQuarterlyAPIService {
                 }
             });
 
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
             
-            console.log('✅ Perp-quarterly spread data received:', data.length, 'records from API');
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ Perp-quarterly spread data received:', data.length, 'records from API', `(${fetchTime}ms)`);
             
             // Check if we have historical data
             if (data.length > 0) {
@@ -203,9 +222,15 @@ export class PerpQuarterlyAPIService {
             
             return sortedFilteredData;
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
             if (error.name === 'AbortError') {
                 console.log('🛑 History request aborted');
-                throw error;
+                return null;
             }
             console.error('❌ Error fetching perp-quarterly spread history:', error);
             throw error;
@@ -229,8 +254,20 @@ export class PerpQuarterlyAPIService {
             `limit=${limit}`;
 
         console.log('📡 Fetching perp-quarterly analytics:', url);
+        
+        const startTime = Date.now();
+        let timeoutId = null;
 
         try {
+            // Add timeout (15 seconds) to prevent hanging requests
+            const timeoutDuration = 15000; // 15 seconds
+            timeoutId = setTimeout(() => {
+                if (this.analyticsAbortController) {
+                    console.warn('⏱️ Analytics request timeout after', timeoutDuration / 1000, 'seconds');
+                    this.analyticsAbortController.abort();
+                }
+            }, timeoutDuration);
+
             const response = await fetch(url, {
                 signal: this.analyticsAbortController.signal,
                 headers: {
@@ -238,20 +275,33 @@ export class PerpQuarterlyAPIService {
                 }
             });
 
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
             
-            console.log('✅ Analytics data received:', data);
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ Analytics data received:', data, `(${fetchTime}ms)`);
             
             // API returns array, get first item
             return data && data.length > 0 ? data[0] : null;
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
             if (error.name === 'AbortError') {
                 console.log('🛑 Analytics request aborted');
-                throw error;
+                return null;
             }
             console.error('❌ Error fetching analytics:', error);
             throw error;

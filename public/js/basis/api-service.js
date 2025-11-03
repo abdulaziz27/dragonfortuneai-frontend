@@ -34,8 +34,20 @@ export class BasisAPIService {
             `limit=${limit}`;
 
         console.log('📡 Fetching basis analytics:', url);
+        
+        const startTime = Date.now();
+        let timeoutId = null;
 
         try {
+            // Add timeout (15 seconds) to prevent hanging requests
+            const timeoutDuration = 15000; // 15 seconds
+            timeoutId = setTimeout(() => {
+                if (this.analyticsAbortController) {
+                    console.warn('⏱️ Analytics request timeout after', timeoutDuration / 1000, 'seconds');
+                    this.analyticsAbortController.abort();
+                }
+            }, timeoutDuration);
+
             const response = await fetch(url, {
                 signal: this.analyticsAbortController.signal,
                 headers: {
@@ -43,12 +55,19 @@ export class BasisAPIService {
                 }
             });
 
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
-            console.log('✅ Basis analytics data received:', data);
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ Basis analytics data received:', data, `(${fetchTime}ms)`);
 
             // API returns array, get first item
             if (!data || !Array.isArray(data) || data.length === 0) {
@@ -60,9 +79,15 @@ export class BasisAPIService {
             console.log('📊 Analytics result:', analyticsResult);
             return analyticsResult;
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
             if (error.name === 'AbortError') {
                 console.log('🛑 Analytics request aborted');
-                throw error;
+                return null;
             }
             console.error('❌ Error fetching analytics:', error);
             throw error;
@@ -92,6 +117,8 @@ export class BasisAPIService {
             `limit=${requestLimit}`;
 
         console.log('📡 Fetching basis history:', url);
+        
+        const startTime = Date.now();
         if (dateRange) {
             console.log('📅 Date Range Filter:', {
                 startDate: dateRange.startDate.toISOString(),
@@ -99,7 +126,17 @@ export class BasisAPIService {
             });
         }
 
+        let timeoutId = null;
         try {
+            // Add timeout (30 seconds) to prevent hanging requests
+            const timeoutDuration = 30000; // 30 seconds
+            timeoutId = setTimeout(() => {
+                if (this.historyAbortController) {
+                    console.warn('⏱️ History request timeout after', timeoutDuration / 1000, 'seconds');
+                    this.historyAbortController.abort();
+                }
+            }, timeoutDuration);
+
             const response = await fetch(url, {
                 signal: this.historyAbortController.signal,
                 headers: {
@@ -107,12 +144,19 @@ export class BasisAPIService {
                 }
             });
 
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
-            console.log('✅ Basis history data received:', data.length, 'records');
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ Basis history data received:', data.length, 'records', `(${fetchTime}ms)`);
 
             // Transform data: verify timestamp format (milliseconds or seconds?)
             const transformed = this.transformHistoryData(data);
@@ -126,11 +170,21 @@ export class BasisAPIService {
 
             // Sort by timestamp (ascending)
             const sorted = [...filteredData].sort((a, b) => a.ts - b.ts);
+            
+            const totalTime = Date.now() - startTime;
+            console.log('⏱️ Total history fetch time:', totalTime + 'ms');
+            
             return sorted;
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
             if (error.name === 'AbortError') {
                 console.log('🛑 History request aborted');
-                throw error;
+                return null;
             }
             console.error('❌ Error fetching history:', error);
             throw error;
@@ -155,8 +209,20 @@ export class BasisAPIService {
             `limit=${limit || 1000}`;
 
         console.log('📡 Fetching term structure:', url);
+        
+        const startTime = Date.now();
+        let timeoutId = null;
 
         try {
+            // Add timeout (15 seconds) to prevent hanging requests
+            const timeoutDuration = 15000; // 15 seconds
+            timeoutId = setTimeout(() => {
+                if (this.termStructureAbortController) {
+                    console.warn('⏱️ Term structure request timeout after', timeoutDuration / 1000, 'seconds');
+                    this.termStructureAbortController.abort();
+                }
+            }, timeoutDuration);
+
             const response = await fetch(url, {
                 signal: this.termStructureAbortController.signal,
                 headers: {
@@ -164,17 +230,30 @@ export class BasisAPIService {
                 }
             });
 
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
-            console.log('✅ Term structure data received:', data);
+            const fetchTime = Date.now() - startTime;
+            console.log('✅ Term structure data received:', data, `(${fetchTime}ms)`);
             return data;
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            
             if (error.name === 'AbortError') {
                 console.log('🛑 Term structure request aborted');
-                throw error;
+                return null;
             }
             console.error('❌ Error fetching term structure:', error);
             throw error;

@@ -31,19 +31,27 @@ export class OpenInterestAPIService {
         
         const startTime = Date.now();
 
+        let timeoutId = null;
         try {
-            // Add timeout (5 seconds) to prevent hanging requests
-            const timeoutId = setTimeout(() => {
+            // Add timeout (30 seconds for initial load, 10 seconds for auto-refresh)
+            // API can be slow, so we need longer timeout
+            const timeoutDuration = 30000; // 30 seconds
+            timeoutId = setTimeout(() => {
                 if (this.historyAbortController) {
+                    console.warn('⏱️ Request timeout after', timeoutDuration / 1000, 'seconds');
                     this.historyAbortController.abort();
                 }
-            }, 5000);
+            }, timeoutDuration);
 
             const response = await fetch(url, {
                 signal: this.historyAbortController.signal
             });
 
-            clearTimeout(timeoutId);
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -60,6 +68,12 @@ export class OpenInterestAPIService {
 
             return transformed;
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+
             if (error.name === 'AbortError') {
                 console.log('⏭️ OI history request cancelled');
                 return null;
@@ -87,19 +101,27 @@ export class OpenInterestAPIService {
         
         const startTime = Date.now();
 
+        let timeoutId = null;
         try {
-            // Add timeout (5 seconds) to prevent hanging requests
-            const timeoutId = setTimeout(() => {
+            // Add timeout (15 seconds) to prevent hanging requests
+            // Analytics endpoint might be slower than history
+            const timeoutDuration = 15000; // 15 seconds
+            timeoutId = setTimeout(() => {
                 if (this.analyticsAbortController) {
+                    console.warn('⏱️ Analytics request timeout after', timeoutDuration / 1000, 'seconds');
                     this.analyticsAbortController.abort();
                 }
-            }, 5000);
+            }, timeoutDuration);
 
             const response = await fetch(url, {
                 signal: this.analyticsAbortController.signal
             });
 
-            clearTimeout(timeoutId);
+            // Clear timeout if request succeeds
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -112,6 +134,12 @@ export class OpenInterestAPIService {
             // Return first item if array, otherwise return as-is
             return Array.isArray(data) ? (data[0] || null) : data;
         } catch (error) {
+            // Clear timeout in case of error
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+
             if (error.name === 'AbortError') {
                 console.log('⏭️ OI analytics request cancelled');
                 return null;
@@ -162,16 +190,24 @@ export class OpenInterestAPIService {
 
     /**
      * Cancel all pending requests
+     * Note: AbortError will be handled gracefully in fetch methods
      */
     cancelAllRequests() {
-        if (this.historyAbortController) {
-            this.historyAbortController.abort();
-        }
-        if (this.analyticsAbortController) {
-            this.analyticsAbortController.abort();
-        }
-        if (this.exchangeAbortController) {
-            this.exchangeAbortController.abort();
+        try {
+            if (this.historyAbortController) {
+                this.historyAbortController.abort();
+            }
+            if (this.analyticsAbortController) {
+                this.analyticsAbortController.abort();
+            }
+            if (this.exchangeAbortController) {
+                this.exchangeAbortController.abort();
+            }
+        } catch (error) {
+            // Ignore errors from abort (expected behavior)
+            if (error.name !== 'AbortError') {
+                console.warn('⚠️ Error canceling requests:', error);
+            }
         }
     }
 

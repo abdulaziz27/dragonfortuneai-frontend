@@ -19,24 +19,25 @@ export function createLongShortRatioController() {
 
         // Global state
         globalPeriod: '1d',
-        globalLoading: false,
+        globalLoading: false, // Start false - optimistic UI (no skeleton)
+        isLoading: false, // Flag to prevent multiple simultaneous loads
         selectedExchange: 'Binance',
         selectedSymbol: 'BTCUSDT',
         selectedInterval: '1h',
         selectedTakerRange: '1h',
         scaleType: 'linear',
         chartType: 'line',
-
+        
         // Time ranges
         timeRanges: [],
-
+        
         // Chart intervals
         chartIntervals: [
             { label: '30M', value: '30m' },
             { label: '1H', value: '1h' },
             { label: '4H', value: '4h' }
         ],
-
+        
         // Auto-refresh state
         refreshInterval: null,
         errorCount: 0,
@@ -66,7 +67,7 @@ export function createLongShortRatioController() {
         /**
          * Initialize controller
          */
-        init() {
+        async init() {
             // Prevent double initialization
             if (this.initialized) {
                 console.warn('⚠️ Dashboard already initialized, skipping...');
@@ -76,11 +77,15 @@ export function createLongShortRatioController() {
             this.initialized = true;
             console.log('🚀 Long Short Ratio Dashboard initialized');
 
-            // Initialize services
+            // Initialize services IMMEDIATELY (non-blocking)
             this.apiService = new LongShortRatioAPIService();
             this.mainChartManager = new ChartManager('longShortRatioMainChart');
             this.positionsChartManager = new ChartManager('longShortRatioPositionsChart');
             this.comparisonChartManager = new ChartManager('longShortRatioComparisonChart');
+
+            // Set globalLoading = false initially (optimistic UI, no skeleton)
+            this.globalLoading = false;
+            this.analyticsLoading = false;
 
             // Initialize time ranges (simplified: 1D, 7D, 1M, ALL)
             this.timeRanges = [
@@ -93,16 +98,47 @@ export function createLongShortRatioController() {
                 // { label: '1Y', value: '1y', days: 365 }
             ];
 
-            // Wait for Chart.js to be ready
-            if (typeof window.chartJsReady !== 'undefined') {
-                window.chartJsReady.then(() => {
-                    this.loadAllData();
+            // STEP 1: Load cache data INSTANT (no loading skeleton)
+            const cacheLoaded = this.loadFromCache();
+            if (cacheLoaded) {
+                console.log('✅ Cache data loaded instantly - showing cached data');
+                // Render charts immediately with cached data (don't wait Chart.js)
+                if (this.mainChartManager && this.topAccountData.length > 0) {
+                    (window.chartJsReady || Promise.resolve()).then(() => {
+                        setTimeout(() => {
+                            this.mainChartManager.renderMainChart(this.topAccountData, this.chartType);
+                        }, 10);
+                    });
+                }
+                if (this.positionsChartManager && this.topPositionData.length > 0) {
+                    (window.chartJsReady || Promise.resolve()).then(() => {
+                        setTimeout(() => {
+                            this.positionsChartManager.renderPositionsChart(this.topPositionData, this.chartType);
+                        }, 10);
+                    });
+                }
+                if (this.comparisonChartManager) {
+                    (window.chartJsReady || Promise.resolve()).then(() => {
+                        setTimeout(() => {
+                            this.comparisonChartManager.renderComparisonChart([], this.topAccountData, this.topPositionData);
+                        }, 10);
+                    });
+                }
+                
+                // STEP 2: Fetch fresh data from endpoints (background, no skeleton)
+                this.loadAllData(true).catch(err => {
+                    console.warn('⚠️ Background fetch failed:', err);
                 });
             } else {
-                setTimeout(() => this.loadAllData(), 500);
+                // No cache available - optimistic UI (no skeleton, show placeholder values)
+                console.log('⚠️ No cache available - loading data with optimistic UI (no skeleton)');
+                // IMPORTANT: Start fetch IMMEDIATELY (don't wait for Chart.js)
+                await this.loadAllData(false).catch(err => {
+                    console.warn('⚠️ Initial load failed:', err);
+                });
             }
 
-            // Start auto-refresh
+            // Start auto-refresh ONLY after initial load completes
             this.startAutoRefresh();
 
             // Setup cleanup listeners
@@ -126,7 +162,8 @@ export function createLongShortRatioController() {
 
             this.refreshInterval = setInterval(() => {
                 if (document.hidden) return;
-                if (this.globalLoading) return;
+                if (this.globalLoading) return; // Skip if showing skeleton
+                if (this.isLoading) return; // Skip if already loading (prevent race condition)
                 if (this.errorCount >= this.maxErrors) {
                     console.error('❌ Too many errors, stopping auto refresh');
                     this.stopAutoRefresh();
@@ -134,7 +171,12 @@ export function createLongShortRatioController() {
                 }
 
                 console.log('🔄 Auto-refresh triggered');
-                this.loadAllData();
+                this.loadAllData(true).catch(err => {
+                    // Handle errors gracefully (AbortError expected during rapid refreshes)
+                    if (err.name !== 'AbortError') {
+                        console.warn('⚠️ Auto-refresh error:', err);
+                    }
+                });
             }, intervalMs);
 
             console.log('✅ Auto-refresh started (5 second interval)');
@@ -151,30 +193,126 @@ export function createLongShortRatioController() {
         },
 
         /**
-         * Load all data (FASE 1: Prioritize Internal API)
-         * Optimized: Load critical data first, non-critical in background
+         * Get cache key for current filter state
          */
-        async loadAllData() {
-            // ⚡ GUARD: Skip if already loading (prevent overlapping requests)
-            if (this.globalLoading) {
+        getCacheKey() {
+            return `lsr_dashboard_${this.selectedSymbol}_${this.selectedExchange}_${this.selectedInterval}_${this.globalPeriod}`;
+        },
+        
+        /**
+         * Load data from cache
+         */
+        loadFromCache() {
+            try {
+                const cacheKey = this.getCacheKey();
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    const data = JSON.parse(cached);
+                    const cacheAge = Date.now() - data.timestamp;
+                    const maxAge = 5 * 60 * 1000; // 5 minutes
+                    
+                    if (cacheAge < maxAge && data.topAccountData && data.topAccountData.length > 0) {
+                        this.topAccountData = data.topAccountData;
+                        this.topPositionData = data.topPositionData || [];
+                        this.currentTopAccountRatio = data.currentTopAccountRatio;
+                        this.currentTopPositionRatio = data.currentTopPositionRatio;
+                        this.topAccountRatioChange = data.topAccountRatioChange || 0;
+                        this.topPositionRatioChange = data.topPositionRatioChange || 0;
+                        this.marketSentiment = data.marketSentiment || 'Balanced';
+                        this.sentimentStrength = data.sentimentStrength || 'Normal';
+                        this.analyticsData = data.analyticsData;
+                        
+                        console.log('✅ Cache loaded:', {
+                            topAccountRecords: this.topAccountData.length,
+                            topPositionRecords: this.topPositionData.length,
+                            age: Math.round(cacheAge / 1000) + 's'
+                        });
+                        return true;
+                    } else {
+                        localStorage.removeItem(cacheKey);
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ Cache load error:', error);
+            }
+            return false;
+        },
+        
+        /**
+         * Save data to cache
+         */
+        saveToCache() {
+            try {
+                const cacheKey = this.getCacheKey();
+                const data = {
+                    timestamp: Date.now(),
+                    topAccountData: this.topAccountData,
+                    topPositionData: this.topPositionData,
+                    currentTopAccountRatio: this.currentTopAccountRatio,
+                    currentTopPositionRatio: this.currentTopPositionRatio,
+                    topAccountRatioChange: this.topAccountRatioChange,
+                    topPositionRatioChange: this.topPositionRatioChange,
+                    marketSentiment: this.marketSentiment,
+                    sentimentStrength: this.sentimentStrength,
+                    analyticsData: this.analyticsData
+                };
+                localStorage.setItem(cacheKey, JSON.stringify(data));
+                console.log('💾 Data saved to cache:', cacheKey);
+            } catch (error) {
+                console.warn('⚠️ Cache save error:', error);
+            }
+        },
+        
+        /**
+         * Load all data (FASE 1: Prioritize Internal API)
+         * Optimized: Progressive Loading + Race Condition Prevention
+         */
+        async loadAllData(isAutoRefresh = false) {
+            // Guard: Skip if already loading (prevent race condition)
+            if (this.isLoading) {
                 console.log('⏭️ Skip load (already loading)');
                 return;
             }
 
-            // Cancel previous requests
-            if (this.apiService) {
+            // Set loading flag to prevent multiple simultaneous loads
+            this.isLoading = true;
+
+            // Only show loading skeleton on initial load (hard refresh)
+            // Auto-refresh should be silent (no skeleton) since data already exists
+            const isInitialLoad = this.topAccountData.length === 0;
+            const shouldShowLoading = isInitialLoad && !isAutoRefresh;
+
+            // IMPORTANT: Don't cancel previous requests on initial load
+            // Initial load needs to complete, and auto-refresh will skip if isLoading = true
+            // Only cancel on subsequent loads (auto-refresh) to prevent stale data
+            if (this.apiService && !isInitialLoad) {
                 this.apiService.cancelAllRequests();
             }
 
-            this.globalLoading = true;
+            if (shouldShowLoading) {
+                this.globalLoading = true; // Show skeleton only on first load
+                console.log('🔄 Initial load - showing skeleton');
+            } else {
+                console.log('🔄 Auto-refresh - silent update (no skeleton)');
+            }
+
+            // Performance monitoring
+            const loadStartTime = Date.now();
+            console.log('⏱️ loadAllData() started at:', new Date().toISOString());
+
             this.errorCount = 0;
 
             try {
                 const timeRange = LongShortRatioUtils.getTimeRange(this.globalPeriod, this.timeRanges);
-                const limit = LongShortRatioUtils.calculateLimit(
+                const calculatedLimit = LongShortRatioUtils.calculateLimit(
                     this.timeRanges.find(r => r.value === this.globalPeriod)?.days || 1,
                     this.selectedInterval
                 );
+                
+                // For initial load, use smaller limit (100) for faster response
+                // Then load full data in background after first render
+                // This provides instant feedback to user - chart appears in <500ms
+                const limit = isInitialLoad ? Math.min(100, calculatedLimit) : calculatedLimit;
 
                 console.log('📡 Loading Long Short Ratio data (FASE 1: Internal API Priority)...', {
                     period: this.globalPeriod,
@@ -193,19 +331,258 @@ export function createLongShortRatioController() {
                     days: this.getDateRangeDays()
                 });
 
-                // Fetch data in parallel - FASE 1: Prioritize Internal API
-                const [
-                    overviewResult,
-                    analyticsResult,
-                    topAccountsResult,
-                    topPositionsResult
-                ] = await Promise.allSettled([
-                    // ✅ 100% Internal API calls (FASE 1 Complete)
-                    this.apiService.fetchOverview({
-                        symbol: this.selectedSymbol,
-                        interval: this.selectedInterval,
-                        limit: limit
-                    }),
+                // ✅ OPTIMIZATION: Fetch critical data FIRST (for instant chart render)
+                // Don't wait for analytics - fetch it in background after chart renders
+                // This is similar to Open Interest optimization
+                const topAccountsPromise = this.apiService.fetchTopAccounts({
+                    symbol: this.selectedSymbol,
+                    exchange: this.selectedExchange,
+                    interval: this.selectedInterval,
+                    limit: limit,
+                    dateRange: dateRange
+                });
+                
+                const topPositionsPromise = this.apiService.fetchTopPositions({
+                    symbol: this.selectedSymbol,
+                    exchange: this.selectedExchange,
+                    interval: this.selectedInterval,
+                    limit: limit,
+                    dateRange: dateRange
+                });
+
+                // Wait for critical data only (for chart)
+                const [topAccountsResult, topPositionsResult] = await Promise.allSettled([
+                    topAccountsPromise,
+                    topPositionsPromise
+                ]);
+
+                // Process critical data
+                if (topAccountsResult.status === 'fulfilled' && topAccountsResult.value) {
+                    this.topAccountData = topAccountsResult.value;
+                    console.log('✅ Top Accounts data loaded:', this.topAccountData.length, 'records');
+                } else if (topAccountsResult.status === 'rejected') {
+                    console.error('❌ Error loading top accounts:', topAccountsResult.reason);
+                }
+                
+                if (topPositionsResult.status === 'fulfilled' && topPositionsResult.value) {
+                    this.topPositionData = topPositionsResult.value;
+                    console.log('✅ Top Positions data loaded:', this.topPositionData.length, 'records');
+                } else if (topPositionsResult.status === 'rejected') {
+                    console.error('❌ Error loading top positions:', topPositionsResult.reason);
+                }
+
+                // Update current values from critical data (for summary cards)
+                this.updateCurrentValues();
+
+                // Hide skeleton immediately after critical data is loaded
+                // Don't wait for analytics - chart will render with this data
+                if (shouldShowLoading) {
+                    this.globalLoading = false;
+                    console.log('⚡ Critical data ready, hiding skeleton');
+                }
+
+                // Taker Buy/Sell data removed (Exchange Rankings section is hidden)
+
+                // Render charts IMMEDIATELY (before analytics completes for faster perceived performance)
+                // Chart is the most important visual element - show it ASAP
+                // Don't wait for Chart.js - it will render when ready (non-blocking)
+                const renderCharts = () => {
+                    try {
+                        // Render main chart (Top Account Ratio & Distribution)
+                        if (this.mainChartManager && this.topAccountData.length > 0) {
+                            this.mainChartManager.renderMainChart(
+                                this.topAccountData,
+                                this.chartType
+                            );
+                        }
+
+                        // Render positions chart (Top Positions Ratio & Distribution)
+                        if (this.positionsChartManager && this.topPositionData.length > 0) {
+                            this.positionsChartManager.renderPositionsChart(
+                                this.topPositionData,
+                                this.chartType
+                            );
+                        }
+
+                        // Render comparison chart (Top Account vs Top Position ratio lines only)
+                        if (this.comparisonChartManager && (this.topAccountData.length > 0 || this.topPositionData.length > 0)) {
+                            this.comparisonChartManager.renderComparisonChart(
+                                [], // No global account data (redundant with top accounts)
+                                this.topAccountData,
+                                this.topPositionData
+                            );
+                        }
+                    } catch (error) {
+                        console.error('❌ Error rendering charts:', error);
+                        setTimeout(() => {
+                            // Retry chart rendering
+                            if (this.mainChartManager && this.topAccountData.length > 0) {
+                                this.mainChartManager.renderMainChart(this.topAccountData, this.chartType);
+                            }
+                            if (this.positionsChartManager && this.topPositionData.length > 0) {
+                                this.positionsChartManager.renderPositionsChart(this.topPositionData, this.chartType);
+                            }
+                            if (this.comparisonChartManager && (this.topAccountData.length > 0 || this.topPositionData.length > 0)) {
+                                this.comparisonChartManager.renderComparisonChart([], this.topAccountData, this.topPositionData);
+                            }
+                        }, 50);
+                    }
+                };
+                
+                // Try immediate render (Chart.js might already be loaded)
+                if (typeof Chart !== 'undefined') {
+                    renderCharts();
+                } else {
+                    // Chart.js not ready yet - wait for it (non-blocking)
+                    (window.chartJsReady || Promise.resolve()).then(() => {
+                        renderCharts();
+                    }).catch(() => {
+                        console.warn('⚠️ Chart.js not available, will retry later');
+                        setTimeout(renderCharts, 100);
+                    });
+                }
+
+                // Fetch analytics and overview data AFTER chart render (non-blocking, fire-and-forget)
+                // This allows chart to appear instantly, analytics updates summary cards later
+                // Following Open Interest optimization pattern
+                if (!isInitialLoad || !isAutoRefresh) {
+                    this.fetchAnalyticsData().catch(err => {
+                        console.warn('⚠️ Analytics fetch failed:', err);
+                    });
+                } else {
+                    // Initial load: load analytics in background after chart render
+                    setTimeout(() => {
+                        this.fetchAnalyticsData(true).catch(err => {
+                            console.warn('⚠️ Background analytics fetch failed:', err);
+                        });
+                    }, 100);
+                }
+
+                // Log total load time
+                const totalLoadTime = Date.now() - loadStartTime;
+                console.log('⏱️ Total loadAllData() time:', totalLoadTime + 'ms');
+                console.log('✅ Critical data loaded successfully (FASE 1: Internal API Priority)');
+
+                // If this was initial load with reduced limit, load full data in background
+                if (isInitialLoad && limit < calculatedLimit && this.topAccountData.length > 0) {
+                    console.log('🔄 Initial load complete, loading full dataset in background...', {
+                        currentLimit: limit,
+                        fullLimit: calculatedLimit
+                    });
+                    
+                    const capturedDateRange = dateRange;
+                    
+                    // Load full data in background IMMEDIATELY (no delay)
+                    this.isLoading = false; // Reset flag so we can load again
+                    
+                    const scheduleFullDataLoad = (callback) => {
+                        if (window.requestIdleCallback) {
+                            window.requestIdleCallback(callback, { timeout: 50 });
+                        } else {
+                            setTimeout(callback, 0);
+                        }
+                    };
+
+                    scheduleFullDataLoad(async () => {
+                        try {
+                            const fullTopAccounts = await this.apiService.fetchTopAccounts({
+                                symbol: this.selectedSymbol,
+                                exchange: this.selectedExchange,
+                                interval: this.selectedInterval,
+                                limit: 5000,
+                                dateRange: capturedDateRange
+                            });
+                            const fullTopPositions = await this.apiService.fetchTopPositions({
+                                symbol: this.selectedSymbol,
+                                exchange: this.selectedExchange,
+                                interval: this.selectedInterval,
+                                limit: 5000,
+                                dateRange: capturedDateRange
+                            });
+
+                            if (fullTopAccounts && fullTopAccounts.length > 0) {
+                                this.topAccountData = fullTopAccounts;
+                                this.updateCurrentValues();
+                                if (this.mainChartManager) {
+                                    this.mainChartManager.renderMainChart(this.topAccountData, this.chartType);
+                                }
+                            }
+                            if (fullTopPositions && fullTopPositions.length > 0) {
+                                this.topPositionData = fullTopPositions;
+                                this.updateCurrentValues();
+                                if (this.positionsChartManager) {
+                                    this.positionsChartManager.renderPositionsChart(this.topPositionData, this.chartType);
+                                }
+                            }
+
+                            this.saveToCache();
+                            console.log('✅ Full dataset loaded and charts updated');
+                        } catch (err) {
+                            console.warn('⚠️ Background full data load failed (using initial data):', err);
+                        }
+                    });
+                } else {
+                    // Normal load complete, reset isLoading flag and save cache
+                    this.isLoading = false;
+                    this.saveToCache();
+                }
+
+            } catch (error) {
+                // Handle AbortError gracefully (don't log as error)
+                if (error.name === 'AbortError') {
+                    console.log('⏭️ Request was cancelled (expected during auto-refresh)');
+                    return; // Exit early, don't increment error count
+                }
+                
+                console.error('❌ Error loading data:', error);
+                this.errorCount++;
+                
+                if (this.errorCount >= this.maxErrors) {
+                    this.stopAutoRefresh();
+                    console.error('❌ Max errors reached, stopping auto-refresh');
+                }
+            } finally {
+                // Always reset loading flags
+                this.isLoading = false;
+                
+                // Hide skeleton only if it was shown (initial load)
+                if (shouldShowLoading) {
+                    this.globalLoading = false;
+                    console.log('✅ Initial load complete - skeleton hidden');
+                }
+            }
+        },
+
+        /**
+         * Fetch analytics and overview data (non-blocking, after chart render)
+         * Following Open Interest optimization pattern
+         */
+        async fetchAnalyticsData(isAutoRefresh = false) {
+            if (this.analyticsLoading) {
+                console.log('⏭️ Skip analytics fetch (already loading)');
+                return;
+            }
+
+            // Logic to prevent analyticsLoading = true if isAutoRefresh is true
+            // Auto-refresh should be silent (no skeleton)
+            if (isAutoRefresh) {
+                this.analyticsLoading = false; // Don't show skeleton during auto-refresh
+            } else if (this.topAccountData.length === 0) {
+                this.analyticsLoading = true; // Only for initial load without data
+            } else {
+                this.analyticsLoading = false; // Data already exists, no skeleton needed
+            }
+
+            try {
+                console.log('📡 Fetching analytics and overview data...');
+                
+                const limit = LongShortRatioUtils.calculateLimit(
+                    this.timeRanges.find(r => r.value === this.globalPeriod)?.days || 1,
+                    this.selectedInterval
+                );
+
+                // Fetch analytics and overview in parallel
+                const [analyticsResult, overviewResult] = await Promise.allSettled([
                     this.apiService.fetchAnalytics({
                         symbol: this.selectedSymbol,
                         exchange: this.selectedExchange,
@@ -213,97 +590,44 @@ export function createLongShortRatioController() {
                         ratio_type: 'accounts',
                         limit: limit
                     }),
-                    this.apiService.fetchTopAccounts({
+                    this.apiService.fetchOverview({
                         symbol: this.selectedSymbol,
-                        exchange: this.selectedExchange,
                         interval: this.selectedInterval,
-                        limit: 5000,
-                        dateRange: dateRange  // Pass date range for client-side filtering
-                    }),
-                    this.apiService.fetchTopPositions({
-                        symbol: this.selectedSymbol,
-                        exchange: this.selectedExchange,
-                        interval: this.selectedInterval,
-                        limit: 5000,
-                        dateRange: dateRange  // Pass date range for client-side filtering
+                        limit: limit
                     })
                 ]);
 
-                // Process results - FASE 1: Use Internal API as primary source
-                let hasCriticalData = false;
-
-                if (overviewResult.status === 'fulfilled' && overviewResult.value) {
-                    this.overviewData = overviewResult.value;
-                    console.log('✅ Overview data loaded from Internal API');
-                }
-                
                 if (analyticsResult.status === 'fulfilled' && analyticsResult.value) {
                     this.analyticsData = analyticsResult.value;
                     console.log('✅ Analytics data loaded from Internal API');
+                    // Map analytics to state (for summary cards)
+                    this.mapAnalyticsToState();
+                } else if (analyticsResult.status === 'rejected') {
+                    console.warn('⚠️ Analytics fetch failed:', analyticsResult.reason);
                 }
                 
-                // Critical data for main chart and summary cards
-                if (topAccountsResult.status === 'fulfilled' && topAccountsResult.value) {
-                    this.topAccountData = topAccountsResult.value;
-                    console.log('✅ Top Accounts data loaded:', this.topAccountData.length, 'records');
-                    hasCriticalData = true;
-                }
-                
-                if (topPositionsResult.status === 'fulfilled' && topPositionsResult.value) {
-                    this.topPositionData = topPositionsResult.value;
-                    console.log('✅ Top Positions data loaded:', this.topPositionData.length, 'records');
+                if (overviewResult.status === 'fulfilled' && overviewResult.value) {
+                    this.overviewData = overviewResult.value;
+                    console.log('✅ Overview data loaded from Internal API');
+                } else if (overviewResult.status === 'rejected') {
+                    console.warn('⚠️ Overview fetch failed:', overviewResult.reason);
                 }
 
-                // FASE 1: Map analytics data to state (for summary cards)
-                this.mapAnalyticsToState();
-
-                // Update current values from data
-                this.updateCurrentValues();
-
-                // ⚡ OPTIMIZATION: Hide skeleton ASAP if critical data is ready
-                if (hasCriticalData) {
-                    this.globalLoading = false;
-                    console.log('⚡ Critical data ready, hiding skeleton');
+                // Save to cache after analytics loaded (if not auto-refresh)
+                if (!isAutoRefresh) {
+                    this.saveToCache();
                 }
-
-                // Taker Buy/Sell data removed (Exchange Rankings section is hidden)
-
-                // ⚡ OPTIMIZATION: Render all charts ONCE with complete data
-                setTimeout(() => {
-                    // Render main chart (Top Account Ratio & Distribution)
-                    if (this.topAccountData.length > 0) {
-                        this.mainChartManager.renderMainChart(
-                            this.topAccountData,
-                            this.chartType
-                        );
-                    }
-
-                    // Render positions chart (Top Positions Ratio & Distribution)
-                    if (this.topPositionData.length > 0) {
-                        this.positionsChartManager.renderPositionsChart(
-                            this.topPositionData,
-                            this.chartType
-                        );
-                    }
-
-                    // Render comparison chart (Top Account vs Top Position ratio lines only)
-                    if (this.topAccountData.length > 0 || this.topPositionData.length > 0) {
-                        this.comparisonChartManager.renderComparisonChart(
-                            [], // No global account data (redundant with top accounts)
-                            this.topAccountData,
-                            this.topPositionData
-                        );
-                    }
-                }, 100); // Single batch render
-
-                console.log('✅ All data loaded successfully (FASE 1: Internal API Priority)');
 
             } catch (error) {
-                console.error('❌ Error loading data:', error);
-                this.errorCount++;
+                // Handle AbortError gracefully
+                if (error.name === 'AbortError') {
+                    console.log('⏭️ Analytics request was cancelled');
+                    return;
+                }
+                console.error('❌ Error loading analytics data:', error);
             } finally {
-                // Ensure skeleton is hidden even if some data fails
-                this.globalLoading = false;
+                // Reset analytics loading flag
+                this.analyticsLoading = false;
             }
         },
 

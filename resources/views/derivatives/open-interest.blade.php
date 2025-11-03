@@ -2,6 +2,21 @@
 
 @section('title', 'Open Interest | DragonFortune')
 
+@push('head')
+    <!-- Resource Hints for Faster API Loading (Critical for Hard Refresh) -->
+    <link rel="dns-prefetch" href="{{ config('app.api_urls.internal') }}">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="{{ config('app.api_urls.internal') }}" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    
+    <!-- Preload critical resources for faster initial load -->
+    <link rel="preload" href="{{ asset('js/open-interest-controller.js') }}" as="script" type="module">
+    
+    <!-- Prefetch API endpoints (will fetch in background during hard refresh) -->
+    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/open-interest/history?symbol=BTCUSDT&exchange=Binance&interval=5m&limit=100&with_price=false" as="fetch" crossorigin="anonymous">
+    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/open-interest/analytics?symbol=BTCUSDT&exchange=Binance&interval=5m&limit=100" as="fetch" crossorigin="anonymous">
+@endpush
+
 @section('content')
     {{--
         Bitcoin: Open Interest Dashboard (HYBRID)
@@ -56,12 +71,6 @@
                         <option value="15m">15 Minutes</option>
                         <option value="1h">1 Hour</option>
                     </select>
-
-                    <!-- Hidden refresh button (auto-refresh is active) -->
-                    <button class="btn btn-primary" @click="loadData()" :disabled="globalLoading" x-show="false">
-                        <span x-show="!globalLoading">🔄 Refresh</span>
-                        <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
-                    </button>
                 </div>
             </div>
         </div>
@@ -686,31 +695,47 @@
                 </div>
             </div>
         </div>
-        --}}
 
     </div>
 @endsection
 
 @section('scripts')
-    <!-- Chart.js with Date Adapter and Plugins -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <!-- Chart.js with Date Adapter and Plugins - Load async for faster initial render -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" defer></script>
 
-    <!-- Wait for Chart.js to load -->
+    <!-- Initialize Chart.js ready promise immediately (non-blocking) -->
     <script>
+        // Create promise immediately (non-blocking)
         window.chartJsReady = new Promise((resolve) => {
+            // Check if Chart.js already loaded (from cache or previous load)
             if (typeof Chart !== 'undefined') {
-                console.log('✅ Chart.js loaded');
+                console.log('✅ Chart.js already loaded');
                 resolve();
-            } else {
-                setTimeout(() => resolve(), 100);
+                return;
             }
+            
+            // Wait for Chart.js to load (with fallback timeout)
+            let checkCount = 0;
+            const checkInterval = setInterval(() => {
+                checkCount++;
+                if (typeof Chart !== 'undefined') {
+                    console.log('✅ Chart.js loaded (after', checkCount * 50, 'ms)');
+                    clearInterval(checkInterval);
+                    resolve();
+                } else if (checkCount > 40) {
+                    // Timeout after 2 seconds - resolve anyway
+                    console.warn('⚠️ Chart.js load timeout, resolving anyway');
+                    clearInterval(checkInterval);
+                    resolve();
+                }
+            }, 50);
         });
     </script>
 
-    <!-- Open Interest Modular Controller -->
-    <script type="module" src="{{ asset('js/open-interest-controller.js') }}"></script>
+    <!-- Open Interest Modular Controller - Load with defer for non-blocking -->
+    <script type="module" src="{{ asset('js/open-interest-controller.js') }}" defer></script>
     
     {{-- FASE 2: Heatmap controller akan diaktifkan nanti --}}
     {{-- <script src="{{ asset('js/laevitas-heatmap.js') }}"></script> --}}

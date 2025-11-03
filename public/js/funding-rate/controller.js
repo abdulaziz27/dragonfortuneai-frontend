@@ -9,13 +9,17 @@ import { FundingRateUtils } from './utils.js';
 
 export function createFundingRateController() {
     return {
+        // Initialization flag
+        initialized: false,
+
         // Services
         apiService: null,
         chartManager: null,
         
         // Global state
         globalPeriod: '1m',
-        globalLoading: false,
+        globalLoading: false, // Start false - optimistic UI (no skeleton)
+        isLoading: false, // Flag to prevent multiple simultaneous loads
         selectedSymbol: 'BTCUSDT',
         selectedExchange: 'binance',
         scaleType: 'linear',
@@ -84,12 +88,23 @@ export function createFundingRateController() {
         /**
          * Initialize controller
          */
-        init() {
-            console.log('🚀 Funding Rate Dashboard initialized (Modular)');
+        async init() {
+            // Prevent double initialization
+            if (this.initialized) {
+                console.log('⏭️ Controller already initialized');
+                return;
+            }
+
+            this.initialized = true;
+            console.log('🚀 Funding Rate Dashboard initialized');
             
-            // Initialize services
+            // Initialize services IMMEDIATELY (non-blocking)
             this.apiService = new FundingRateAPIService();
             this.chartManager = new ChartManager('fundingRateMainChart');
+            
+            // Set globalLoading = false initially (optimistic UI, no skeleton)
+            this.globalLoading = false;
+            this.analyticsLoading = false;
             
             // Initialize time ranges
             this.timeRanges = [
@@ -102,23 +117,54 @@ export function createFundingRateController() {
                 // { label: '1Y', value: '1y', days: 365 },
             ];
             
-            // Initial data load (will also trigger fetchAnalyticsData and fetchExchangesData)
-            this.loadData();
+            // STEP 1: Load cache data INSTANT (no loading skeleton)
+            const cacheLoaded = this.loadFromCache();
+            if (cacheLoaded) {
+                console.log('✅ Cache data loaded instantly - showing cached data');
+                // Render chart immediately with cached data (don't wait Chart.js)
+                // Chart will render when Chart.js is ready
+                if (this.chartManager && this.rawData.length > 0) {
+                    // Wait for Chart.js to be ready (but don't block other operations)
+                    (window.chartJsReady || Promise.resolve()).then(() => {
+                        setTimeout(() => {
+                            this.chartManager.renderChart(this.rawData, this.priceData, this.chartType);
+                        }, 10);
+                    });
+                }
+                // globalLoading already false from loadFromCache (no skeleton shown)
+                
+                // STEP 2: Fetch fresh data from endpoints (background, no skeleton)
+                // Don't await - let it run in background while showing cache
+                this.loadData(true).catch(err => {
+                    console.warn('⚠️ Background fetch failed:', err);
+                });
+            } else {
+                // No cache available - optimistic UI (no skeleton, show placeholder values)
+                console.log('⚠️ No cache available - loading data with optimistic UI (no skeleton)');
+                // Don't set globalLoading = true - show layout immediately with placeholder values
+                // Data will appear seamlessly after fetch completes
+                
+                // IMPORTANT: Start fetch IMMEDIATELY (don't wait for Chart.js)
+                // This makes hard refresh faster - API fetch starts ASAP
+                const fetchPromise = this.loadData(false).catch(err => {
+                    console.warn('⚠️ Initial load failed:', err);
+                });
+                
+                // Wait for fetch to complete before starting auto-refresh
+                // But don't block on Chart.js - chart will render when ready
+                await fetchPromise;
+            }
             
-            // Start auto-refresh
+            // Start auto-refresh ONLY after initial load completes
             this.startAutoRefresh();
-            
-            console.log('✅ Dashboard initialized - Analytics and Exchanges data will load in parallel');
             
             // Setup cleanup listeners
             window.addEventListener('beforeunload', () => this.cleanup());
             document.addEventListener('visibilitychange', () => {
                 if (document.hidden) {
                     this.stopAutoRefresh();
-                    console.log('⏸️ Auto-refresh paused (tab hidden)');
                 } else {
                     this.startAutoRefresh();
-                    console.log('▶️ Auto-refresh resumed (tab visible)');
                 }
             });
         },
@@ -134,7 +180,8 @@ export function createFundingRateController() {
             this.refreshInterval = setInterval(() => {
                 // Safety checks
                 if (document.hidden) return; // Don't refresh hidden tabs
-                if (this.globalLoading) return; // Skip if loading
+                if (this.globalLoading) return; // Skip if showing skeleton
+                if (this.isLoading) return; // Skip if already loading (prevent race condition)
                 if (this.errorCount >= this.maxErrors) {
                     console.error('❌ Too many errors, stopping auto refresh');
                     this.stopAutoRefresh();
@@ -142,11 +189,18 @@ export function createFundingRateController() {
                 }
                 
                 console.log('🔄 Auto-refresh triggered');
-                this.loadData(); // This will also trigger fetchAnalyticsData()
+                // Pass isAutoRefresh=true to prevent loading skeleton during auto-refresh
+                this.loadData(true).catch(err => {
+                    // Handle errors gracefully (AbortError expected during rapid refreshes)
+                    if (err.name !== 'AbortError') {
+                        console.warn('⚠️ Auto-refresh error:', err);
+                    }
+                }); // Silent update - no skeleton shown
                 
                 // Also refresh analytics data independently (handles its own errors)
+                // Pass isAutoRefresh=true to prevent analytics skeleton during auto-refresh
                 if (!this.analyticsLoading) {
-                    this.fetchAnalyticsData().catch(err => {
+                    this.fetchAnalyticsData(true).catch(err => {
                         console.warn('⚠️ Analytics refresh failed:', err);
                     });
                 }
@@ -220,15 +274,120 @@ export function createFundingRateController() {
         },
         
         /**
-         * Load data from API
+         * Get cache key for current filter state
          */
-        async loadData() {
-            if (this.globalLoading) {
+        getCacheKey() {
+            const exchange = FundingRateUtils.capitalizeExchange(this.selectedExchange);
+            return `fr_dashboard_${this.selectedSymbol}_${exchange}_${this.selectedInterval}_${this.globalPeriod}`;
+        },
+        
+        /**
+         * Load data from cache
+         */
+        loadFromCache() {
+            try {
+                const cacheKey = this.getCacheKey();
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    const data = JSON.parse(cached);
+                    const cacheAge = Date.now() - data.timestamp;
+                    const maxAge = 5 * 60 * 1000; // 5 minutes
+                    
+                    if (cacheAge < maxAge && data.rawData && data.rawData.length > 0) {
+                        this.rawData = data.rawData;
+                        this.priceData = data.priceData || [];
+                        this.currentFundingRate = data.currentFundingRate;
+                        this.avgFundingRate = data.avgFundingRate;
+                        this.maxFundingRate = data.maxFundingRate;
+                        this.minFundingRate = data.minFundingRate;
+                        this.fundingVolatility = data.fundingVolatility;
+                        this.marketSignal = data.marketSignal;
+                        this.signalStrength = data.signalStrength;
+                        this.currentPrice = data.currentPrice;
+                        this.dataLoaded = true;
+                        this.summaryDataLoaded = true;
+                        
+                        // IMPORTANT: Hide loading skeletons immediately after cache loaded
+                        // This matches Open Interest optimization pattern
+                        this.globalLoading = false;
+                        this.analyticsLoading = false;
+                        
+                        console.log('✅ Cache loaded:', {
+                            records: this.rawData.length,
+                            age: Math.round(cacheAge / 1000) + 's'
+                        });
+                        return true;
+                    } else {
+                        localStorage.removeItem(cacheKey);
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ Cache load error:', error);
+            }
+            return false;
+        },
+        
+        /**
+         * Save data to cache
+         */
+        saveToCache() {
+            try {
+                const cacheKey = this.getCacheKey();
+                const data = {
+                    timestamp: Date.now(),
+                    rawData: this.rawData,
+                    priceData: this.priceData,
+                    currentFundingRate: this.currentFundingRate,
+                    avgFundingRate: this.avgFundingRate,
+                    maxFundingRate: this.maxFundingRate,
+                    minFundingRate: this.minFundingRate,
+                    fundingVolatility: this.fundingVolatility,
+                    marketSignal: this.marketSignal,
+                    signalStrength: this.signalStrength,
+                    currentPrice: this.currentPrice
+                };
+                localStorage.setItem(cacheKey, JSON.stringify(data));
+                console.log('💾 Data saved to cache:', cacheKey);
+            } catch (error) {
+                console.warn('⚠️ Cache save error:', error);
+            }
+        },
+        
+        /**
+         * Load data from API (OPTIMIZED: Progressive Loading)
+         */
+        async loadData(isAutoRefresh = false) {
+            // Guard: Skip if already loading (prevent race condition)
+            if (this.isLoading) {
                 console.log('⏭️ Skip load (already loading)');
                 return;
             }
             
-            this.globalLoading = true;
+            // Set loading flag to prevent multiple simultaneous loads
+            this.isLoading = true;
+            
+            // Only show loading skeleton on initial load (hard refresh)
+            // Auto-refresh should be silent (no skeleton) since data already exists
+            const isInitialLoad = this.rawData.length === 0;
+            const shouldShowLoading = isInitialLoad && !isAutoRefresh;
+            
+            // IMPORTANT: Don't cancel previous requests on initial load
+            // Initial load needs to complete, and auto-refresh will skip if isLoading = true
+            // Only cancel on subsequent loads (auto-refresh) to prevent stale data
+            if (this.apiService && !isInitialLoad) {
+                this.apiService.cancelAllRequests();
+            }
+            
+            if (shouldShowLoading) {
+                this.globalLoading = true; // Show skeleton only on first load
+                console.log('🔄 Initial load - showing skeleton');
+            } else {
+                console.log('🔄 Auto-refresh - silent update (no skeleton)');
+            }
+            
+            // Performance monitoring
+            const loadStartTime = Date.now();
+            console.log('⏱️ loadData() started at:', new Date().toISOString());
             
             try {
                 console.log('📡 Loading funding rate data...');
@@ -238,26 +397,29 @@ export function createFundingRateController() {
                 // Calculate date range (startDate to endDate)
                 const dateRange = this.getDateRange();
                 
-                // Calculate expected records for verification
-                const intervalHours = {
-                    '1m': 1 / 60,  // 1 minute = 1/60 hours
-                    '1h': 1,
-                    '8h': 8
-                    // Commented for future use:
-                    // '4h': 4,
-                    // '1d': 24,
-                    // '1w': 168
-                };
-                const hours = intervalHours[this.selectedInterval] || 8;
-                const days = this.getDateRangeDays();
-                const expectedRecords = Math.ceil((days * 24) / hours);
+                // For initial load, use smaller limit (100) for faster response
+                // Then load full data (5000) in background after first render
+                // This provides instant feedback to user - chart appears in <500ms
+                const calculatedLimit = 5000;
+                const limit = isInitialLoad ? 100 : calculatedLimit;
                 
-                // Fetch data from internal API with date range
+                console.log('📡 Loading Funding Rate data...', {
+                    symbol: this.selectedSymbol,
+                    exchange: exchange,
+                    interval: this.selectedInterval,
+                    period: this.globalPeriod,
+                    limit: limit,
+                    isInitialLoad: isInitialLoad,
+                    calculatedLimit: calculatedLimit
+                });
+                
+                // Fetch data from internal API with progressive loading
                 const data = await this.apiService.fetchHistory({
                     symbol: this.selectedSymbol,
                     exchange: exchange,
                     interval: this.selectedInterval,
-                    dateRange: dateRange // Pass date range instead of limit
+                    dateRange: dateRange,
+                    limit: limit // Pass limit for progressive loading
                 });
                 
                 // Handle cancelled requests
@@ -272,63 +434,161 @@ export function createFundingRateController() {
                 
                 console.log('✅ Data loaded:', this.rawData.length, 'records');
                 
-                // Verify data completeness after filtering
-                const actualCount = this.rawData.length;
-                const coveragePercent = (actualCount / expectedRecords) * 100;
-                
-                if (actualCount < expectedRecords * 0.8) {
-                    // Less than 80% of expected data - might be incomplete
-                    console.warn(`⚠️ Data completeness: ${coveragePercent.toFixed(1)}% (${actualCount}/${expectedRecords} records)`);
-                    console.warn(`⚠️ Consider increasing limit or checking backend filter`);
-                } else {
-                    console.log(`✅ Data completeness: ${coveragePercent.toFixed(1)}% (${actualCount}/${expectedRecords} records)`);
-                }
-                
-                // Extract price data from funding rate data (bonus: it's included!)
+                // Extract price data from funding rate data (optimized - direct map, filter later if needed)
                 this.priceData = data
                     .filter(d => d.price !== null && d.price !== undefined)
                     .map(d => ({ date: d.date, price: d.price }));
                 
-                // Debug price data extraction
                 console.log('💰 Price data extracted:', this.priceData.length, 'points');
-                if (this.priceData.length === 0) {
-                    console.warn('⚠️ No price data available! symbol_price might be null in API response');
+                
+                // Update current funding rate from latest data (immediate, before chart render)
+                if (this.rawData.length > 0) {
+                    this.currentFundingRate = this.rawData[this.rawData.length - 1].value;
+                    if (this.rawData.length > 1) {
+                        // Calculate change from previous value
+                        const prevValue = this.rawData[this.rawData.length - 2].value;
+                        this.fundingChange = this.currentFundingRate - prevValue;
+                    }
+                }
+                
+                this.dataLoaded = true;
+                
+                // Render chart IMMEDIATELY (before analytics fetch for faster perceived performance)
+                // Chart is the most important visual element - show it ASAP
+                // Don't wait for Chart.js - it will render when ready (non-blocking)
+                const chartRenderStart = Date.now();
+                const renderChart = () => {
+                    try {
+                        if (this.chartManager && this.rawData.length > 0) {
+                            // Use renderChart directly (same as Open Interest)
+                            this.chartManager.renderChart(this.rawData, this.priceData, this.chartType);
+                            const chartRenderTime = Date.now() - chartRenderStart;
+                            console.log('⏱️ Chart render time:', chartRenderTime + 'ms');
+                        }
+                    } catch (error) {
+                        console.error('❌ Error rendering chart:', error);
+                        setTimeout(() => {
+                            if (this.chartManager && this.rawData.length > 0) {
+                                this.chartManager.renderChart(this.rawData, this.priceData, this.chartType);
+                            }
+                        }, 50);
+                    }
+                };
+                
+                // Try immediate render (Chart.js might already be loaded)
+                if (typeof Chart !== 'undefined') {
+                    renderChart();
                 } else {
-                    console.log('💰 Price range:', {
-                        min: Math.min(...this.priceData.map(d => d.price)),
-                        max: Math.max(...this.priceData.map(d => d.price)),
-                        latest: this.priceData[this.priceData.length - 1]?.price
+                    // Chart.js not ready yet - wait for it (non-blocking)
+                    (window.chartJsReady || Promise.resolve()).then(() => {
+                        renderChart();
+                    }).catch(() => {
+                        console.warn('⚠️ Chart.js not available, will retry later');
+                        setTimeout(renderChart, 100);
                     });
                 }
                 
-                // Calculate metrics
-                this.calculateMetrics();
-                this.summaryDataLoaded = true;
-                this.dataLoaded = true;
-                
-                // Fetch analytics data in parallel (includes bias + summary stats)
-                // Important: This sets marketSignal, signalStrength, and fundingVolatility
-                this.fetchAnalyticsData().catch(err => {
-                    console.error('❌ Analytics fetch failed in loadData:', err);
-                    console.error('❌ This will cause market signal and volatility to remain at default values');
-                });
+                // Fetch analytics AFTER chart render (non-blocking, fire-and-forget)
+                // This allows chart to appear instantly, analytics updates summary cards later
+                // Following Open Interest optimization pattern
+                if (!isInitialLoad || !isAutoRefresh) {
+                    this.fetchAnalyticsData(isAutoRefresh).catch(err => {
+                        console.warn('⚠️ Analytics fetch failed:', err);
+                    });
+                } else {
+                    // Initial load: load analytics in background after chart render
+                    setTimeout(() => {
+                        this.fetchAnalyticsData(true).catch(err => {
+                            console.warn('⚠️ Background analytics fetch failed:', err);
+                        });
+                    }, 100);
+                }
 
-                // Fetch exchanges comparison data in parallel
+                // Fetch exchanges comparison data in parallel (non-blocking)
                 this.fetchExchangesData().catch(err => {
                     console.warn('⚠️ Exchanges fetch failed:', err);
                 });
                 
-                // Update charts with delay to ensure cleanup is complete
-                setTimeout(() => {
-                    try {
-                        this.chartManager.updateChart(this.rawData, this.priceData, this.chartType);
-                        // Distribution and MA charts removed - not industry standard for funding rate
-                    } catch (error) {
-                        console.error('❌ Error updating charts:', error);
-                    }
-                }, 150); // Increased delay for safer cleanup
+                // Log total load time
+                const totalLoadTime = Date.now() - loadStartTime;
+                console.log('⏱️ Total loadData() time:', totalLoadTime + 'ms');
+                
+                // If this was initial load with reduced limit, load full data in background
+                if (isInitialLoad && limit < calculatedLimit && this.rawData.length > 0) {
+                    console.log('🔄 Initial load complete, loading full dataset in background...', {
+                        currentLimit: limit,
+                        fullLimit: calculatedLimit
+                    });
+                    
+                    const capturedDateRange = dateRange;
+                    
+                    // Load full data in background IMMEDIATELY (no delay)
+                    this.isLoading = false; // Reset flag so we can load again
+                    
+                    const scheduleFullDataLoad = (callback) => {
+                        if (window.requestIdleCallback) {
+                            window.requestIdleCallback(callback, { timeout: 50 });
+                        } else {
+                            setTimeout(callback, 0);
+                        }
+                    };
+
+                    scheduleFullDataLoad(async () => {
+                        try {
+                            const fullData = await this.apiService.fetchHistory({
+                                symbol: this.selectedSymbol,
+                                exchange: exchange,
+                                interval: this.selectedInterval,
+                                dateRange: capturedDateRange,
+                                limit: calculatedLimit
+                            });
+
+                            if (fullData && fullData.length > 0) {
+                                // Update with full dataset
+                                this.rawData = fullData;
+                                this.priceData = fullData
+                                    .filter(d => d.price !== null && d.price !== undefined)
+                                    .map(d => ({ date: d.date, price: d.price }));
+                                
+                                // Update current funding rate from latest data
+                                if (this.rawData.length > 0) {
+                                    this.currentFundingRate = this.rawData[this.rawData.length - 1].value;
+                                    if (this.rawData.length > 1) {
+                                        const prevValue = this.rawData[this.rawData.length - 2].value;
+                                        this.fundingChange = this.currentFundingRate - prevValue;
+                                    }
+                                }
+
+                                // Update chart with full data (use renderChart directly like Open Interest)
+                                if (this.chartManager) {
+                                    this.chartManager.renderChart(this.rawData, this.priceData, this.chartType);
+                                }
+
+                                // Save updated cache
+                                this.saveToCache();
+
+                                console.log('✅ Full dataset loaded and chart updated:', {
+                                    records: this.rawData.length,
+                                    previousRecords: limit
+                                });
+                            }
+                        } catch (err) {
+                            console.warn('⚠️ Background full data load failed (using initial data):', err);
+                        }
+                    });
+                } else {
+                    // Normal load complete, reset isLoading flag and save cache
+                    this.isLoading = false;
+                    this.saveToCache();
+                }
                 
             } catch (error) {
+                // Handle AbortError gracefully (don't log as error)
+                if (error.name === 'AbortError') {
+                    console.log('⏭️ Request was cancelled (expected during auto-refresh)');
+                    return; // Exit early, don't increment error count
+                }
+                
                 console.error('❌ Error loading data:', error);
                 this.errorCount++;
                 
@@ -337,7 +597,14 @@ export function createFundingRateController() {
                     this.showError('Auto-refresh disabled due to repeated errors');
                 }
             } finally {
-                this.globalLoading = false;
+                // Always reset loading flags
+                this.isLoading = false;
+                
+                // Hide skeleton only if it was shown (initial load)
+                if (shouldShowLoading) {
+                    this.globalLoading = false;
+                    console.log('✅ Initial load complete - skeleton hidden');
+                }
             }
         },
         
@@ -498,13 +765,21 @@ export function createFundingRateController() {
         /**
          * Fetch analytics data from API (includes bias + summary stats)
          */
-        async fetchAnalyticsData() {
+        async fetchAnalyticsData(isAutoRefresh = false) {
             if (this.analyticsLoading) {
                 console.log('⏭️ Skip analytics fetch (already loading)');
                 return;
             }
 
-            this.analyticsLoading = true;
+            // Logic to prevent analyticsLoading = true if isAutoRefresh is true
+            // Auto-refresh should be silent (no skeleton)
+            if (isAutoRefresh) {
+                this.analyticsLoading = false; // Don't show skeleton during auto-refresh
+            } else if (this.rawData.length === 0) {
+                this.analyticsLoading = true; // Only for initial load without data
+            } else {
+                this.analyticsLoading = false; // Data already exists, no skeleton needed
+            }
 
             try {
                 console.log('📡 Fetching analytics data...');
@@ -552,6 +827,11 @@ export function createFundingRateController() {
                     signalStrength: this.signalStrength,
                     volatilitySet: this.fundingVolatility
                 });
+
+                // Save to cache after analytics loaded (if not auto-refresh)
+                if (!isAutoRefresh) {
+                    this.saveToCache();
+                }
 
             } catch (error) {
                 console.error('❌ Error loading analytics data:', error);

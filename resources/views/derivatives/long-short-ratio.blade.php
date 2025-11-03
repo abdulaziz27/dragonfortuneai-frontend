@@ -2,6 +2,21 @@
 
 @section('title', 'Long Short Ratio | DragonFortune')
 
+@push('head')
+    <!-- Resource Hints for Faster API Loading (Critical for Hard Refresh) -->
+    <link rel="dns-prefetch" href="{{ config('app.api_urls.internal') }}">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="{{ config('app.api_urls.internal') }}" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    
+    <!-- Preload critical resources for faster initial load -->
+    <link rel="preload" href="{{ asset('js/long-short-ratio-controller.js') }}" as="script" type="module">
+    
+    <!-- Prefetch API endpoints (will fetch in background during hard refresh) -->
+    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/long-short-ratio/top-accounts?symbol=BTCUSDT&exchange=Binance&interval=1h&limit=100" as="fetch" crossorigin="anonymous">
+    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/long-short-ratio/analytics?symbol=BTCUSDT&exchange=Binance&interval=1h&ratio_type=accounts&limit=100" as="fetch" crossorigin="anonymous">
+@endpush
+
 @section('content')
     {{--
         Bitcoin: Long/Short Ratio Dashboard (HYBRID)
@@ -25,7 +40,8 @@
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <h1 class="mb-0">Long-Short Ratio</h1>
-                        <span class="pulse-dot pulse-success"></span>
+                        <span class="pulse-dot pulse-success" x-show="topAccountData.length > 0"></span>
+                        <span class="spinner-border spinner-border-sm text-primary" style="width: 16px; height: 16px;" x-show="topAccountData.length === 0" x-cloak></span>
                     </div>
                     <p class="mb-0 text-secondary">
                         Analisis sentimen pasar melalui rasio posisi long vs short untuk mengidentifikasi crowding dan peluang contrarian.
@@ -61,14 +77,10 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Top Account</span>
-                        <span class="badge text-bg-info">Ratio</span>
+                        <span class="badge text-bg-info" x-show="currentTopAccountRatio !== null && currentTopAccountRatio !== undefined">Ratio</span>
+                        <span class="badge text-bg-secondary" x-show="currentTopAccountRatio === null || currentTopAccountRatio === undefined">Loading...</span>
                     </div>
-                    <template x-if="globalLoading">
-                        <div class="h3 mb-2 skeleton skeleton-text" style="width: 70%; height: 28px;"></div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div class="h3 mb-1" x-text="formatRatio(currentTopAccountRatio)"></div>
-                    </template>
+                    <div class="h3 mb-1" x-text="currentTopAccountRatio !== null && currentTopAccountRatio !== undefined ? formatRatio(currentTopAccountRatio) : '--'"></div>
                     <div class="small text-secondary">Real-time</div>
                 </div>
             </div>
@@ -78,14 +90,10 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Top Position</span>
-                        <span class="badge text-bg-success">Ratio</span>
+                        <span class="badge text-bg-success" x-show="currentTopPositionRatio !== null && currentTopPositionRatio !== undefined">Ratio</span>
+                        <span class="badge text-bg-secondary" x-show="currentTopPositionRatio === null || currentTopPositionRatio === undefined">Loading...</span>
                     </div>
-                    <template x-if="globalLoading">
-                        <div class="h3 mb-2 skeleton skeleton-text" style="width: 70%; height: 28px;"></div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div class="h3 mb-1" x-text="formatRatio(currentTopPositionRatio)"></div>
-                    </template>
+                    <div class="h3 mb-1" x-text="currentTopPositionRatio !== null && currentTopPositionRatio !== undefined ? formatRatio(currentTopPositionRatio) : '--'"></div>
                     <div class="small text-secondary">Real-time</div>
                 </div>
             </div>
@@ -94,18 +102,10 @@
             <div class="col-md-4">
                 <div class="df-panel p-3 h-100">
                     <div class="small text-secondary mb-2">Sentimen Pasar</div>
-                    <template x-if="globalLoading">
-                        <div>
-                            <div class="h4 mb-2 skeleton skeleton-text" style="width: 60%; height: 22px;"></div>
-                            <div class="small text-secondary skeleton skeleton-text" style="width: 90%; height: 16px;"></div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div>
-                            <div class="h4 mb-1" :class="getSentimentColorClass()" x-text="marketSentiment"></div>
-                            <div class="small text-secondary" x-text="sentimentDescription"></div>
-                        </div>
-                    </template>
+                    <div>
+                        <div class="h4 mb-1" :class="getSentimentColorClass()" x-text="marketSentiment !== null && marketSentiment !== undefined ? marketSentiment : '--'"></div>
+                        <div class="small text-secondary" x-text="sentimentDescription || 'Loading market sentiment...'"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -118,18 +118,10 @@
                         <div class="d-flex align-items-center gap-3">
                             <h5 class="mb-0">Top Accounts Ratio & Distribution</h5>
                             <div class="chart-info">
-                                <template x-if="globalLoading">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="current-value skeleton skeleton-text" style="width: 120px; height: 22px;"></span>
-                                        <span class="change-badge skeleton skeleton-pill" style="width: 80px; height: 24px;"></span>
-                                    </div>
-                                </template>
-                                <!-- <template x-if="!globalLoading">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="current-value" x-text="formatRatio(currentGlobalRatio)"></span>
-                                        <span class="change-badge" :class="globalRatioChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(globalRatioChange)"></span>
-                                    </div>
-                                </template> -->
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="current-value" x-text="currentTopAccountRatio !== null && currentTopAccountRatio !== undefined ? formatRatio(currentTopAccountRatio) : '--'"></span>
+                                    <span class="change-badge" :class="topAccountRatioChange >= 0 ? 'positive' : 'negative'" x-text="currentTopAccountRatio !== null && currentTopAccountRatio !== undefined ? formatChange(topAccountRatioChange) : '--'"></span>
+                                </div>
                             </div>
                         </div>
                         <div class="chart-controls">
@@ -245,18 +237,10 @@
                         <div class="d-flex align-items-center gap-3">
                             <h5 class="mb-0">Top Positions Ratio & Distribution</h5>
                             <div class="chart-info">
-                                <template x-if="globalLoading || analyticsLoading">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="current-value skeleton skeleton-text" style="width: 120px; height: 22px;"></span>
-                                        <span class="change-badge skeleton skeleton-pill" style="width: 80px; height: 24px;"></span>
-                                    </div>
-                                </template>
-                                <!-- <template x-if="!globalLoading && !analyticsLoading">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="current-value" x-text="formatRatio(currentTopPositionRatio)"></span>
-                                        <span class="change-badge" :class="topPositionRatioChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(topPositionRatioChange)"></span>
-                                    </div>
-                                </template> -->
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="current-value" x-text="currentTopPositionRatio !== null && currentTopPositionRatio !== undefined ? formatRatio(currentTopPositionRatio) : '--'"></span>
+                                    <span class="change-badge" :class="topPositionRatioChange >= 0 ? 'positive' : 'negative'" x-text="currentTopPositionRatio !== null && currentTopPositionRatio !== undefined ? formatChange(topPositionRatioChange) : '--'"></span>
+                                </div>
                             </div>
                         </div>
                         <div class="chart-controls">
@@ -626,25 +610,42 @@
 @endsection
 
 @section('scripts')
-    <!-- Chart.js with Date Adapter and Plugins -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <!-- Chart.js with Date Adapter and Plugins - Load async for faster initial render -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" defer></script>
 
-    <!-- Wait for Chart.js to load -->
+    <!-- Initialize Chart.js ready promise immediately (non-blocking) -->
     <script>
+        // Create promise immediately (non-blocking)
         window.chartJsReady = new Promise((resolve) => {
+            // Check if Chart.js already loaded (from cache or previous load)
             if (typeof Chart !== 'undefined') {
-                console.log('✅ Chart.js loaded');
+                console.log('✅ Chart.js already loaded');
                 resolve();
-            } else {
-                setTimeout(() => resolve(), 100);
+                return;
             }
+            
+            // Wait for Chart.js to load (with fallback timeout)
+            let checkCount = 0;
+            const checkInterval = setInterval(() => {
+                checkCount++;
+                if (typeof Chart !== 'undefined') {
+                    console.log('✅ Chart.js loaded (after', checkCount * 50, 'ms)');
+                    clearInterval(checkInterval);
+                    resolve();
+                } else if (checkCount > 40) {
+                    // Timeout after 2 seconds - resolve anyway
+                    console.warn('⚠️ Chart.js load timeout, resolving anyway');
+                    clearInterval(checkInterval);
+                    resolve();
+                }
+            }, 50);
         });
     </script>
 
-    <!-- Long/Short Ratio Controller (Modular) -->
-    <script type="module" src="{{ asset('js/long-short-ratio-controller.js') }}"></script>
+    <!-- Long/Short Ratio Controller - Load with defer for non-blocking -->
+    <script type="module" src="{{ asset('js/long-short-ratio-controller.js') }}" defer></script>
     
     <!-- Open Interest Internal API Handler -->
     <script src="{{ asset('js/open-interest-internal-api.js') }}"></script>

@@ -15,6 +15,7 @@ export function createOpenInterestController() {
         // Loading states
         globalLoading: false, // Start false - will show skeleton only if no cache
         analyticsLoading: false,
+        isLoading: false, // Flag to prevent multiple simultaneous loads
         errorCount: 0,
         maxErrors: 3,
 
@@ -79,7 +80,7 @@ export function createOpenInterestController() {
             this.initialized = true;
             console.log('🚀 Open Interest Dashboard initialized');
 
-            // Initialize services
+            // Initialize services IMMEDIATELY (non-blocking)
             this.apiService = new OpenInterestAPIService();
             this.chartManager = new ChartManager('openInterestMainChart');
 
@@ -91,11 +92,15 @@ export function createOpenInterestController() {
             const cacheLoaded = this.loadFromCache();
             if (cacheLoaded) {
                 console.log('✅ Cache data loaded instantly - showing cached data');
-                // Render chart immediately with cached data
+                // Render chart immediately with cached data (don't wait Chart.js)
+                // Chart will render when Chart.js is ready
                 if (this.chartManager && this.historyData.length > 0) {
-                    setTimeout(() => {
-                        this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
-                    }, 50);
+                    // Wait for Chart.js to be ready (but don't block other operations)
+                    (window.chartJsReady || Promise.resolve()).then(() => {
+                        setTimeout(() => {
+                            this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
+                        }, 10);
+                    });
                 }
                 // globalLoading already false from loadFromCache (no skeleton shown)
                 
@@ -109,12 +114,19 @@ export function createOpenInterestController() {
                 console.log('⚠️ No cache available - loading data with optimistic UI (no skeleton)');
                 // Don't set globalLoading = true - show layout immediately with placeholder values
                 // Data will appear seamlessly after fetch completes
-                this.loadData(true).catch(err => {
+                
+                // IMPORTANT: Start fetch IMMEDIATELY (don't wait for Chart.js)
+                // This makes hard refresh faster - API fetch starts ASAP
+                const fetchPromise = this.loadData(false).catch(err => {
                     console.warn('⚠️ Initial load failed:', err);
                 });
+                
+                // Wait for fetch to complete before starting auto-refresh
+                // But don't block on Chart.js - chart will render when ready
+                await fetchPromise;
             }
 
-            // Start auto-refresh
+            // Start auto-refresh ONLY after initial load completes
             this.startAutoRefresh();
 
             // Setup cleanup listeners
@@ -217,21 +229,26 @@ export function createOpenInterestController() {
          * @param {boolean} isAutoRefresh - If true, don't show loading skeleton
          */
         async loadData(isAutoRefresh = false) {
-            // Guard: Skip if already loading
-            if (this.globalLoading && this.historyData.length > 0) {
+            // Guard: Skip if already loading (prevent race condition)
+            if (this.isLoading) {
                 console.log('⏭️ Skip load (already loading)');
                 return;
             }
 
-            // Cancel previous requests
-            if (this.apiService) {
-                this.apiService.cancelAllRequests();
-            }
+            // Set loading flag to prevent multiple simultaneous loads
+            this.isLoading = true;
 
             // Only show loading skeleton on initial load (hard refresh)
             // Auto-refresh should be silent (no skeleton) since data already exists
             const isInitialLoad = this.historyData.length === 0;
             const shouldShowLoading = isInitialLoad && !isAutoRefresh;
+
+            // IMPORTANT: Don't cancel previous requests on initial load
+            // Initial load needs to complete, and auto-refresh will skip if isLoading = true
+            // Only cancel on subsequent loads (auto-refresh) to prevent stale data
+            if (this.apiService && !isInitialLoad) {
+                this.apiService.cancelAllRequests();
+            }
             
             if (shouldShowLoading) {
                 this.globalLoading = true; // Show skeleton only on first load
@@ -248,26 +265,39 @@ export function createOpenInterestController() {
 
             try {
                 const dateRange = this.getDateRange();
-                const limit = OpenInterestUtils.calculateLimit(
+                const calculatedLimit = OpenInterestUtils.calculateLimit(
                     this.timeRanges.find(r => r.value === this.globalPeriod)?.days || 1,
                     this.selectedInterval
                 );
+
+                // For initial load, use ULTRA small limit (100) for INSTANT response
+                // Then load full data in background after first render
+                // This provides instant feedback to user - chart appears in <500ms
+                const limit = isInitialLoad ? Math.min(100, calculatedLimit) : calculatedLimit;
+                
+                // Skip price overlay on initial load for faster response
+                // Price data can be loaded in background after chart renders
+                const withPrice = isInitialLoad ? false : true;
 
                 console.log('📡 Loading Open Interest data...', {
                     symbol: this.selectedSymbol,
                     exchange: this.selectedExchange,
                     interval: this.selectedInterval,
                     period: this.globalPeriod,
-                    limit: limit
+                    limit: limit,
+                    withPrice: withPrice,
+                    isInitialLoad: isInitialLoad,
+                    calculatedLimit: calculatedLimit
                 });
 
                 // OPTIMISTIC LOADING: Fetch history first (main data)
+                // Use ultra small limit + skip price for instant feedback
                 const historyData = await this.apiService.fetchHistory({
                     symbol: this.selectedSymbol,
                     exchange: this.selectedExchange,
                     interval: this.selectedInterval,
                     limit: limit,
-                    with_price: true
+                    with_price: withPrice
                 });
 
                 // Handle cancelled requests
@@ -303,45 +333,157 @@ export function createOpenInterestController() {
                 // Update current values from history (immediate)
                 this.updateCurrentValues();
 
-                // Fetch analytics in background (non-blocking, fire-and-forget)
-                // This will update: trend, volatilityLevel, minOI, maxOI
-                // Pass isAutoRefresh to prevent skeleton during auto-refresh
-                this.fetchAnalyticsData(isAutoRefresh).then(() => {
-                    // Save to cache after analytics loaded
-                    this.saveToCache();
-                }).catch(err => {
-                    console.warn('⚠️ Analytics fetch failed (will use defaults):', err);
-                    // Set defaults if analytics fails
-                    this.trend = 'stable';
-                    this.volatilityLevel = 'moderate';
-                    // Save cache even if analytics failed
-                    this.saveToCache();
-                });
-
-                // Render chart immediately (no delay needed for first load)
-                // Delay only needed for updates when chart already exists
+                // Render chart IMMEDIATELY (before analytics fetch for faster perceived performance)
+                // Chart is the most important visual element - show it ASAP
+                // Don't wait for Chart.js - it will render when ready (non-blocking)
                 const chartRenderStart = Date.now();
-                try {
-                    if (this.chartManager && this.historyData.length > 0) {
-                        this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
-                        const chartRenderTime = Date.now() - chartRenderStart;
-                        console.log('⏱️ Chart render time:', chartRenderTime + 'ms');
-                    }
-                } catch (error) {
-                    console.error('❌ Error rendering chart:', error);
-                    // Fallback: try with small delay if immediate render fails
-                    setTimeout(() => {
+                const renderChart = () => {
+                    try {
                         if (this.chartManager && this.historyData.length > 0) {
                             this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
+                            const chartRenderTime = Date.now() - chartRenderStart;
+                            console.log('⏱️ Chart render time:', chartRenderTime + 'ms');
                         }
-                    }, 50);
+                    } catch (error) {
+                        console.error('❌ Error rendering chart:', error);
+                        // Fallback: try with small delay if immediate render fails
+                        setTimeout(() => {
+                            if (this.chartManager && this.historyData.length > 0) {
+                                this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
+                            }
+                        }, 50);
+                    }
+                };
+
+                // Try immediate render (Chart.js might already be loaded)
+                if (typeof Chart !== 'undefined') {
+                    renderChart();
+                } else {
+                    // Chart.js not ready yet - wait for it (non-blocking)
+                    (window.chartJsReady || Promise.resolve()).then(() => {
+                        renderChart();
+                    }).catch(() => {
+                        // Fallback if Chart.js fails to load
+                        console.warn('⚠️ Chart.js not available, will retry later');
+                        setTimeout(renderChart, 100);
+                    });
+                }
+
+                // Fetch analytics AFTER chart render (non-blocking, fire-and-forget)
+                // This allows chart to appear instantly, analytics updates summary cards later
+                // Pass isAutoRefresh to prevent skeleton during auto-refresh
+                // Skip analytics on initial load for even faster performance - load it in background
+                if (!isInitialLoad || !isAutoRefresh) {
+                    this.fetchAnalyticsData(isAutoRefresh).then(() => {
+                        // Save to cache after analytics loaded
+                        this.saveToCache();
+                    }).catch(err => {
+                        console.warn('⚠️ Analytics fetch failed (will use defaults):', err);
+                        // Set defaults if analytics fails
+                        this.trend = 'stable';
+                        this.volatilityLevel = 'moderate';
+                        // Save cache even if analytics failed
+                        this.saveToCache();
+                    });
+                } else {
+                    // Initial load: load analytics in background after chart render
+                    // This provides instant chart, analytics updates later
+                    setTimeout(() => {
+                        this.fetchAnalyticsData(true).then(() => {
+                            this.saveToCache();
+                        }).catch(err => {
+                            console.warn('⚠️ Background analytics fetch failed:', err);
+                            this.trend = 'stable';
+                            this.volatilityLevel = 'moderate';
+                            this.saveToCache();
+                        });
+                    }, 100); // Small delay to let chart render first
                 }
 
                 // Log total load time
                 const totalLoadTime = Date.now() - loadStartTime;
                 console.log('⏱️ Total loadData() time:', totalLoadTime + 'ms');
 
+                // If this was initial load with reduced limit, load full data in background
+                // Start immediately (no delay) for faster full data load
+                if (isInitialLoad && limit < calculatedLimit && this.historyData.length > 0) {
+                    console.log('🔄 Initial load complete, loading full dataset in background...', {
+                        currentLimit: limit,
+                        fullLimit: calculatedLimit
+                    });
+                    
+                    // Capture dateRange for use in async function
+                    const capturedDateRange = dateRange;
+                    
+                    // Load full data in background IMMEDIATELY (no delay)
+                    // Reset isLoading flag first so auto-refresh can work
+                    this.isLoading = false;
+                    
+                    // Start full data load immediately (non-blocking)
+                    // Use requestIdleCallback for better performance (falls back to setTimeout)
+                    const scheduleFullDataLoad = (callback) => {
+                        if (window.requestIdleCallback) {
+                            window.requestIdleCallback(callback, { timeout: 50 });
+                        } else {
+                            setTimeout(callback, 0); // Start immediately
+                        }
+                    };
+
+                    scheduleFullDataLoad(async () => {
+                        try {
+                            const fullHistoryData = await this.apiService.fetchHistory({
+                                symbol: this.selectedSymbol,
+                                exchange: this.selectedExchange,
+                                interval: this.selectedInterval,
+                                limit: calculatedLimit,
+                                with_price: true
+                            });
+
+                            if (fullHistoryData && fullHistoryData.length > 0) {
+                                // Apply client-side date range filtering
+                                let filteredData = fullHistoryData;
+                                if (this.globalPeriod !== 'all') {
+                                    filteredData = this.apiService.filterByDateRange(
+                                        fullHistoryData,
+                                        capturedDateRange.startDate,
+                                        capturedDateRange.endDate
+                                    );
+                                }
+
+                                // Update with full dataset
+                                this.historyData = filteredData;
+                                this.priceData = filteredData.map(d => ({ ts: d.ts, price: d.price }));
+                                this.updateCurrentValues();
+
+                                // Update chart with full data (smooth update)
+                                if (this.chartManager) {
+                                    this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
+                                }
+
+                                // Save updated cache
+                                this.saveToCache();
+
+                                console.log('✅ Full dataset loaded and chart updated:', {
+                                    records: this.historyData.length,
+                                    previousRecords: limit
+                                });
+                            }
+                        } catch (err) {
+                            console.warn('⚠️ Background full data load failed (using initial data):', err);
+                        }
+                    });
+                } else {
+                    // Normal load complete, reset isLoading flag
+                    this.isLoading = false;
+                }
+
             } catch (error) {
+                // Handle AbortError gracefully (don't log as error)
+                if (error.name === 'AbortError') {
+                    console.log('⏭️ Request was cancelled (expected during auto-refresh)');
+                    return; // Exit early, don't increment error count
+                }
+
                 console.error('❌ Error loading data:', error);
                 this.errorCount++;
 
@@ -350,6 +492,9 @@ export function createOpenInterestController() {
                     this.stopAutoRefresh();
                 }
             } finally {
+                // Always reset loading flag
+                this.isLoading = false;
+
                 // Hide skeleton only if it was shown (initial load)
                 // Auto-refresh doesn't show skeleton, so don't set it here
                 if (shouldShowLoading) {
@@ -484,7 +629,8 @@ export function createOpenInterestController() {
             this.refreshInterval = setInterval(() => {
                 // Safety checks
                 if (document.hidden) return; // Don't refresh hidden tabs
-                if (this.globalLoading) return; // Skip if loading
+                if (this.globalLoading) return; // Skip if showing skeleton
+                if (this.isLoading) return; // Skip if already loading (prevent race condition)
                 if (this.errorCount >= this.maxErrors) {
                     console.error('❌ Too many errors, stopping auto refresh');
                     this.stopAutoRefresh();
@@ -493,7 +639,12 @@ export function createOpenInterestController() {
 
                 console.log('🔄 Auto-refresh triggered');
                 // Pass isAutoRefresh=true to prevent loading skeleton during auto-refresh
-                this.loadData(true); // Silent update - no skeleton shown
+                this.loadData(true).catch(err => {
+                    // Handle errors gracefully (AbortError expected during rapid refreshes)
+                    if (err.name !== 'AbortError') {
+                        console.warn('⚠️ Auto-refresh error:', err);
+                    }
+                }); // Silent update - no skeleton shown
 
                 // Also refresh analytics independently (non-blocking)
                 // Pass isAutoRefresh=true to prevent analytics skeleton during auto-refresh

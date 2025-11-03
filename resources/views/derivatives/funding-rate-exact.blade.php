@@ -2,6 +2,21 @@
 
 @section('title', 'Funding Rate | DragonFortune')
 
+@push('head')
+    <!-- Resource Hints for Faster API Loading (Critical for Hard Refresh) -->
+    <link rel="dns-prefetch" href="{{ config('app.api_urls.internal') }}">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="{{ config('app.api_urls.internal') }}" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    
+    <!-- Preload critical resources for faster initial load -->
+    <link rel="preload" href="{{ asset('js/funding-rate-exact-controller.js') }}" as="script" type="module">
+    
+    <!-- Prefetch API endpoints (will fetch in background during hard refresh) -->
+    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/funding-rate/history?symbol=BTCUSDT&exchange=Binance&interval=1h&limit=100" as="fetch" crossorigin="anonymous">
+    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/funding-rate/analytics?symbol=BTCUSDT&exchange=Binance&interval=1h&limit=100" as="fetch" crossorigin="anonymous">
+@endpush
+
 @section('content')
     {{--
         Bitcoin: Funding Rate Dashboard
@@ -21,7 +36,8 @@
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <h1 class="mb-0">Funding Rate</h1>
-                        <span class="pulse-dot pulse-success"></span>
+                        <span class="pulse-dot pulse-success" x-show="rawData.length > 0"></span>
+                        <span class="spinner-border spinner-border-sm text-primary" style="width: 16px; height: 16px;" x-show="rawData.length === 0" x-cloak></span>
                     </div>
                     <p class="mb-0 text-secondary">
                         Pantau funding rate dari kontrak perpetual (perpetual futures) untuk melihat arah sentimen pasar dan mengidentifikasi potensi pembalikan tren.
@@ -51,10 +67,6 @@
                         <option value="8h">8 Hours</option>
                     </select>
 
-                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading" x-show="false">
-                        <span x-show="!globalLoading">🔄 Refresh</span>
-                        <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
-                    </button>
                 </div>
             </div>
         </div>
@@ -66,18 +78,12 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Current Rate</span>
-                        <span class="badge text-bg-primary">Latest</span>
+                        <span class="badge text-bg-primary" x-show="currentFundingRate !== null && currentFundingRate !== undefined">Latest</span>
+                        <span class="badge text-bg-secondary" x-show="currentFundingRate === null || currentFundingRate === undefined">Loading...</span>
                     </div>
-                    <template x-if="globalLoading">
-                        <div>
-                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 70%; height: 28px;"></div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div>
-                            <div class="h3 mb-1" x-text="formatFundingRate(currentFundingRate)"></div>
-                        </div>
-                    </template>
+                    <div>
+                        <div class="h3 mb-1" x-text="currentFundingRate !== null && currentFundingRate !== undefined ? formatFundingRate(currentFundingRate) : '--'"></div>
+                    </div>
                 </div>
             </div>
 
@@ -86,18 +92,12 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Period Avg</span>
-                        <span class="badge text-bg-info">Avg</span>
+                        <span class="badge text-bg-info" x-show="avgFundingRate !== null && avgFundingRate !== undefined">Avg</span>
+                        <span class="badge text-bg-secondary" x-show="avgFundingRate === null || avgFundingRate === undefined">Loading...</span>
                     </div>
-                    <template x-if="globalLoading">
-                        <div>
-                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div>
-                            <div class="h3 mb-1" x-text="formatFundingRate(avgFundingRate)"></div>
-                        </div>
-                    </template>
+                    <div>
+                        <div class="h3 mb-1" x-text="avgFundingRate !== null && avgFundingRate !== undefined ? formatFundingRate(avgFundingRate) : '--'"></div>
+                    </div>
                 </div>
             </div>
 
@@ -106,20 +106,13 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Peak Rate</span>
-                        <span class="badge text-bg-danger">Max</span>
+                        <span class="badge text-bg-danger" x-show="maxFundingRate !== null && maxFundingRate !== undefined">Max</span>
+                        <span class="badge text-bg-secondary" x-show="maxFundingRate === null || maxFundingRate === undefined">Loading...</span>
                     </div>
-                    <template x-if="globalLoading">
-                        <div>
-                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
-                            <div class="small text-secondary skeleton skeleton-text" style="width: 80px; height: 16px;"></div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div>
-                            <div class="h3 mb-1 text-danger" x-text="formatFundingRate(maxFundingRate)"></div>
-                            <div class="small text-secondary" x-text="peakDate"></div>
-                        </div>
-                    </template>
+                    <div>
+                        <div class="h3 mb-1 text-danger" x-text="maxFundingRate !== null && maxFundingRate !== undefined ? formatFundingRate(maxFundingRate) : '--'"></div>
+                        <div class="small text-secondary" x-text="peakDate || '--'"></div>
+                    </div>
                 </div>
             </div>
 
@@ -128,18 +121,12 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Volatility</span>
-                        <span class="badge text-bg-warning">Vol</span>
+                        <span class="badge text-bg-warning" x-show="fundingVolatility !== null && fundingVolatility !== undefined">Vol</span>
+                        <span class="badge text-bg-secondary" x-show="fundingVolatility === null || fundingVolatility === undefined">Loading...</span>
                     </div>
-                    <template x-if="globalLoading">
-                        <div>
-                            <div class="h3 mb-2 skeleton skeleton-text" style="width: 65%; height: 28px;"></div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div>
-                            <div class="h3 mb-1" x-text="fundingVolatility !== null && fundingVolatility !== undefined ? formatFundingRate(fundingVolatility) : '--'"></div>
-                        </div>
-                    </template>
+                    <div>
+                        <div class="h3 mb-1" x-text="fundingVolatility !== null && fundingVolatility !== undefined ? formatFundingRate(fundingVolatility) : '--'"></div>
+                    </div>
                 </div>
             </div>
 
@@ -148,25 +135,13 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Market Signal</span>
-                        <template x-if="globalLoading">
-                            <span class="badge skeleton skeleton-badge" style="width: 80px; height: 22px;"></span>
-                        </template>
-                        <template x-if="!globalLoading">
-                            <span class="badge" :class="getSignalBadgeClass()" x-text="signalStrength"></span>
-                        </template>
+                        <span class="badge" :class="getSignalBadgeClass()" x-show="marketSignal !== null && marketSignal !== undefined && marketSignal !== 'Neutral'" x-text="signalStrength"></span>
+                        <span class="badge text-bg-secondary" x-show="marketSignal === null || marketSignal === undefined || marketSignal === 'Neutral'">Loading...</span>
                     </div>
-                    <template x-if="globalLoading">
-                        <div>
-                            <div class="h4 mb-2 skeleton skeleton-text" style="width: 60%; height: 22px;"></div>
-                            <div class="small text-secondary skeleton skeleton-text" style="width: 90%; height: 16px;"></div>
-                        </div>
-                    </template>
-                    <template x-if="!globalLoading">
-                        <div>
-                            <div class="h4 mb-1" :class="getSignalColorClass()" x-text="marketSignal"></div>
-                            <div class="small text-secondary" x-text="signalDescription"></div>
-                        </div>
-                    </template>
+                    <div>
+                        <div class="h4 mb-1" :class="getSignalColorClass()" x-text="marketSignal !== null && marketSignal !== undefined ? marketSignal : '--'"></div>
+                        <div class="small text-secondary" x-text="signalDescription || 'Loading market signal...'"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -179,18 +154,10 @@
                         <div class="d-flex align-items-center gap-3">
                             <h5 class="mb-0">Funding Rate</h5>
                             <div class="chart-info">
-                                <template x-if="globalLoading">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="current-value skeleton skeleton-text" style="width: 120px; height: 22px;"></span>
-                                        <span class="change-badge skeleton skeleton-pill" style="width: 80px; height: 24px;"></span>
-                                    </div>
-                                </template>
-                                <template x-if="!globalLoading">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="current-value" x-text="formatFundingRate(currentFundingRate)"></span>
-                                        <!-- <span class="change-badge" :class="fundingChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(fundingChange)"></span> -->
-                                    </div>
-                                </template>
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="current-value" x-text="currentFundingRate !== null && currentFundingRate !== undefined ? formatFundingRate(currentFundingRate) : '--'"></span>
+                                    <!-- <span class="change-badge" :class="fundingChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(fundingChange)"></span> -->
+                                </div>
                             </div>
                         </div>
                         <div class="chart-controls">
@@ -521,25 +488,42 @@
 @endsection
 
 @section('scripts')
-    <!-- Chart.js with Date Adapter and Plugins -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <!-- Chart.js with Date Adapter and Plugins - Load async for faster initial render -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" defer></script>
 
-    <!-- Wait for Chart.js to load -->
+    <!-- Initialize Chart.js ready promise immediately (non-blocking) -->
     <script>
+        // Create promise immediately (non-blocking)
         window.chartJsReady = new Promise((resolve) => {
+            // Check if Chart.js already loaded (from cache or previous load)
             if (typeof Chart !== 'undefined') {
-                console.log('✅ Chart.js loaded');
+                console.log('✅ Chart.js already loaded');
                 resolve();
-            } else {
-                setTimeout(() => resolve(), 100);
+                return;
             }
+            
+            // Wait for Chart.js to load (with fallback timeout)
+            let checkCount = 0;
+            const checkInterval = setInterval(() => {
+                checkCount++;
+                if (typeof Chart !== 'undefined') {
+                    console.log('✅ Chart.js loaded (after', checkCount * 50, 'ms)');
+                    clearInterval(checkInterval);
+                    resolve();
+                } else if (checkCount > 40) {
+                    // Timeout after 2 seconds - resolve anyway
+                    console.warn('⚠️ Chart.js load timeout, resolving anyway');
+                    clearInterval(checkInterval);
+                    resolve();
+                }
+            }, 50);
         });
     </script>
 
-    <!-- Funding Rate Controller (Modular ES6) -->
-    <script type="module" src="{{ asset('js/funding-rate-exact-controller.js') }}"></script>
+    <!-- Funding Rate Controller - Load with defer for non-blocking -->
+    <script type="module" src="{{ asset('js/funding-rate-exact-controller.js') }}" defer></script>
 
     <style>
         /* Skeleton placeholders */
