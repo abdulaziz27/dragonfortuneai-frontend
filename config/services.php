@@ -42,7 +42,8 @@ return [
 
     // Spot microstructure API base URL (CoinGlass integration)
     'spot_microstructure' => [
-        'base_url' => env('SPOT_MICROSTRUCTURE_API_URL', 'http://localhost:8000'),
+        // Fallback to the primary API base when a dedicated URL is not provided
+        'base_url' => env('SPOT_MICROSTRUCTURE_API_URL', env('API_BASE_URL', 'https://test.dragonfortune.ai')),
     ],
 
 ];
