@@ -48,13 +48,16 @@ export function createOpenInterestController() {
         chartType: 'line',
 
         // Available options
-        symbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'],
-        exchanges: ['Binance', 'Bybit'],
+        symbols: ['BTCUSDT'],
+        exchanges: ['OKX','Binance','HTX','Bitmex','Bitfinex','Bybit','Deribit','Gate','Kraken','KuCoin','CME','Bitget','dYdX','CoinEx','BingX','Coinbase','Gemini','Crypto.com','Hyperliquid','Bitunix','MEXC','WhiteBIT','Aster','Lighter','EdgeX','Drift','Paradex','Extended','ApeX Omni'],
         intervals: [
             { label: '1 Minute', value: '1m' },
             { label: '5 Minutes', value: '5m' },
             { label: '15 Minutes', value: '15m' },
-            { label: '1 Hour', value: '1h' }
+            { label: '1 Hour', value: '1h' },
+            { label: '4 Hours', value: '4h' },
+            { label: '8 Hours', value: '8h' },
+            { label: '1 Week', value: '1w' }
         ],
         timeRanges: [
             { label: '1D', value: '1d', days: 1 },
@@ -144,7 +147,7 @@ export function createOpenInterestController() {
          * Get cache key based on current filters
          */
         getCacheKey() {
-            return `oi_dashboard_${this.selectedSymbol}_${this.selectedExchange}_${this.selectedInterval}_${this.globalPeriod}`;
+            return `oi_dashboard_v2_${this.selectedSymbol}_${this.selectedExchange}_${this.selectedInterval}_${this.globalPeriod}`;
         },
 
         /**
@@ -275,9 +278,8 @@ export function createOpenInterestController() {
                 // This provides instant feedback to user - chart appears in <500ms
                 const limit = isInitialLoad ? Math.min(100, calculatedLimit) : calculatedLimit;
                 
-                // Skip price overlay on initial load for faster response
-                // Price data can be loaded in background after chart renders
-                const withPrice = isInitialLoad ? false : true;
+                // Per new API spec, always include price overlay
+                const withPrice = true;
 
                 console.log('📡 Loading Open Interest data...', {
                     symbol: this.selectedSymbol,
@@ -306,18 +308,52 @@ export function createOpenInterestController() {
                     return;
                 }
 
-                // Apply client-side date range filtering
+                // Apply client-side date range filtering (anchor to latest data if backend window is stale)
                 const filterStartTime = Date.now();
                 let filteredData = historyData;
-                if (this.globalPeriod !== 'all') {
-                    filteredData = this.apiService.filterByDateRange(
-                        historyData,
-                        dateRange.startDate,
-                        dateRange.endDate
-                    );
+                if (Array.isArray(historyData) && historyData.length > 0) {
+                    const latestTs = historyData[historyData.length - 1].ts;
+                    if (this.globalPeriod !== 'all') {
+                        const days = this.timeRanges.find(r => r.value === this.globalPeriod)?.days || 1;
+                        const desiredEndTs = Math.max(dateRange.endDate.getTime(), latestTs);
+                        const desiredStartTs = desiredEndTs - (days * 24 * 60 * 60 * 1000);
+                        filteredData = this.apiService.filterByDateRange(
+                            historyData,
+                            new Date(desiredStartTs),
+                            new Date(desiredEndTs)
+                        );
+                    }
                 }
                 const filterTime = Date.now() - filterStartTime;
                 console.log('⏱️ Client-side filter time:', filterTime + 'ms');
+
+                // Coverage check: ensure we cover desired days; if not, re-fetch with larger limit (silent)
+                if (Array.isArray(filteredData) && filteredData.length > 0 && this.globalPeriod !== 'all') {
+                    const haveSpanMs = filteredData[filteredData.length - 1].ts - filteredData[0].ts;
+                    const wantDays = this.timeRanges.find(r => r.value === this.globalPeriod)?.days || 1;
+                    const wantMs = wantDays * 24 * 60 * 60 * 1000;
+                    if (haveSpanMs + 1 < wantMs * 0.95 && limit < 20000) {
+                        const upscaleLimit = Math.min(20000, Math.ceil(calculatedLimit * 1.5));
+                        console.log('🔁 Coverage insufficient, refetching with larger limit:', upscaleLimit);
+                        const retryData = await this.apiService.fetchHistory({
+                            symbol: this.selectedSymbol,
+                            exchange: this.selectedExchange,
+                            interval: this.selectedInterval,
+                            limit: upscaleLimit,
+                            with_price: true
+                        });
+                        if (Array.isArray(retryData) && retryData.length > 0) {
+                            const latestTs2 = retryData[retryData.length - 1].ts;
+                            const desiredEndTs2 = Math.max(dateRange.endDate.getTime(), latestTs2);
+                            const desiredStartTs2 = desiredEndTs2 - wantMs;
+                            filteredData = this.apiService.filterByDateRange(
+                                retryData,
+                                new Date(desiredStartTs2),
+                                new Date(desiredEndTs2)
+                            );
+                        }
+                    }
+                }
 
                 // Transform price data (optimized)
                 const transformStartTime = Date.now();
@@ -440,17 +476,32 @@ export function createOpenInterestController() {
                             });
 
                             if (fullHistoryData && fullHistoryData.length > 0) {
-                                // Apply client-side date range filtering
-                                let filteredData = fullHistoryData;
+                                // Merge with current data to preserve newer points if backend returned older window
+                                const currentLatest = this.historyData[this.historyData.length - 1]?.ts || 0;
+                                const fullLatest = fullHistoryData[fullHistoryData.length - 1]?.ts || 0;
+                                let merged = fullHistoryData;
+                                if (fullLatest < currentLatest) {
+                                    const map = new Map();
+                                    for (const d of fullHistoryData) map.set(d.ts, d);
+                                    for (const d of this.historyData) map.set(d.ts, d);
+                                    merged = Array.from(map.values()).sort((a,b) => a.ts - b.ts);
+                                }
+
+                                // Apply client-side date range filtering (anchor to latest available)
+                                let filteredData = merged;
                                 if (this.globalPeriod !== 'all') {
+                                    const days = this.timeRanges.find(r => r.value === this.globalPeriod)?.days || 1;
+                                    const latestTs = merged[merged.length - 1].ts;
+                                    const desiredEndTs = Math.max(capturedDateRange.endDate.getTime(), latestTs);
+                                    const desiredStartTs = desiredEndTs - (days * 24 * 60 * 60 * 1000);
                                     filteredData = this.apiService.filterByDateRange(
-                                        fullHistoryData,
-                                        capturedDateRange.startDate,
-                                        capturedDateRange.endDate
+                                        merged,
+                                        new Date(desiredStartTs),
+                                        new Date(desiredEndTs)
                                     );
                                 }
 
-                                // Update with full dataset
+                                // Update with full dataset (filtered)
                                 this.historyData = filteredData;
                                 this.priceData = filteredData.map(d => ({ ts: d.ts, price: d.price }));
                                 this.updateCurrentValues();
@@ -691,11 +742,17 @@ export function createOpenInterestController() {
             
             if (cacheLoaded) {
                 console.log('✅ Cache loaded for new filter - showing cached data');
-                // Render chart immediately with cached data
-                if (this.chartManager && this.historyData.length > 0) {
+                // Re-filter cached data to the new date range before render (instant visual)
+                const { startDate, endDate } = this.getDateRange();
+                let filtered = this.historyData;
+                if (this.globalPeriod !== 'all' && Array.isArray(filtered) && filtered.length > 0) {
+                    filtered = this.apiService.filterByDateRange(filtered, startDate, endDate);
+                }
+                if (this.chartManager && filtered.length > 0) {
                     setTimeout(() => {
-                        this.chartManager.renderChart(this.historyData, this.priceData, this.chartType);
-                    }, 50);
+                        const filteredPrice = filtered.map(d => ({ ts: d.ts, price: d.price }));
+                        this.chartManager.renderChart(filtered, filteredPrice, this.chartType);
+                    }, 10);
                 }
                 // Fetch fresh data in background (no skeleton)
                 this.loadData(true).catch(err => {
@@ -718,22 +775,28 @@ export function createOpenInterestController() {
         },
 
         updateSymbol(symbol) {
-            if (this.selectedSymbol === symbol) return;
-            this.selectedSymbol = symbol;
+            const allowed = new Set(['BTCUSDT']);
+            const finalSymbol = allowed.has(symbol) ? symbol : 'BTCUSDT';
+            if (this.selectedSymbol === finalSymbol) return;
+            this.selectedSymbol = finalSymbol;
             console.log('💱 Symbol changed:', symbol);
             this.handleFilterChange();
         },
 
         updateExchange(exchange) {
-            if (this.selectedExchange === exchange) return;
-            this.selectedExchange = exchange;
+            const allowed = new Set(['OKX','Binance','HTX','Bitmex','Bitfinex','Bybit','Deribit','Gate','Kraken','KuCoin','CME','Bitget','dYdX','CoinEx','BingX','Coinbase','Gemini','Crypto.com','Hyperliquid','Bitunix','MEXC','WhiteBIT','Aster','Lighter','EdgeX','Drift','Paradex','Extended','ApeX Omni']);
+            const finalExchange = allowed.has(exchange) ? exchange : 'Binance';
+            if (this.selectedExchange === finalExchange) return;
+            this.selectedExchange = finalExchange;
             console.log('🏦 Exchange changed:', exchange);
             this.handleFilterChange();
         },
 
         updateInterval(interval) {
-            if (this.selectedInterval === interval) return;
-            this.selectedInterval = interval;
+            const allowed = new Set(['1m','5m','15m','1h','4h','8h','1w']);
+            const finalInterval = allowed.has(interval) ? interval : '5m';
+            if (this.selectedInterval === finalInterval) return;
+            this.selectedInterval = finalInterval;
             console.log('⏱️ Interval changed:', interval);
             this.handleFilterChange();
         },

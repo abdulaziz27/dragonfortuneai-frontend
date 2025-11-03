@@ -165,12 +165,12 @@ export class FundingRateAPIService {
         // Backend uses margin_type field (e.g., "1m", "1h", "8h") which should match interval
         const intervalMap = {
             '1m': '1m',
+            '5m': '5m',
+            '15m': '15m',
             '1h': '1h',
-            '8h': '8h'
-            // Commented for future use:
-            // '4h': '4h',
-            // '1d': '1d',
-            // '1w': '1w'
+            '4h': '4h',
+            '8h': '8h',
+            '1w': '1w'
         };
         
         const targetMarginType = intervalMap[interval.toLowerCase()] || interval.toLowerCase();

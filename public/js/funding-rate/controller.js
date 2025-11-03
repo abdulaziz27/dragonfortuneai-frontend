@@ -21,16 +21,20 @@ export function createFundingRateController() {
         globalLoading: false, // Start false - optimistic UI (no skeleton)
         isLoading: false, // Flag to prevent multiple simultaneous loads
         selectedSymbol: 'BTCUSDT',
-        selectedExchange: 'binance',
+        selectedExchange: 'Binance',
         scaleType: 'linear',
         
         // Chart intervals
         chartIntervals: [
-            // { label: '1M', value: '1m' },
+            { label: '1m', value: '1m' },
+            { label: '5m', value: '5m' },
+            { label: '15m', value: '15m' },
             { label: '1H', value: '1h' },
-            { label: '8H', value: '8h' }
+            { label: '4H', value: '4h' },
+            { label: '8H', value: '8h' },
+            { label: '1W', value: '1w' }
         ],
-        selectedInterval: '1h',
+        selectedInterval: '8h',
         
         // Time ranges (initialized in init)
         timeRanges: [],
@@ -72,7 +76,7 @@ export function createFundingRateController() {
         // Market signal (from analytics API)
         marketSignal: 'Neutral',
         signalStrength: 'Normal',
-        signalDescription: 'Loading...',
+        signalDescription: '',
         analyticsData: null,
         analyticsLoading: false,
         
@@ -205,9 +209,9 @@ export function createFundingRateController() {
                     });
                 }
 
-                // Also refresh exchanges data independently
+                // Also refresh exchanges data independently (silent)
                 if (!this.exchangesLoading) {
-                    this.fetchExchangesData().catch(err => {
+                    this.fetchExchangesData(true).catch(err => {
                         console.warn('⚠️ Exchanges refresh failed:', err);
                     });
                 }
@@ -278,7 +282,7 @@ export function createFundingRateController() {
          */
         getCacheKey() {
             const exchange = FundingRateUtils.capitalizeExchange(this.selectedExchange);
-            return `fr_dashboard_${this.selectedSymbol}_${exchange}_${this.selectedInterval}_${this.globalPeriod}`;
+            return `fr_dashboard_v2_${this.selectedSymbol}_${exchange}_${this.selectedInterval}_${this.globalPeriod}`;
         },
         
         /**
@@ -505,7 +509,7 @@ export function createFundingRateController() {
                 }
 
                 // Fetch exchanges comparison data in parallel (non-blocking)
-                this.fetchExchangesData().catch(err => {
+                this.fetchExchangesData(isAutoRefresh).catch(err => {
                     console.warn('⚠️ Exchanges fetch failed:', err);
                 });
                 
@@ -857,13 +861,18 @@ export function createFundingRateController() {
         /**
          * Fetch exchanges comparison data
          */
-        async fetchExchangesData() {
+        async fetchExchangesData(isAutoRefresh = false) {
             if (this.exchangesLoading) {
                 console.log('⏭️ Skip exchanges fetch (already loading)');
                 return;
             }
 
-            this.exchangesLoading = true;
+            // Silent update: only show loading if initial and no data
+            if (!isAutoRefresh && this.exchangesData.length === 0) {
+                this.exchangesLoading = true;
+            } else {
+                this.exchangesLoading = false;
+            }
 
             try {
                 console.log('📡 Fetching exchanges comparison data...');
@@ -876,11 +885,15 @@ export function createFundingRateController() {
                     return;
                 }
 
-                // Map selectedInterval to margin_type format
+                // Map selectedInterval to margin_type format (support full set)
                 const intervalMap = {
                     '1m': '1m',
+                    '5m': '5m',
+                    '15m': '15m',
                     '1h': '1h',
-                    '8h': '8h'
+                    '4h': '4h',
+                    '8h': '8h',
+                    '1w': '1w'
                 };
                 const targetMarginType = intervalMap[this.selectedInterval] || this.selectedInterval;
 
@@ -921,7 +934,10 @@ export function createFundingRateController() {
                 console.error('❌ Error loading exchanges data:', error);
                 this.exchangesData = [];
             } finally {
-                this.exchangesLoading = false;
+                // Keep silent (don't flip loading on auto-refresh)
+                if (!isAutoRefresh) {
+                    this.exchangesLoading = false;
+                }
             }
         },
 
@@ -1204,6 +1220,10 @@ export function createFundingRateController() {
          * Update symbol
          */
         updateSymbol() {
+            // Enforce allowed symbol (BTCUSDT only)
+            if (this.selectedSymbol !== 'BTCUSDT') {
+                this.selectedSymbol = 'BTCUSDT';
+            }
             console.log('🔄 Updating symbol to:', this.selectedSymbol);
             this.loadData();
         },
@@ -1212,6 +1232,11 @@ export function createFundingRateController() {
          * Update exchange
          */
         updateExchange() {
+            // Normalize to supported exchanges list
+            const allowed = new Set(['OKX','Binance','HTX','Bitmex','Bitfinex','Bybit','Deribit','Gate','Kraken','KuCoin','CME','Bitget','dYdX','CoinEx','BingX','Coinbase','Gemini','Crypto.com','Hyperliquid','Bitunix','MEXC','WhiteBIT','Aster','Lighter','EdgeX','Drift','Paradex','Extended','ApeX Omni']);
+            if (!allowed.has(this.selectedExchange)) {
+                this.selectedExchange = 'Binance';
+            }
             console.log('🔄 Updating exchange to:', this.selectedExchange);
             this.loadData();
         },
@@ -1220,6 +1245,11 @@ export function createFundingRateController() {
          * Update interval
          */
         updateInterval() {
+            // Normalize to supported intervals
+            const allowed = new Set(['1m','5m','15m','1h','4h','8h','1w']);
+            if (!allowed.has(this.selectedInterval)) {
+                this.selectedInterval = '8h';
+            }
             console.log('🔄 Updating interval to:', this.selectedInterval);
             this.loadData();
         },

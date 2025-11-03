@@ -13,7 +13,7 @@
     <link rel="preload" href="{{ asset('js/open-interest-controller.js') }}" as="script" type="module">
     
     <!-- Prefetch API endpoints (will fetch in background during hard refresh) -->
-    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/open-interest/history?symbol=BTCUSDT&exchange=Binance&interval=5m&limit=100&with_price=false" as="fetch" crossorigin="anonymous">
+    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/open-interest/history?symbol=BTCUSDT&exchange=Binance&interval=5m&limit=100&with_price=true" as="fetch" crossorigin="anonymous">
     <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/open-interest/analytics?symbol=BTCUSDT&exchange=Binance&interval=5m&limit=100" as="fetch" crossorigin="anonymous">
 @endpush
 
@@ -53,15 +53,39 @@
                     <!-- Symbol Selector -->
                     <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="updateSymbol($event.target.value)">
                         <option value="BTCUSDT">BTC/USDT</option>
-                        <option value="ETHUSDT">ETH/USDT</option>
-                        <option value="SOLUSDT">SOL/USDT</option>
-                        <option value="BNBUSDT">BNB/USDT</option>
                     </select>
 
                     <!-- Exchange Selector -->
                     <select class="form-select" style="width: 160px;" x-model="selectedExchange" @change="updateExchange($event.target.value)">
+                        <option value="OKX">OKX</option>
                         <option value="Binance">Binance</option>
+                        <option value="HTX">HTX</option>
+                        <option value="Bitmex">Bitmex</option>
+                        <option value="Bitfinex">Bitfinex</option>
                         <option value="Bybit">Bybit</option>
+                        <option value="Deribit">Deribit</option>
+                        <option value="Gate">Gate</option>
+                        <option value="Kraken">Kraken</option>
+                        <option value="KuCoin">KuCoin</option>
+                        <option value="CME">CME</option>
+                        <option value="Bitget">Bitget</option>
+                        <option value="dYdX">dYdX</option>
+                        <option value="CoinEx">CoinEx</option>
+                        <option value="BingX">BingX</option>
+                        <option value="Coinbase">Coinbase</option>
+                        <option value="Gemini">Gemini</option>
+                        <option value="Crypto.com">Crypto.com</option>
+                        <option value="Hyperliquid">Hyperliquid</option>
+                        <option value="Bitunix">Bitunix</option>
+                        <option value="MEXC">MEXC</option>
+                        <option value="WhiteBIT">WhiteBIT</option>
+                        <option value="Aster">Aster</option>
+                        <option value="Lighter">Lighter</option>
+                        <option value="EdgeX">EdgeX</option>
+                        <option value="Drift">Drift</option>
+                        <option value="Paradex">Paradex</option>
+                        <option value="Extended">Extended</option>
+                        <option value="ApeX Omni">ApeX Omni</option>
                     </select>
 
                     <!-- Interval Selector -->
@@ -70,6 +94,9 @@
                         <option value="5m">5 Minutes</option>
                         <option value="15m">15 Minutes</option>
                         <option value="1h">1 Hour</option>
+                        <option value="4h">4 Hours</option>
+                        <option value="8h">8 Hours</option>
+                        <option value="1w">1 Week</option>
                     </select>
                 </div>
             </div>

@@ -34,8 +34,6 @@ export class ChartManager {
      * @param {string} chartType - 'line' or 'bar' (default: 'line')
      */
     renderChart(data, priceData = [], chartType = 'line') {
-        this.destroy();
-
         const canvas = document.getElementById(this.canvasId);
         if (!canvas) {
             console.warn('⚠️ Canvas element not found:', this.canvasId);
@@ -53,94 +51,46 @@ export class ChartManager {
             return;
         }
 
-        // Small delay to ensure destroy is complete
-        setTimeout(() => {
+        const sorted = [...data].sort((a, b) => a.ts - b.ts);
+        const labels = sorted.map(d => d.ts);
+        const oiValues = sorted.map(d => parseFloat(d.oi_usd || 0));
+        const priceValues = sorted.map(d => d.price ? parseFloat(d.price) : null);
+        const hasPrice = priceValues.some(p => p !== null);
+
+        // If chart exists and type matches, update in place (no flicker)
+        if (this.chart && this.chart.config && (this.chart.config.type === (chartType === 'bar' ? 'bar' : 'line'))) {
             try {
-                // Clear canvas
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                const sorted = [...data].sort((a, b) => a.ts - b.ts);
-                const labels = sorted.map(d => d.ts);
-                
-                // Open Interest data
-                const oiValues = sorted.map(d => parseFloat(d.oi_usd || 0));
-                
-                // Price data (from history with_price=true)
-                const priceValues = sorted.map(d => d.price ? parseFloat(d.price) : null);
-                const hasPrice = priceValues.some(p => p !== null);
-
-                console.log('📊 Rendering OI chart:', {
-                    chartType,
-                    dataPoints: oiValues.length,
-                    hasPrice,
-                    oiRange: [Math.min(...oiValues), Math.max(...oiValues)],
-                    priceRange: hasPrice ? [Math.min(...priceValues.filter(p => p !== null)), Math.max(...priceValues.filter(p => p !== null))] : null
-                });
-
-                // Prepare datasets based on chart type
-                const datasets = [];
-
-                // OI Dataset
-                if (chartType === 'bar') {
-                    datasets.push({
-                        label: 'Open Interest',
-                        data: oiValues,
-                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                        borderColor: '#3b82f6',
-                        borderWidth: 1,
-                        borderRadius: 4,
-                        yAxisID: 'y'
-                    });
-                } else {
-                    // Line chart
-                    datasets.push({
-                        label: 'Open Interest',
-                        data: oiValues,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 4,
-                        yAxisID: 'y'
-                    });
-                }
-
-                // Add price overlay if available (always as line)
+                this.chart.data.labels = labels;
+                // Ensure datasets length (1 or 2 depending on price overlay)
                 if (hasPrice) {
-                    datasets.push({
-                        type: 'line', // Force line even if main chart is bar
-                        label: 'Price (USD)',
-                        data: priceValues,
-                        borderColor: '#f59e0b',
-                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 4,
-                        yAxisID: 'y1'
-                    });
+                    if (this.chart.data.datasets.length < 2) {
+                        this.chart.data.datasets = this._buildDatasets(oiValues, priceValues, chartType);
+                    } else {
+                        this.chart.data.datasets[0].data = oiValues;
+                        this.chart.data.datasets[1].data = priceValues;
+                    }
+                } else {
+                    this.chart.data.datasets = this._buildDatasets(oiValues, null, chartType);
                 }
-
-                const chartOptions = this.getChartOptions(hasPrice);
-
-                this.chart = new Chart(ctx, {
-                    type: chartType === 'bar' ? 'bar' : 'line',
-                    data: {
-                        labels: labels,
-                        datasets: datasets
-                    },
-                    options: chartOptions
-                });
-
-                console.log('✅ OI chart rendered successfully');
-            } catch (error) {
-                console.error('❌ Error rendering chart:', error);
-                this.chart = null;
+                this.chart.update('none'); // No animation, silent update
+                return;
+            } catch (e) {
+                console.warn('⚠️ In-place update failed, recreating chart:', e);
+                this.destroy();
             }
-        }, 50);
+        } else if (this.chart) {
+            // Chart type changed → recreate
+            this.destroy();
+        }
+
+        // Create new chart
+        const datasets = this._buildDatasets(oiValues, hasPrice ? priceValues : null, chartType);
+        const chartOptions = this.getChartOptions(!!hasPrice);
+        this.chart = new Chart(ctx, {
+            type: chartType === 'bar' ? 'bar' : 'line',
+            data: { labels, datasets },
+            options: chartOptions
+        });
     }
 
     /**
@@ -158,6 +108,7 @@ export class ChartManager {
             responsive: true,
             maintainAspectRatio: false,
             animation: false, // Disable for stability during auto-refresh
+            transitions: { active: { animation: { duration: 0 } } },
             interaction: {
                 mode: 'index',
                 intersect: false
@@ -320,6 +271,50 @@ export class ChartManager {
                 })
             }
         };
+    }
+
+    _buildDatasets(oiValues, priceValuesOrNull, chartType) {
+        const datasets = [];
+        if (chartType === 'bar') {
+            datasets.push({
+                label: 'Open Interest',
+                data: oiValues,
+                backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                borderColor: '#3b82f6',
+                borderWidth: 1,
+                borderRadius: 4,
+                yAxisID: 'y'
+            });
+        } else {
+            datasets.push({
+                label: 'Open Interest',
+                data: oiValues,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                yAxisID: 'y'
+            });
+        }
+        if (priceValuesOrNull) {
+            datasets.push({
+                type: 'line',
+                label: 'Price (USD)',
+                data: priceValuesOrNull,
+                borderColor: '#f59e0b',
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                yAxisID: 'y1'
+            });
+        }
+        return datasets;
     }
 }
 

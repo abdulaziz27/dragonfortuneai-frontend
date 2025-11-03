@@ -114,8 +114,20 @@ export const OpenInterestUtils = {
      * Calculate API limit based on date range and interval
      */
     calculateLimit(days, interval) {
-        // Fixed limit for date range filtering
-        return 5000;
+        const pointsPerDayMap = {
+            '1m': 1440,
+            '5m': 288,
+            '15m': 96,
+            '1h': 24,
+            '4h': 6,
+            '8h': 3,
+            '1w': 1 / 7 // approx one point per 7 days
+        };
+        const perDay = pointsPerDayMap[interval] || 288; // default to 5m density
+        const rawNeeded = Math.ceil(perDay * days);
+        const headroom = Math.ceil(rawNeeded * 1.25); // 25% headroom for gaps
+        const maxLimit = 20000;
+        return Math.max(500, Math.min(headroom, maxLimit));
     },
 
     /**
@@ -123,18 +135,19 @@ export const OpenInterestUtils = {
      */
     getDateRange(period, timeRanges) {
         const now = new Date();
-        let startDate, endDate;
+        let startDate = new Date();
+        let endDate = new Date();
 
         if (period === 'all') {
-            // All time: 2 years ago
+            // All time: 2 years back to end of today
             startDate = new Date(now.getTime() - (730 * 24 * 60 * 60 * 1000));
-            endDate = now;
         } else {
             const range = timeRanges.find(r => r.value === period);
             const days = range ? range.days : 1;
             startDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
-            endDate = now;
         }
+        // Normalize end to end-of-day for inclusive range
+        endDate.setHours(23, 59, 59, 999);
 
         return { startDate, endDate };
     },

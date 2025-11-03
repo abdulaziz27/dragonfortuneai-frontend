@@ -13,8 +13,8 @@
     <link rel="preload" href="{{ asset('js/funding-rate-exact-controller.js') }}" as="script" type="module">
     
     <!-- Prefetch API endpoints (will fetch in background during hard refresh) -->
-    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/funding-rate/history?symbol=BTCUSDT&exchange=Binance&interval=1h&limit=100" as="fetch" crossorigin="anonymous">
-    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/funding-rate/analytics?symbol=BTCUSDT&exchange=Binance&interval=1h&limit=100" as="fetch" crossorigin="anonymous">
+    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/funding-rate/history?symbol=BTCUSDT&exchange=Binance&interval=8h&limit=100" as="fetch" crossorigin="anonymous">
+    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/funding-rate/analytics?symbol=BTCUSDT&exchange=Binance&interval=8h&limit=100" as="fetch" crossorigin="anonymous">
 @endpush
 
 @section('content')
@@ -49,22 +49,50 @@
                     <!-- Symbol Selector -->
                     <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="updateSymbol()">
                         <option value="BTCUSDT">BTC/USDT</option>
-                        <option value="ETHUSDT">ETH/USDT</option>
-                        <option value="SOLUSDT">SOL/USDT</option>
-                        <option value="BNBUSDT">BNB/USDT</option>
                     </select>
 
                     <!-- Exchange Selector -->
                     <select class="form-select" style="width: 160px;" x-model="selectedExchange" @change="updateExchange()">
-                        <option value="binance">Binance</option>
-                        <option value="bybit">Bybit</option>
+                        <option value="OKX">OKX</option>
+                        <option value="Binance">Binance</option>
+                        <option value="HTX">HTX</option>
+                        <option value="Bitmex">Bitmex</option>
+                        <option value="Bitfinex">Bitfinex</option>
+                        <option value="Bybit">Bybit</option>
+                        <option value="Deribit">Deribit</option>
+                        <option value="Gate">Gate</option>
+                        <option value="Kraken">Kraken</option>
+                        <option value="KuCoin">KuCoin</option>
+                        <option value="CME">CME</option>
+                        <option value="Bitget">Bitget</option>
+                        <option value="dYdX">dYdX</option>
+                        <option value="CoinEx">CoinEx</option>
+                        <option value="BingX">BingX</option>
+                        <option value="Coinbase">Coinbase</option>
+                        <option value="Gemini">Gemini</option>
+                        <option value="Crypto.com">Crypto.com</option>
+                        <option value="Hyperliquid">Hyperliquid</option>
+                        <option value="Bitunix">Bitunix</option>
+                        <option value="MEXC">MEXC</option>
+                        <option value="WhiteBIT">WhiteBIT</option>
+                        <option value="Aster">Aster</option>
+                        <option value="Lighter">Lighter</option>
+                        <option value="EdgeX">EdgeX</option>
+                        <option value="Drift">Drift</option>
+                        <option value="Paradex">Paradex</option>
+                        <option value="Extended">Extended</option>
+                        <option value="ApeX Omni">ApeX Omni</option>
                     </select>
 
                     <!-- Interval Selector -->
                     <select class="form-select" style="width: 120px;" x-model="selectedInterval" @change="updateInterval()">
-                        <!-- <option value="1m">1 Minute</option> -->
+                        <option value="1m">1 Minute</option>
+                        <option value="5m">5 Minutes</option>
+                        <option value="15m">15 Minutes</option>
                         <option value="1h">1 Hour</option>
+                        <option value="4h">4 Hours</option>
                         <option value="8h">8 Hours</option>
+                        <option value="1w">1 Week</option>
                     </select>
 
                 </div>
@@ -79,7 +107,7 @@
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Current Rate</span>
                         <span class="badge text-bg-primary" x-show="currentFundingRate !== null && currentFundingRate !== undefined">Latest</span>
-                        <span class="badge text-bg-secondary" x-show="currentFundingRate === null || currentFundingRate === undefined">Loading...</span>
+                        <!-- No loading badge for optimistic UI -->
                     </div>
                     <div>
                         <div class="h3 mb-1" x-text="currentFundingRate !== null && currentFundingRate !== undefined ? formatFundingRate(currentFundingRate) : '--'"></div>
@@ -93,7 +121,7 @@
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Period Avg</span>
                         <span class="badge text-bg-info" x-show="avgFundingRate !== null && avgFundingRate !== undefined">Avg</span>
-                        <span class="badge text-bg-secondary" x-show="avgFundingRate === null || avgFundingRate === undefined">Loading...</span>
+                        <!-- No loading badge for optimistic UI -->
                     </div>
                     <div>
                         <div class="h3 mb-1" x-text="avgFundingRate !== null && avgFundingRate !== undefined ? formatFundingRate(avgFundingRate) : '--'"></div>
@@ -107,11 +135,11 @@
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Peak Rate</span>
                         <span class="badge text-bg-danger" x-show="maxFundingRate !== null && maxFundingRate !== undefined">Max</span>
-                        <span class="badge text-bg-secondary" x-show="maxFundingRate === null || maxFundingRate === undefined">Loading...</span>
+                        <!-- No loading badge for optimistic UI -->
                     </div>
                     <div>
                         <div class="h3 mb-1 text-danger" x-text="maxFundingRate !== null && maxFundingRate !== undefined ? formatFundingRate(maxFundingRate) : '--'"></div>
-                        <div class="small text-secondary" x-text="peakDate || '--'"></div>
+                        <!-- <div class="small text-secondary" x-text="peakDate || '--'"></div> -->
                     </div>
                 </div>
             </div>
@@ -122,7 +150,7 @@
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Volatility</span>
                         <span class="badge text-bg-warning" x-show="fundingVolatility !== null && fundingVolatility !== undefined">Vol</span>
-                        <span class="badge text-bg-secondary" x-show="fundingVolatility === null || fundingVolatility === undefined">Loading...</span>
+                        <!-- No loading badge for optimistic UI -->
                     </div>
                     <div>
                         <div class="h3 mb-1" x-text="fundingVolatility !== null && fundingVolatility !== undefined ? formatFundingRate(fundingVolatility) : '--'"></div>
@@ -136,11 +164,11 @@
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Market Signal</span>
                         <span class="badge" :class="getSignalBadgeClass()" x-show="marketSignal !== null && marketSignal !== undefined && marketSignal !== 'Neutral'" x-text="signalStrength"></span>
-                        <span class="badge text-bg-secondary" x-show="marketSignal === null || marketSignal === undefined || marketSignal === 'Neutral'">Loading...</span>
+                        <!-- No loading badge for optimistic UI -->
                     </div>
                     <div>
                         <div class="h4 mb-1" :class="getSignalColorClass()" x-text="marketSignal !== null && marketSignal !== undefined ? marketSignal : '--'"></div>
-                        <div class="small text-secondary" x-text="signalDescription || 'Loading market signal...'"></div>
+                        <div class="small text-secondary" x-text="signalDescription || ''"></div>
                     </div>
                 </div>
             </div>
@@ -331,22 +359,13 @@
                         </small>
                     </div>
 
-                    <template x-if="exchangesLoading">
-                        <div class="text-center py-4">
-                            <div class="spinner-border spinner-border-sm text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <div class="mt-2 small text-secondary">Memuat data exchange...</div>
-                        </div>
-                    </template>
-
-                    <template x-if="!exchangesLoading && exchangesData.length === 0">
+                    <template x-if="exchangesData.length === 0">
                         <div class="text-center py-4 text-secondary">
                             <small>Tidak ada data exchange tersedia</small>
                         </div>
                     </template>
 
-                    <template x-if="!exchangesLoading && exchangesData.length > 0">
+                    <template x-if="exchangesData.length > 0">
                         <div>
                             <!-- Arbitrage Info -->
                             <template x-if="calculateArbitrage()">
