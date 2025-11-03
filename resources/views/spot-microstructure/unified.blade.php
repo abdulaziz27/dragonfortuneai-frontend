@@ -45,54 +45,83 @@
         <div class="row g-3">
             <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                 <div class="df-panel p-3 h-100">
-                    <span class="small text-secondary text-uppercase fw-semibold">Last Trade Price</span>
-                    <div class="h3 fw-semibold mb-1" id="spotLastPrice">-</div>
-                    <small class="text-secondary">Updated <span id="spotLastPriceTime">-</span></small>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary text-uppercase">Last Trade Price</span>
+                        <span class="badge text-bg-success">Live</span>
+                    </div>
+                    <div>
+                        <div class="h3 mb-1 text-info text-break" id="spotLastPrice">-</div>
+                        <div class="small text-secondary">Updated <span id="spotLastPriceTime">-</span></div>
+                    </div>
                 </div>
             </div>
 
             <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                 <div class="df-panel p-3 h-100">
-                    <span class="small text-secondary text-uppercase fw-semibold">Buy / Sell Bias</span>
-                    <div class="h3 fw-semibold mb-2" id="spotTradeBias">-</div>
-                    <span class="badge text-bg-secondary" id="spotBiasStrength">-</span>
-                    <small class="text-warning d-none mt-2 d-block" id="spotBiasCardNotice">Data belum tersedia dari provider.</small>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary text-uppercase">Buy / Sell Bias</span>
+                        <span class="badge text-bg-primary" id="spotBiasStrength">-</span>
+                    </div>
+                    <div>
+                        <div class="h4 mb-1 text-break" id="spotTradeBias">-</div>
+                        <div class="small text-warning d-none" id="spotBiasCardNotice">Data belum tersedia dari provider.</div>
+                    </div>
                 </div>
             </div>
 
             <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                 <div class="df-panel p-3 h-100">
-                    <span class="small text-secondary text-uppercase fw-semibold">CVD Delta</span>
-                    <div class="h3 fw-semibold mb-2" id="spotCvdDelta">-</div>
-                    <small class="text-secondary">Across latest series</small>
-                    <small class="text-warning d-none mt-2 d-block" id="spotCvdCardNotice">Data belum tersedia dari provider.</small>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary text-uppercase">CVD Delta</span>
+                        <span class="badge text-bg-secondary">Series</span>
+                    </div>
+                    <div>
+                        <div class="h3 mb-1 text-break" id="spotCvdDelta">-</div>
+                        <div class="small text-secondary">Across latest series</div>
+                        <div class="small text-warning d-none" id="spotCvdCardNotice">Data belum tersedia dari provider.</div>
+                    </div>
                 </div>
             </div>
 
             <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                 <div class="df-panel p-3 h-100">
-                    <span class="small text-secondary text-uppercase fw-semibold">VWAP Signal</span>
-                    <div class="h3 fw-semibold mb-2" id="spotVwapSignal">-</div>
-                    <small class="text-secondary">Position: <span id="spotVwapPosition">-</span></small>
-                    <small class="text-warning d-none mt-2 d-block" id="spotVwapCardNotice">Data belum tersedia dari provider.</small>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary text-uppercase">VWAP Signal</span>
+                        <span class="badge text-bg-info">VWAP</span>
+                    </div>
+                    <div>
+                        <div class="h4 mb-1 text-break" id="spotVwapSignal">-</div>
+                        <div class="small text-secondary">Position: <span id="spotVwapPosition">-</span></div>
+                        <div class="small text-warning d-none" id="spotVwapCardNotice">Data belum tersedia dari provider.</div>
+                    </div>
                 </div>
             </div>
 
             <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                 <div class="df-panel p-3 h-100">
-                    <span class="small text-secondary text-uppercase fw-semibold">Orderbook Spread</span>
-                    <div class="h3 fw-semibold mb-2" id="spotSpread">-</div>
-                    <small class="text-secondary">Depth <span id="spotOrderbookDepth">-</span></small>
-                    <small class="text-warning d-none mt-2 d-block" id="spotOrderbookCardNotice">Data belum tersedia dari provider.</small>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary text-uppercase">Orderbook Spread</span>
+                        <span class="badge text-bg-warning">Depth</span>
+                    </div>
+                    <div>
+                        <div class="h4 mb-1 text-warning text-break" id="spotSpread">-</div>
+                        <div class="small text-secondary">Depth <span id="spotOrderbookDepth">-</span></div>
+                        <div class="small text-warning d-none" id="spotOrderbookCardNotice">Data belum tersedia dari provider.</div>
+                    </div>
                 </div>
             </div>
 
             <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
                 <div class="df-panel p-3 h-100">
-                    <span class="small text-secondary text-uppercase fw-semibold">Pressure Ratio</span>
-                    <div class="h3 fw-semibold mb-2" id="spotPressureRatio">-</div>
-                    <small class="text-secondary">Latest imbalance: <span id="spotPressureImbalance">-</span></small>
-                    <small class="text-warning d-none mt-2 d-block" id="spotPressureCardNotice">Data belum tersedia dari provider.</small>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary text-uppercase">Pressure Ratio</span>
+                        <span class="badge text-bg-secondary">Book</span>
+                    </div>
+                    <div>
+                        <div class="h4 mb-1 text-break" id="spotPressureRatio">-</div>
+                        <div class="small text-secondary">Latest imbalance: <span id="spotPressureImbalance">-</span></div>
+                        <div class="small text-warning d-none" id="spotPressureCardNotice">Data belum tersedia dari provider.</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -183,8 +212,8 @@
                         <h5 class="mb-0">Recent Trades</h5>
                         <small class="text-secondary">Latest 50 records</small>
                     </div>
-                    <div class="table-responsive">
-                        <table class="table table-dark table-striped table-sm align-middle mb-0">
+                    <div class="table-responsive" style="max-height: 340px; overflow-y: auto;">
+                        <table class="table table-dark table-striped table-hover table-sm align-middle mb-0">
                             <thead>
                                 <tr>
                                     <th>Time</th>
@@ -211,9 +240,9 @@
                     </div>
                     <div class="row g-0">
                         <div class="col-md-6 border-end border-dark-subtle">
-                            <div class="table-responsive p-3">
+                            <div class="table-responsive p-3" style="max-height: 300px; overflow-y: auto;">
                                 <h6 class="text-success mb-2">Bids</h6>
-                                <table class="table table-dark table-sm align-middle mb-0">
+                                <table class="table table-dark table-hover table-sm align-middle mb-0">
                                     <thead>
                                         <tr>
                                             <th>Price</th>
@@ -227,9 +256,9 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="table-responsive p-3">
+                            <div class="table-responsive p-3" style="max-height: 300px; overflow-y: auto;">
                                 <h6 class="text-danger mb-2">Asks</h6>
-                                <table class="table table-dark table-sm align-middle mb-0">
+                                <table class="table table-dark table-hover table-sm align-middle mb-0">
                                     <thead>
                                         <tr>
                                             <th>Price</th>
@@ -254,8 +283,8 @@
                         <h5 class="mb-0">Volume Profile</h5>
                         <small class="text-secondary">Lookback detail</small>
                     </div>
-                    <div class="table-responsive">
-                        <table class="table table-dark table-striped align-middle mb-0">
+                    <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                        <table class="table table-dark table-striped table-hover align-middle mb-0">
                             <tbody id="spotVolumeProfileBody">
                                 <tr>
                                     <td class="text-muted text-center py-4">Loading volume profile...</td>
@@ -272,8 +301,8 @@
                         <h5 class="mb-0">Book Pressure Table</h5>
                         <small class="text-secondary">Recent ratios</small>
                     </div>
-                    <div class="table-responsive">
-                        <table class="table table-dark table-striped align-middle mb-0">
+                    <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+                        <table class="table table-dark table-striped table-hover align-middle mb-0">
                             <thead>
                                 <tr>
                                     <th>Time</th>
@@ -297,6 +326,6 @@
 @endsection
 
 @section('scripts')
-<script src="{{ asset('js/spot-microstructure-unified.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+<script src="{{ asset('js/spot-microstructure-unified.js') }}" defer></script>
 @endsection
-

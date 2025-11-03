@@ -6,7 +6,27 @@
     const base = (metaValue('spot-microstructure-api') || metaValue('api-base-url') || 'https://test.dragonfortune.ai').replace(/\/+$/, '');
     const el = (id) => document.getElementById(id);
 
-    const state = { loading: false, timer: null };
+    const normalizeSymbol = (value) => {
+        if (!value) return 'BTC/USDT';
+        const raw = value.toString().trim();
+        if (!raw) return 'BTC/USDT';
+        if (raw.includes('/')) return raw.toUpperCase();
+
+        const cleaned = raw.replace(/[^A-Za-z]/g, '').toUpperCase();
+        if (cleaned.length >= 6) {
+            const base = cleaned.slice(0, cleaned.length - 4);
+            const quote = cleaned.slice(-4);
+            return `${base}/${quote}`;
+        }
+        return cleaned || 'BTC/USDT';
+    };
+
+    const TRADE_SUMMARY_INTERVAL = '5m';
+    const TRADE_SUMMARY_INTERVAL_MINUTES = 5;
+    const TRADE_SUMMARY_LIMIT = 60;
+    const TRADE_FETCH_LIMIT = 200;
+
+    const state = { loading: false, timer: null, trades: [] };
 
     const refs = {
         symbol: el('spotSymbolSelect'),
@@ -173,7 +193,12 @@
 
     const request = async (path, params = {}) => {
         try {
-            const response = await fetch(buildUrl(path, params), {
+            const response = await fetch(buildUrl(path, {
+                ...params,
+                symbol: Object.prototype.hasOwnProperty.call(params, 'symbol')
+                    ? normalizeSymbol(params.symbol)
+                    : undefined
+            }), {
                 headers: { Accept: 'application/json' },
                 cache: 'no-cache'
             });
@@ -198,6 +223,7 @@
 
     const updateTrades = (payload) => {
         const rows = Array.isArray(payload?.data) ? payload.data : [];
+        state.trades = rows;
         if (!rows.length) {
             refs.tradesBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No trades available.</td></tr>';
         } else {
@@ -214,17 +240,91 @@
         setText(refs.lastPriceTime, latest ? fmtAgo(parseTs(latest.timestamp)) : '-');
     };
 
+    const buildFallbackSummary = (trades, intervalMinutes, maxBuckets) => {
+        if (!Array.isArray(trades) || trades.length === 0) return [];
+        const bucketMs = Math.max(intervalMinutes, 1) * 60 * 1000;
+        const bucketMap = new Map();
+
+        trades.forEach((trade) => {
+            const ts = parseTs(trade.timestamp);
+            const price = toNum(trade.price);
+            const quantity = toNum(trade.quantity);
+            if (!ts || !Number.isFinite(price) || !Number.isFinite(quantity)) return;
+
+            const key = Math.floor(ts.getTime() / bucketMs) * bucketMs;
+            const side = (trade.side || '').toString().toLowerCase();
+            const bucket = bucketMap.get(key) || {
+                timestamp: new Date(key),
+                buy_volume_quote: 0,
+                sell_volume_quote: 0,
+                trades_count: 0
+            };
+
+            const notional = price * quantity;
+            if (side === 'buy') bucket.buy_volume_quote += notional;
+            else if (side === 'sell') bucket.sell_volume_quote += notional;
+            else {
+                bucket.buy_volume_quote += notional / 2;
+                bucket.sell_volume_quote += notional / 2;
+            }
+            bucket.trades_count += 1;
+
+            bucketMap.set(key, bucket);
+        });
+
+        const buckets = Array.from(bucketMap.values())
+            .sort((a, b) => a.timestamp - b.timestamp)
+            .slice(-maxBuckets);
+
+        return buckets.map((bucket) => ({
+            ...bucket,
+            total_volume: bucket.buy_volume_quote + bucket.sell_volume_quote
+        }));
+    };
+
     const updateTradeSummary = (payload) => {
-        const buckets = Array.isArray(payload?.data) ? payload.data : [];
-        setText(refs.summaryCount, `${buckets.length} buckets`);
+        let buckets = Array.isArray(payload?.data) ? payload.data : [];
+        if (buckets.length <= 1) {
+            const fallback = buildFallbackSummary(state.trades, TRADE_SUMMARY_INTERVAL_MINUTES, TRADE_SUMMARY_LIMIT);
+            if (fallback.length > buckets.length) {
+                buckets = fallback;
+            }
+        }
 
-        if (!charts.summary) return;
-        charts.summary.data.labels = buckets.map((item) => fmtHm(parseTs(item.timestamp)));
-        charts.summary.data.datasets[0].data = buckets.map((item) => toNum(item.buy_volume));
-        charts.summary.data.datasets[1].data = buckets.map((item) => toNum(item.sell_volume));
-        charts.summary.update('none');
+        const bucketCount = Math.max(payload?.count ?? 0, buckets.length);
+        setText(refs.summaryCount, `${bucketCount} bucket${bucketCount === 1 ? '' : 's'}`);
 
-        setNotice('spotTradeSummaryNotice', buckets.length === 0);
+        const extractVolume = (item, keys) => {
+            for (const key of keys) {
+                if (item && item[key] !== undefined && item[key] !== null) {
+                    return toNum(item[key]);
+                }
+            }
+            return NaN;
+        };
+
+        const labels = buckets.map((item) => {
+            const rawTs = item.timestamp || item.bucket_time;
+            const ts = parseTs(rawTs);
+            return ts ? fmtHm(ts) : (rawTs || '-');
+        });
+
+        const buyVolumes = buckets.map((item) =>
+            extractVolume(item, ['buy_volume', 'buy_volume_quote', 'buy_volume_base', 'buy_volume_value'])
+        );
+        const sellVolumes = buckets.map((item) =>
+            extractVolume(item, ['sell_volume', 'sell_volume_quote', 'sell_volume_base', 'sell_volume_value'])
+        );
+
+        if (charts.summary) {
+            charts.summary.data.labels = labels;
+            charts.summary.data.datasets[0].data = buyVolumes;
+            charts.summary.data.datasets[1].data = sellVolumes;
+            charts.summary.update('none');
+        }
+
+        const hasData = buckets.length > 0 && (buyVolumes.some(Number.isFinite) || sellVolumes.some(Number.isFinite));
+        setNotice('spotTradeSummaryNotice', !hasData);
     };
 
     const updateCvd = (payload) => {
@@ -393,8 +493,8 @@
     };
 
     const fetchAll = () => Promise.all([
-        request('/api/spot-microstructure/trades', { symbol: refs.symbol?.value || 'BTC/USDT', exchange: refs.exchange?.value || 'binance', limit: 50 }),
-        request('/api/spot-microstructure/trades/summary', { symbol: refs.symbol?.value || 'BTC/USDT', interval: '5m', limit: 60 }),
+        request('/api/spot-microstructure/trades', { symbol: refs.symbol?.value || 'BTC/USDT', exchange: refs.exchange?.value || 'binance', limit: TRADE_FETCH_LIMIT }),
+        request('/api/spot-microstructure/trades/summary', { symbol: refs.symbol?.value || 'BTC/USDT', interval: TRADE_SUMMARY_INTERVAL, limit: TRADE_SUMMARY_LIMIT }),
         request('/api/spot-microstructure/cvd', { symbol: refs.symbol?.value || 'BTC/USDT', exchange: refs.exchange?.value || 'binance', limit: 120 }),
         request('/api/spot-microstructure/trade-bias', { symbol: refs.symbol?.value || 'BTC/USDT', limit: 1000 }),
         request('/api/spot-microstructure/orderbook/snapshot', { symbol: refs.symbol?.value || 'BTC/USDT', exchange: refs.exchange?.value || 'binance', depth: 15 }),
