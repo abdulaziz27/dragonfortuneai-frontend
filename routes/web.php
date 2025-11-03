@@ -68,6 +68,15 @@ Route::get('/api/cryptoquant/open-interest', [App\Http\Controllers\CryptoQuantCo
 Route::get('/api/cryptoquant/funding-rates-comparison', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRatesComparison'])->name('api.cryptoquant.funding-rates-comparison');
 
 // Coinglass API Proxy Routes
+
+// On-Chain Metrics API Proxy
+Route::prefix('api/onchain')->group(function () {
+    Route::get('/metrics', [App\Http\Controllers\OnchainMetricsController::class, 'metrics'])->name('api.onchain.metrics');
+    Route::get('/metrics/available', [App\Http\Controllers\OnchainMetricsController::class, 'availableMetrics'])->name('api.onchain.metrics.available');
+    Route::get('/exchange-flows', [App\Http\Controllers\OnchainMetricsController::class, 'exchangeFlows'])->name('api.onchain.exchange-flows');
+    Route::get('/network-activity', [App\Http\Controllers\OnchainMetricsController::class, 'networkActivity'])->name('api.onchain.network-activity');
+    Route::get('/market-data', [App\Http\Controllers\OnchainMetricsController::class, 'marketData'])->name('api.onchain.market-data');
+});
 Route::get('/api/coinglass/global-account-ratio', [App\Http\Controllers\CoinglassController::class, 'getGlobalAccountRatio'])->name('api.coinglass.global-account-ratio');
 Route::get('/api/coinglass/top-account-ratio', [App\Http\Controllers\CoinglassController::class, 'getTopAccountRatio'])->name('api.coinglass.top-account-ratio');
 Route::get('/api/coinglass/top-position-ratio', [App\Http\Controllers\CoinglassController::class, 'getTopPositionRatio'])->name('api.coinglass.top-position-ratio');
