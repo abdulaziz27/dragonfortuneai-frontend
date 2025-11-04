@@ -33,9 +33,13 @@ export function createLongShortRatioController() {
         
         // Chart intervals
         chartIntervals: [
-            { label: '30M', value: '30m' },
+            { label: '1M', value: '1m' },
+            { label: '5M', value: '5m' },
+            { label: '15M', value: '15m' },
             { label: '1H', value: '1h' },
-            { label: '4H', value: '4h' }
+            { label: '4H', value: '4h' },
+            { label: '8H', value: '8h' },
+            { label: '1W', value: '1w' }
         ],
         
         // Auto-refresh state
@@ -51,6 +55,7 @@ export function createLongShortRatioController() {
         overviewData: null,
         analyticsData: null,
         analyticsLoading: false,
+        takerBuySellData: null,
 
         // Current metrics
         currentTopAccountRatio: null,
@@ -319,7 +324,9 @@ export function createLongShortRatioController() {
                     exchange: this.selectedExchange,
                     symbol: this.selectedSymbol,
                     interval: this.selectedInterval,
-                    limit: limit
+                    limit: limit,
+                    supportedExchanges: ['Binance', 'Bybit', 'CoinEx'],
+                    supportedIntervals: ['1m', '5m', '15m', '1h', '4h', '8h', '1w']
                 });
 
                 // Calculate date range for filtering
@@ -388,34 +395,59 @@ export function createLongShortRatioController() {
                 // Don't wait for Chart.js - it will render when ready (non-blocking)
                 const renderCharts = () => {
                     try {
+                        // CRITICAL: Clone data BEFORE passing to ChartManager to break Alpine.js Proxy
+                        // This prevents Chart.js "Maximum call stack size exceeded" error
+                        const clonedTopAccounts = this.topAccountData.length > 0 
+                            ? JSON.parse(JSON.stringify(this.topAccountData)) 
+                            : [];
+                        const clonedTopPositions = this.topPositionData.length > 0 
+                            ? JSON.parse(JSON.stringify(this.topPositionData)) 
+                            : [];
+
                         // Render main chart (Top Account Ratio & Distribution)
-                        if (this.mainChartManager && this.topAccountData.length > 0) {
-                            this.mainChartManager.renderMainChart(
-                                this.topAccountData,
-                                this.chartType
-                            );
+                        if (this.mainChartManager && clonedTopAccounts.length > 0) {
+                            if (this.mainChartManager.chart) {
+                                this.mainChartManager.updateRatioDistributionData(clonedTopAccounts, false);
+                            } else {
+                                this.mainChartManager.renderMainChart(
+                                    clonedTopAccounts,
+                                    this.chartType
+                                );
+                            }
                         }
 
                         // Render positions chart (Top Positions Ratio & Distribution)
-                        if (this.positionsChartManager && this.topPositionData.length > 0) {
-                            this.positionsChartManager.renderPositionsChart(
-                                this.topPositionData,
-                                this.chartType
-                            );
+                        if (this.positionsChartManager && clonedTopPositions.length > 0) {
+                            if (this.positionsChartManager.chart) {
+                                this.positionsChartManager.updateRatioDistributionData(clonedTopPositions, true);
+                            } else {
+                                this.positionsChartManager.renderPositionsChart(
+                                    clonedTopPositions,
+                                    this.chartType
+                                );
+                            }
                         }
 
                         // Render comparison chart (Top Account vs Top Position ratio lines only)
-                        if (this.comparisonChartManager && (this.topAccountData.length > 0 || this.topPositionData.length > 0)) {
-                            this.comparisonChartManager.renderComparisonChart(
-                                [], // No global account data (redundant with top accounts)
-                                this.topAccountData,
-                                this.topPositionData
-                            );
+                        if (this.comparisonChartManager && (clonedTopAccounts.length > 0 || clonedTopPositions.length > 0)) {
+                            if (this.comparisonChartManager.chart) {
+                                this.comparisonChartManager.updateComparisonChartData(
+                                    [], // No global account data (redundant with top accounts)
+                                    clonedTopAccounts,
+                                    clonedTopPositions
+                                );
+                            } else {
+                                this.comparisonChartManager.renderComparisonChart(
+                                    [], // No global account data (redundant with top accounts)
+                                    clonedTopAccounts,
+                                    clonedTopPositions
+                                );
+                            }
                         }
                     } catch (error) {
                         console.error('❌ Error rendering charts:', error);
                         setTimeout(() => {
-                            // Retry chart rendering
+                            // Retry chart rendering (always use full render on retry, not update)
                             if (this.mainChartManager && this.topAccountData.length > 0) {
                                 this.mainChartManager.renderMainChart(this.topAccountData, this.chartType);
                             }
@@ -504,14 +536,26 @@ export function createLongShortRatioController() {
                                 this.topAccountData = fullTopAccounts;
                                 this.updateCurrentValues();
                                 if (this.mainChartManager) {
-                                    this.mainChartManager.renderMainChart(this.topAccountData, this.chartType);
+                                    // Clone before passing to ChartManager
+                                    const clonedData = JSON.parse(JSON.stringify(this.topAccountData));
+                                    if (this.mainChartManager.chart) {
+                                        this.mainChartManager.updateRatioDistributionData(clonedData, false);
+                                    } else {
+                                        this.mainChartManager.renderMainChart(clonedData, this.chartType);
+                                    }
                                 }
                             }
                             if (fullTopPositions && fullTopPositions.length > 0) {
                                 this.topPositionData = fullTopPositions;
                                 this.updateCurrentValues();
                                 if (this.positionsChartManager) {
-                                    this.positionsChartManager.renderPositionsChart(this.topPositionData, this.chartType);
+                                    // Clone before passing to ChartManager
+                                    const clonedData = JSON.parse(JSON.stringify(this.topPositionData));
+                                    if (this.positionsChartManager.chart) {
+                                        this.positionsChartManager.updateRatioDistributionData(clonedData, true);
+                                    } else {
+                                        this.positionsChartManager.renderPositionsChart(clonedData, this.chartType);
+                                    }
                                 }
                             }
 
@@ -598,8 +642,20 @@ export function createLongShortRatioController() {
                 ]);
 
                 if (analyticsResult.status === 'fulfilled' && analyticsResult.value) {
-                    this.analyticsData = analyticsResult.value;
-                    console.log('✅ Analytics data loaded from Internal API');
+                    // Normalize analytics payload: extract all fields from response
+                    const raw = analyticsResult.value;
+                    const normalized = Array.isArray(raw) ? (raw[0] || null) : raw;
+                    this.analyticsData = normalized ? {
+                        // Core analytics fields
+                        positioning: normalized.positioning ?? null,
+                        trend: normalized.trend ?? null,
+                        data_points: normalized.data_points ?? null,
+                        exchange: normalized.exchange ?? null,
+                        symbol: normalized.symbol ?? null,
+                        // Ratio statistics (for summary cards)
+                        ratio_stats: normalized.ratio_stats ?? null
+                    } : null;
+                    console.log('✅ Analytics data loaded from Internal API', this.analyticsData);
                     // Map analytics to state (for summary cards)
                     this.mapAnalyticsToState();
                 } else if (analyticsResult.status === 'rejected') {
@@ -814,6 +870,11 @@ export function createLongShortRatioController() {
 
         updateSymbol() {
             console.log('🔄 Updating symbol to:', this.selectedSymbol);
+            this.loadAllData();
+        },
+
+        updateInterval() {
+            console.log('🔄 Updating interval to:', this.selectedInterval);
             this.loadAllData();
         },
 

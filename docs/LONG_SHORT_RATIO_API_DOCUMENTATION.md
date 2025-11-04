@@ -69,8 +69,8 @@ Mengambil data analisis mendalam Long/Short Ratio termasuk statistik ratio, posi
 | Parameter | Tipe | Required | Default | Deskripsi |
 |-----------|------|----------|---------|-----------|
 | `symbol` | string | Ya | BTCUSDT | Pasangan trading (BTCUSDT, ETHUSDT, BNBUSDT, SOLUSDT) |
-| `exchange` | string | Ya | Binance | Nama exchange (Binance, Bybit) |
-| `interval` | string | Tidak | 30m | Interval waktu (30m, 1h, 4h) |
+| `exchange` | string | Ya | Binance | Nama exchange (Binance, Bybit, CoinEx) |
+| `interval` | string | Tidak | 1h | Interval waktu (1m, 5m, 15m, 1h, 4h, 8h, 1w) |
 | `ratio_type` | string | Tidak | accounts | Tipe ratio (accounts, positions) |
 | `limit` | integer | Tidak | 1000 | Jumlah maksimal record yang dikembalikan |
 
@@ -117,8 +117,8 @@ Mengambil data Long/Short Ratio berdasarkan top trader accounts untuk analisis s
 | Parameter | Tipe | Required | Default | Deskripsi |
 |-----------|------|----------|---------|-----------|
 | `symbol` | string | Ya | BTCUSDT | Pasangan trading (BTCUSDT, ETHUSDT, BNBUSDT, SOLUSDT) |
-| `exchange` | string | Ya | Binance | Nama exchange (Binance, Bybit) |
-| `interval` | string | Tidak | 30m | Interval waktu (30m, 1h, 4h) |
+| `exchange` | string | Ya | Binance | Nama exchange (Binance, Bybit, CoinEx) |
+| `interval` | string | Tidak | 1h | Interval waktu (1m, 5m, 15m, 1h, 4h, 8h, 1w) |
 | `limit` | integer | Tidak | 1000 | Jumlah maksimal record yang dikembalikan |
 
 ### Contoh cURL Request
@@ -167,8 +167,8 @@ Mengambil data Long/Short Ratio berdasarkan top positions (volume-weighted) untu
 | Parameter | Tipe | Required | Default | Deskripsi |
 |-----------|------|----------|---------|-----------|
 | `symbol` | string | Ya | BTCUSDT | Pasangan trading (BTCUSDT, ETHUSDT, BNBUSDT, SOLUSDT) |
-| `exchange` | string | Ya | Binance | Nama exchange (Binance, Bybit) |
-| `interval` | string | Tidak | 30m | Interval waktu (30m, 1h, 4h) |
+| `exchange` | string | Ya | Binance | Nama exchange (Binance, Bybit, CoinEx) |
+| `interval` | string | Tidak | 1h | Interval waktu (1m, 5m, 15m, 1h, 4h, 8h, 1w) |
 | `limit` | integer | Tidak | 1000 | Jumlah maksimal record yang dikembalikan |
 
 ### Contoh cURL Request

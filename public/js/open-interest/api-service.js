@@ -1,50 +1,77 @@
 /**
  * Open Interest API Service
- * Handles all API requests for Open Interest data
+ * Handles all data fetching from internal API
  */
 
 export class OpenInterestAPIService {
     constructor() {
-        this.baseUrl = window.APP_CONFIG?.apiBaseUrl || '';
+        // Align with funding-rate behavior: use configured base URL (can be external)
+        this.baseUrl = window.APP_CONFIG?.apiBaseUrl || document.querySelector('meta[name="api-base-url"]')?.getAttribute('content') || 'https://test.dragonfortune.ai';
+        this.abortController = null; // For history
+        this.analyticsAbortController = null; // For analytics
         
-        // Separate AbortController for each request type
-        this.historyAbortController = null;
-        this.analyticsAbortController = null;
-        this.exchangeAbortController = null;
+        console.log('📡 Open Interest API Service initialized with base URL:', this.baseUrl);
     }
 
     /**
-     * Fetch Open Interest history data
+     * Fetch historical Open Interest data
+     * @param {Object} params - Fetch parameters
+     * @param {Boolean} isPrefetch - If true, use separate abort controller (don't cancel main requests)
      */
-    async fetchHistory(params) {
-        const { symbol, exchange, interval, limit, with_price = true } = params;
-
-        // Cancel previous request
-        if (this.historyAbortController) {
-            this.historyAbortController.abort();
+    // Fetch historical Open Interest data
+    // isPrefetch: true when called from background prefetch
+    // noTimeout: true to disable request timeout (for main, user-facing requests)
+    async fetchHistory(params, isPrefetch = false, noTimeout = false) {
+        const { symbol, exchange, interval, limit, with_price = false } = params;
+        
+        // Use separate abort controller for prefetch to avoid cancelling main requests
+        let abortController;
+        if (isPrefetch) {
+            // Prefetch uses its own controller (not shared)
+            abortController = new AbortController();
+        } else {
+            // Main request: cancel previous main request if exists
+            if (this.abortController) {
+                this.abortController.abort();
+            }
+            this.abortController = new AbortController();
+            abortController = this.abortController;
         }
-        this.historyAbortController = new AbortController();
 
-        const url = `${this.baseUrl}/api/open-interest/history?symbol=${symbol}&exchange=${exchange}&interval=${interval}&limit=${limit}&with_price=${with_price}`;
+        // Use limit directly (limit-based approach, no dateRange)
+        const requestLimit = limit || 100;
 
-        console.log('📡 Fetching OI history:', url);
+        const url = `${this.baseUrl}/api/open-interest/history?` +
+            `symbol=${symbol}&` +
+            `exchange=${exchange}&` +
+            `interval=${interval}&` +
+            `limit=${requestLimit}&` +
+            `with_price=${with_price}`;
+
+        console.log(`[HIST:START] interval=${interval} limit=${requestLimit} exchange=${exchange}`);
         
         const startTime = Date.now();
 
         let timeoutId = null;
+        let didTimeout = false;
         try {
-            // Add timeout (30 seconds for initial load, 10 seconds for auto-refresh)
-            // API can be slow, so we need longer timeout
-            const timeoutDuration = 30000; // 30 seconds
-            timeoutId = setTimeout(() => {
-                if (this.historyAbortController) {
-                    console.warn('⏱️ Request timeout after', timeoutDuration / 1000, 'seconds');
-                    this.historyAbortController.abort();
-                }
-            }, timeoutDuration);
+            // Add timeout (30 seconds) unless explicitly disabled
+            if (!noTimeout) {
+                const timeoutDuration = 30000; // 30 seconds
+                timeoutId = setTimeout(() => {
+                    if (abortController) {
+                        console.warn('⏱️ Request timeout after', timeoutDuration / 1000, 'seconds');
+                        didTimeout = true;
+                        abortController.abort();
+                    }
+                }, timeoutDuration);
+            }
 
             const response = await fetch(url, {
-                signal: this.historyAbortController.signal
+                signal: abortController.signal,
+                headers: {
+                    'Accept': 'application/json'
+                }
             });
 
             // Clear timeout if request succeeds
@@ -58,63 +85,146 @@ export class OpenInterestAPIService {
             }
 
             const data = await response.json();
+            
+            console.log(`[HIST:OK] records=${data.length}`);
+
+            // Sort data by timestamp (oldest first) before transform
+            const sortedData = [...data].sort((a, b) => a.ts - b.ts);
+            
+            // Transform data
+            const transformed = this.transformHistoryData(sortedData);
+            
             const fetchTime = Date.now() - startTime;
-            console.log('✅ OI history data received:', data?.length || 0, 'records', `(${fetchTime}ms)`);
-
-            // Transform data efficiently
-            const transformed = this.transformHistoryData(data);
+            console.log(`[HIST:OK] records=${transformed.length} fetch_ms=${fetchTime}`);
+            
             const totalTime = Date.now() - startTime;
-            console.log('⏱️ Total history fetch time:', totalTime + 'ms');
-
+            console.log(`[HIST:TOTAL] ms=${totalTime}`);
+            
             return transformed;
+
         } catch (error) {
             // Clear timeout in case of error
             if (timeoutId) {
                 clearTimeout(timeoutId);
                 timeoutId = null;
             }
-
-            if (error.name === 'AbortError') {
-                console.log('⏭️ OI history request cancelled');
-                return null;
+            
+            if (didTimeout) {
+                const timeoutError = new Error('RequestTimeout');
+                timeoutError.code = 'TIMEOUT';
+                console.warn('[HIST:TIMEOUT]');
+                throw timeoutError;
             }
-            console.error('❌ Error fetching OI history:', error);
+            
+            if (error.name === 'AbortError') {
+                console.log('[HIST:CANCEL] reason=abort');
+                return null; // Return null for cancelled requests
+            }
+            console.error('[HIST:ERROR]', error);
             throw error;
+        } finally {
+            this.abortController = null;
         }
     }
 
     /**
-     * Fetch Open Interest analytics data
+     * Cancel only history request (do not cancel analytics)
      */
-    async fetchAnalytics(params) {
-        const { symbol, exchange, interval, limit } = params;
-
-        // Cancel previous request
-        if (this.analyticsAbortController) {
-            this.analyticsAbortController.abort();
+    cancelHistoryOnly() {
+        if (this.abortController) {
+            try {
+                this.abortController.abort();
+            } catch (_) {}
+            this.abortController = null;
         }
-        this.analyticsAbortController = new AbortController();
+    }
+    
+    /**
+     * Transform internal API format to controller format
+     * 
+     * FROM (Internal API - ACTUAL RESPONSE):
+     * [{
+     *   "ts": 1762208100000,
+     *   "exchange": "Binance",
+     *   "pair": "BTCUSDT",
+     *   "oi_usd": "8230487962.44420000",
+     *   "price": "0E-8" or actual price
+     * }]
+     * 
+     * TO (Controller format):
+     * [{
+     *   "date": "2024-01-01T08:00:00.000Z",
+     *   "value": 8230487962.4442,
+     *   "price": null or actual price,
+     *   "exchange": "binance"
+     * }]
+     */
+    transformHistoryData(data) {
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid data format: expected array');
+        }
 
-        const url = `${this.baseUrl}/api/open-interest/analytics?symbol=${symbol}&exchange=${exchange}&interval=${interval}&limit=${limit}`;
+        return data.map(item => {
+            const price = item.price && item.price !== '0E-8' && parseFloat(item.price) > 0 
+                ? parseFloat(item.price) 
+                : null;
+
+            return {
+                date: new Date(item.ts).toISOString(),
+                value: parseFloat(item.oi_usd),
+                price: price,
+                exchange: item.exchange.toLowerCase()
+            };
+        });
+    }
+
+    /**
+     * Fetch analytics Open Interest data
+     */
+    // Fetch analytics Open Interest data
+    // isPrefetch: use isolated controller
+    // noTimeout: when true, do not set a timeout (allow long-running request)
+    async fetchAnalytics(symbol, exchange, interval, limit = 1000, isPrefetch = false, noTimeout = false) {
+        // Controller policy: never abort a running main analytics request
+        let controller;
+        if (isPrefetch) {
+            controller = new AbortController();
+        } else {
+            if (!this.analyticsAbortController) {
+                this.analyticsAbortController = new AbortController();
+            }
+            controller = this.analyticsAbortController;
+        }
+
+        const url = `${this.baseUrl}/api/open-interest/analytics?` +
+            `symbol=${symbol}&` +
+            `exchange=${exchange}&` +
+            `interval=${interval}&` +
+            `limit=${limit}`;
 
         console.log('📡 Fetching OI analytics:', url);
         
         const startTime = Date.now();
-
+        
         let timeoutId = null;
         try {
-            // Add timeout (15 seconds) to prevent hanging requests
-            // Analytics endpoint might be slower than history
-            const timeoutDuration = 15000; // 15 seconds
-            timeoutId = setTimeout(() => {
-                if (this.analyticsAbortController) {
+            // Optional timeout for analytics, disabled when noTimeout=true
+            if (!noTimeout) {
+                const timeoutDuration = 15000; // 15 seconds
+                timeoutId = setTimeout(() => {
                     console.warn('⏱️ Analytics request timeout after', timeoutDuration / 1000, 'seconds');
-                    this.analyticsAbortController.abort();
-                }
-            }, timeoutDuration);
+                    // Do NOT abort main analytics; just log (prefetch will be abandoned by abort)
+                    if (isPrefetch) {
+                        controller.abort();
+                    }
+                }, timeoutDuration);
+            }
 
             const response = await fetch(url, {
-                signal: this.analyticsAbortController.signal
+                signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json'
+                }
             });
 
             // Clear timeout if request succeeds
@@ -124,85 +234,65 @@ export class OpenInterestAPIService {
             }
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
+            
             const fetchTime = Date.now() - startTime;
             console.log('✅ OI analytics data received:', data, `(${fetchTime}ms)`);
 
-            // Return first item if array, otherwise return as-is
-            return Array.isArray(data) ? (data[0] || null) : data;
+            // Handle array response (API returns array with single object)
+            const analyticsData = Array.isArray(data) ? data[0] : data;
+
+            return {
+                // Trend from API
+                trend: analyticsData.trend || null,
+                // Current OI from API
+                currentOI: analyticsData.open_interest ? parseFloat(analyticsData.open_interest) : null,
+                // Insights from API
+                insights: analyticsData.insights || {},
+                // Direct mapping for summary cards
+                dataPoints: analyticsData.insights?.data_points || null,
+                maxOI: analyticsData.insights?.max_oi ? parseFloat(analyticsData.insights.max_oi) : null,
+                minOI: analyticsData.insights?.min_oi ? parseFloat(analyticsData.insights.min_oi) : null,
+                volatilityLevel: analyticsData.insights?.volatility_level || null
+            };
         } catch (error) {
             // Clear timeout in case of error
             if (timeoutId) {
                 clearTimeout(timeoutId);
                 timeoutId = null;
             }
-
+            
             if (error.name === 'AbortError') {
                 console.log('⏭️ OI analytics request cancelled');
                 return null;
             }
-            console.error('❌ Error fetching OI analytics:', error);
-            return null; // Return null instead of throwing for analytics
+            console.error('❌ Error fetching analytics data:', error);
+            throw error;
+        } finally {
+            // Keep controller for main analytics; prefetch controller is GC'd
         }
     }
 
     /**
-     * Fetch Open Interest per exchange (for FASE 2)
+     * Cancel ongoing requests
      */
-    async fetchExchange(params) {
-        const { symbol, exchange, limit, pivot = false } = params;
-
-        // Cancel previous request
-        if (this.exchangeAbortController) {
-            this.exchangeAbortController.abort();
+    cancelRequest() {
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
         }
-        this.exchangeAbortController = new AbortController();
-
-        const url = `${this.baseUrl}/api/open-interest/exchange?symbol=${symbol}&exchange=${exchange}&limit=${limit}&pivot=${pivot}`;
-
-        console.log('📡 Fetching OI exchange data:', url);
-
-        try {
-            const response = await fetch(url, {
-                signal: this.exchangeAbortController.signal
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            console.log('✅ OI exchange data received:', data?.length || 0, 'records');
-
-            return data;
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                console.log('⏭️ OI exchange request cancelled');
-                return null;
-            }
-            console.error('❌ Error fetching OI exchange:', error);
-            return null;
-        }
+        // Do not abort analytics here by default (we avoid cancelling long-running analytics)
     }
 
     /**
-     * Cancel all pending requests
-     * Note: AbortError will be handled gracefully in fetch methods
+     * Cancel all pending requests (alias for cancelRequest for consistency)
      */
     cancelAllRequests() {
         try {
-            if (this.historyAbortController) {
-                this.historyAbortController.abort();
-            }
-            if (this.analyticsAbortController) {
-                this.analyticsAbortController.abort();
-            }
-            if (this.exchangeAbortController) {
-                this.exchangeAbortController.abort();
-            }
+            this.cancelRequest();
         } catch (error) {
             // Ignore errors from abort (expected behavior)
             if (error.name !== 'AbortError') {
@@ -210,72 +300,4 @@ export class OpenInterestAPIService {
             }
         }
     }
-
-    /**
-     * Transform history data from API format to chart format
-     */
-    transformHistoryData(data) {
-        if (!Array.isArray(data)) {
-            console.warn('⚠️ History data is not an array');
-            return [];
-        }
-
-        // Transform and ensure timestamps are in milliseconds
-        const transformed = data.map(item => {
-            const ts = item.ts || item.time || 0;
-            
-            return {
-                ts: ts < 1e12 ? ts * 1000 : ts, // Convert to milliseconds if needed
-                oi_usd: parseFloat(item.oi_usd || item.open_interest || 0),
-                price: item.price ? parseFloat(item.price) : null,
-                exchange: item.exchange
-            };
-        });
-
-        // Sort by timestamp ascending
-        transformed.sort((a, b) => a.ts - b.ts);
-
-        console.log('📊 Transformed history data:', {
-            count: transformed.length,
-            first: transformed[0],
-            last: transformed[transformed.length - 1]
-        });
-
-        return transformed;
-    }
-
-    /**
-     * Filter data by date range (client-side) - Optimized for large datasets
-     */
-    filterByDateRange(data, startDate, endDate) {
-        if (!Array.isArray(data) || data.length === 0) return data;
-
-        const startTs = startDate.getTime();
-        const endTs = endDate.getTime();
-
-        // Optimized filter - single pass, early exit conditions
-        const filtered = [];
-        for (let i = 0; i < data.length; i++) {
-            const item = data[i];
-            const ts = item.ts || item.time || 0;
-            
-            // Early exit if we're past the end date (data should be sorted by timestamp)
-            if (ts > endTs) break;
-            
-            if (ts >= startTs && ts <= endTs) {
-                filtered.push(item);
-            }
-        }
-
-        console.log('📅 Date Range Filter:', {
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            beforeFilter: data.length,
-            afterFilter: filtered.length,
-            filteredPercent: ((filtered.length / data.length) * 100).toFixed(1) + '%'
-        });
-
-        return filtered;
-    }
 }
-

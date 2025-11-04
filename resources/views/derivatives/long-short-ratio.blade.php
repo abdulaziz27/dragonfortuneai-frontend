@@ -54,58 +54,82 @@
                     <select class="form-select" style="width: 160px;" x-model="selectedExchange" @change="updateExchange()">
                         <option value="Binance">Binance</option>
                         <option value="Bybit">Bybit</option>
+                        <!-- <option value="CoinEx">CoinEx</option> -->
                     </select>
 
                     <!-- Symbol/Pair Selector -->
                     <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="updateSymbol()">
                         <option value="BTCUSDT">BTC/USDT</option>
-                        <option value="ETHUSDT">ETH/USDT</option>
+                        <!-- <option value="ETHUSDT">ETH/USDT</option>
                         <option value="BNBUSDT">BNB/USDT</option>
-                        <option value="SOLUSDT">SOL/USDT</option>
+                        <option value="SOLUSDT">SOL/USDT</option> -->
                     </select>
 
-
+                    <!-- Interval Selector -->
+                    <select class="form-select" style="width: 100px;" x-model="selectedInterval" @change="updateInterval()">
+                        <template x-for="interval in chartIntervals" :key="interval.value">
+                            <option :value="interval.value" x-text="interval.label"></option>
+                        </template>
+                    </select>
 
                 </div>
             </div>
         </div>
 
-        <!-- Summary Cards Row -->
+        <!-- Summary Cards Row (from Analytics API) -->
         <div class="row g-3">
-            <!-- Top Account Ratio -->
+            <!-- Average Ratio -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Top Account</span>
-                        <span class="badge text-bg-info" x-show="currentTopAccountRatio !== null && currentTopAccountRatio !== undefined">Ratio</span>
-                        <span class="badge text-bg-secondary" x-show="currentTopAccountRatio === null || currentTopAccountRatio === undefined">Loading...</span>
+                        <span class="small text-secondary">Avg Ratio</span>
+                        <span class="badge text-bg-primary" x-show="analyticsData?.ratio_stats">Analytics</span>
                     </div>
-                    <div class="h3 mb-1" x-text="currentTopAccountRatio !== null && currentTopAccountRatio !== undefined ? formatRatio(currentTopAccountRatio) : '--'"></div>
-                    <div class="small text-secondary">Real-time</div>
+                    <div class="h3 mb-1" x-text="analyticsData?.ratio_stats?.avg_ratio ? parseFloat(analyticsData.ratio_stats.avg_ratio).toFixed(2) : '--'"></div>
+                    <div class="small text-secondary">Average</div>
                 </div>
             </div>
 
-            <!-- Top Position Ratio -->
+            <!-- Max Ratio -->
             <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Top Position</span>
-                        <span class="badge text-bg-success" x-show="currentTopPositionRatio !== null && currentTopPositionRatio !== undefined">Ratio</span>
-                        <span class="badge text-bg-secondary" x-show="currentTopPositionRatio === null || currentTopPositionRatio === undefined">Loading...</span>
-                    </div>
-                    <div class="h3 mb-1" x-text="currentTopPositionRatio !== null && currentTopPositionRatio !== undefined ? formatRatio(currentTopPositionRatio) : '--'"></div>
-                    <div class="small text-secondary">Real-time</div>
+                    <div class="small text-secondary mb-2">Max Ratio</div>
+                    <div class="h3 mb-1 text-danger" x-text="analyticsData?.ratio_stats?.max_ratio ? parseFloat(analyticsData.ratio_stats.max_ratio).toFixed(2) : '--'"></div>
+                    <div class="small text-secondary">Peak</div>
                 </div>
             </div>
 
-            <!-- Market Sentiment -->
-            <div class="col-md-4">
+            <!-- Min Ratio -->
+            <div class="col-md-2">
                 <div class="df-panel p-3 h-100">
-                    <div class="small text-secondary mb-2">Sentimen Pasar</div>
-                    <div>
-                        <div class="h4 mb-1" :class="getSentimentColorClass()" x-text="marketSentiment !== null && marketSentiment !== undefined ? marketSentiment : '--'"></div>
-                        <div class="small text-secondary" x-text="sentimentDescription || 'Loading market sentiment...'"></div>
-                    </div>
+                    <div class="small text-secondary mb-2">Min Ratio</div>
+                    <div class="h3 mb-1 text-success" x-text="analyticsData?.ratio_stats?.min_ratio ? parseFloat(analyticsData.ratio_stats.min_ratio).toFixed(2) : '--'"></div>
+                    <div class="small text-secondary">Low</div>
+                </div>
+            </div>
+
+            <!-- Volatility -->
+            <div class="col-md-2">
+                <div class="df-panel p-3 h-100">
+                    <div class="small text-secondary mb-2">Volatility</div>
+                    <div class="h3 mb-1 text-warning" x-text="analyticsData?.ratio_stats?.volatility ? (analyticsData.ratio_stats.volatility * 100).toFixed(2) + '%' : '--'"></div>
+                    <div class="small text-secondary">Stability</div>
+                </div>
+            </div>
+
+            <!-- Positioning -->
+            <div class="col-md-2">
+                <div class="df-panel p-3 h-100">
+                    <div class="small text-secondary mb-2">Positioning</div>
+                    <div class="h5 mb-0 text-break" x-text="analyticsData?.positioning || '--'"></div>
+                </div>
+            </div>
+
+            <!-- Trend -->
+            <div class="col-md-2">
+                <div class="df-panel p-3 h-100">
+                    <div class="small text-secondary mb-2">Trend</div>
+                    <div class="h5 mb-0 text-break" x-text="analyticsData?.trend || '--'"></div>
                 </div>
             </div>
         </div>
@@ -117,12 +141,6 @@
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
                             <h5 class="mb-0">Top Accounts Ratio & Distribution</h5>
-                            <div class="chart-info">
-                                <div class="d-flex align-items-center gap-3">
-                                    <span class="current-value" x-text="currentTopAccountRatio !== null && currentTopAccountRatio !== undefined ? formatRatio(currentTopAccountRatio) : '--'"></span>
-                                    <span class="change-badge" :class="topAccountRatioChange >= 0 ? 'positive' : 'negative'" x-text="currentTopAccountRatio !== null && currentTopAccountRatio !== undefined ? formatChange(topAccountRatioChange) : '--'"></span>
-                                </div>
-                            </div>
                         </div>
                         <div class="chart-controls">
                             <!-- Time Range Buttons -->
@@ -236,12 +254,12 @@
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
                             <h5 class="mb-0">Top Positions Ratio & Distribution</h5>
-                            <div class="chart-info">
+                            <!-- <div class="chart-info">
                                 <div class="d-flex align-items-center gap-3">
                                     <span class="current-value" x-text="currentTopPositionRatio !== null && currentTopPositionRatio !== undefined ? formatRatio(currentTopPositionRatio) : '--'"></span>
                                     <span class="change-badge" :class="topPositionRatioChange >= 0 ? 'positive' : 'negative'" x-text="currentTopPositionRatio !== null && currentTopPositionRatio !== undefined ? formatChange(topPositionRatioChange) : '--'"></span>
                                 </div>
-                            </div>
+                            </div> -->
                         </div>
                         <div class="chart-controls">
                             <!-- Time Range Buttons -->
@@ -556,52 +574,8 @@
                 <div class="df-panel p-4">
                     <h5 class="mb-3">📚 Memahami Long/Short Ratio</h5>
 
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <div class="p-3 rounded" style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444;">
-                                <div class="fw-bold mb-2 text-danger">�  Ratio > 2.0: Long Crowded</div>
-                                <div class="small text-secondary">
-                                    <ul class="mb-0 ps-3">
-                                        <li>Posisi long sangat ramai dan jenuh</li>
-                                        <li>Potensi koreksi harga tinggi</li>
-                                        <li>Risk short squeeze jika breakout</li>
-                                        <li>Strategi: Contrarian - siap ambil profit long</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <div class="p-3 rounded" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e;">
-                                <div class="fw-bold mb-2 text-success">� R atio 0.8-1.2: Balanced</div>
-                                <div class="small text-secondary">
-                                    <ul class="mb-0 ps-3">
-                                        <li>Pasar seimbang dan sehat</li>
-                                        <li>Kelanjutan trend yang sustainable</li>
-                                        <li>Tidak ada crowding ekstrem</li>
-                                        <li>Strategi: Ikuti trend continuation</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-4">
-                            <div class="p-3 rounded" style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6;">
-                                <div class="fw-bold mb-2 text-primary">🔵 Ratio < 0.5: Short Crowded</div>
-                                <div class="small text-secondary">
-                                    <ul class="mb-0 ps-3">
-                                        <li>Posisi short sangat ramai dan jenuh</li>
-                                        <li>Potensi rally atau bounce tinggi</li>
-                                        <li>Risk long squeeze jika reversal</li>
-                                        <li>Strategi: Contrarian - siap cover short</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="alert alert-info mt-3 mb-0">
-                        <strong>💡 Tips Pro:</strong> Long/Short Ratio adalah indikator contrarian yang kuat. Ketika ratio ekstrem (>2.0 atau <0.5), pasar cenderung overcrowded dan siap untuk reversal. Gunakan bersama analisis teknikal untuk timing entry/exit yang optimal.
+                    <div class="alert alert-info mb-0">
+                        <strong>💡 Tips Pro:</strong> Long/Short Ratio adalah indikator contrarian yang kuat. Ketika rasio berada pada kondisi ekstrem, pasar cenderung overcrowded dan berpotensi mengalami reversal. Gunakan bersama analisis teknikal untuk timing entry/exit yang optimal.
                     </div>
                 </div>
             </div>
