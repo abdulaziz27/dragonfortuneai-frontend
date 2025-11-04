@@ -674,12 +674,18 @@ document.addEventListener("alpine:init", () => {
                 const zonePlugin = {
                     id: "mvrvZones",
                     beforeDraw: (chart) => {
-                        const { ctx, chartArea, scales } = chart;
-                        if (!ctx || !chartArea) {
+                        const { ctx: context, chartArea, scales } = chart;
+                        if (
+                            !context ||
+                            typeof context.save !== "function" ||
+                            !chartArea
+                        ) {
                             return;
                         }
                         const axis = scales.mvrv;
-                        if (!axis) return;
+                        if (!axis || typeof axis.getPixelForValue !== "function") {
+                            return;
+                        }
                         const sections = [
                             {
                                 limit: Math.min(1, axis.max ?? 1),
@@ -697,15 +703,15 @@ document.addEventListener("alpine:init", () => {
                         let start = axis.getPixelForValue(axis.min ?? 0);
                         sections.forEach((section) => {
                             const top = axis.getPixelForValue(section.limit);
-                            ctx.save();
-                            ctx.fillStyle = section.color;
-                            ctx.fillRect(
+                            context.save();
+                            context.fillStyle = section.color;
+                            context.fillRect(
                                 chartArea.left,
                                 Math.min(start, top),
                                 chartArea.right - chartArea.left,
                                 Math.abs(start - top)
                             );
-                            ctx.restore();
+                            context.restore();
                             start = top;
                         });
                     },
