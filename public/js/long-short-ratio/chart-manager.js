@@ -51,9 +51,7 @@ export class ChartManager {
             return;
         }
 
-        // Small delay to ensure destroy is complete
-        setTimeout(() => {
-            try {
+        try {
                 const sorted = [...data].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
                 const labels = sorted.map(d => d.time || d.ts);
                 
@@ -163,6 +161,16 @@ export class ChartManager {
 
                 const chartOptions = this.getMainChartOptions(true); // Enable dual-axis for percentages
 
+                // Defensive cleanup: if Chart.js still tracks a chart on this canvas, destroy it first
+                try {
+                    const existing = Chart.getChart ? Chart.getChart(canvas) : null;
+                    if (existing && typeof existing.destroy === 'function') {
+                        existing.destroy();
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Pre-destroy existing chart failed (safe to ignore):', e);
+                }
+
                 this.chart = new Chart(ctx, {
                     type: chartType === 'bar' ? 'bar' : 'line',
                     data: {
@@ -177,7 +185,63 @@ export class ChartManager {
                 console.error('❌ Error rendering chart:', error);
                 this.chart = null;
             }
-        }, 50);
+    }
+
+    /**
+     * Update existing ratio + distribution chart data in-place (no re-render)
+     * Applies to main (accounts) and positions charts. Avoids flicker during auto-refresh.
+     */
+    updateRatioDistributionData(data, isPositions = false) {
+        if (!this.chart || !this.chart.data || !Array.isArray(this.chart.data.datasets)) {
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            return;
+        }
+
+        try {
+            // Data is already cloned in controller before being passed here
+            const sorted = [...data].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
+            
+            const ratioField = isPositions ? 'ls_ratio_positions' : 'ls_ratio_accounts';
+            const longPercentField = isPositions ? 'long_positions_percent' : 'long_accounts';
+            const shortPercentField = isPositions ? 'short_positions_percent' : 'short_accounts';
+
+            // Extract primitive values (numbers/timestamps)
+            const labels = sorted.map(d => d.time || d.ts);
+            const ratioValues = sorted.map(d => parseFloat(d[ratioField] || 0));
+            const longPercentages = sorted.map(d => parseFloat(d[longPercentField] || 0));
+            const shortPercentages = sorted.map(d => parseFloat(d[shortPercentField] || 0));
+
+            // Update labels (plain array of primitives)
+            this.chart.data.labels = labels;
+
+            // Expected dataset order: [ratio line/bar, long %, short %]
+            if (this.chart.data.datasets[0]) {
+                this.chart.data.datasets[0].data = ratioValues;
+            }
+            if (this.chart.data.datasets[1]) {
+                this.chart.data.datasets[1].data = longPercentages;
+            }
+            if (this.chart.data.datasets[2]) {
+                this.chart.data.datasets[2].data = shortPercentages;
+            }
+
+            // Smooth update without animation
+            this.chart.update('none');
+            
+            const chartLabel = isPositions ? 'Positions' : 'Accounts';
+            console.log(`✅ ${chartLabel} chart data updated after refresh (in-place):`, {
+                canvas: this.canvasId,
+                points: labels.length,
+                lastRatio: ratioValues[ratioValues.length - 1]
+            });
+        } catch (error) {
+            console.warn('⚠️ Failed to update ratio distribution chart, falling back to re-render:', error);
+            // If in-place update fails, fall back to full render to keep chart consistent
+            this.renderRatioDistributionChart(data, 'line', isPositions);
+        }
     }
 
     /**
@@ -219,77 +283,143 @@ export class ChartManager {
             return;
         }
 
-        // Small delay to ensure destroy is complete
-        setTimeout(() => {
-            try {
-                // Use first available dataset as base for timestamps
-                const baseData = globalData.length > 0 ? globalData : 
-                                topAccountData.length > 0 ? topAccountData : 
-                                topPositionData;
+        try {
+            // Use first available dataset as base for timestamps
+            const baseData = globalData.length > 0 ? globalData : 
+                            topAccountData.length > 0 ? topAccountData : 
+                            topPositionData;
 
-                const sorted = [...baseData].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
-                // Keep full timestamp (milliseconds) for accurate time display in tooltip
-                const labels = sorted.map(d => d.time || d.ts);
+            const sorted = [...baseData].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
+            // Keep full timestamp (milliseconds) for accurate time display in tooltip
+            const labels = sorted.map(d => d.time || d.ts);
 
-                const datasets = [];
+            const datasets = [];
 
-                // Top Account Ratio (from Internal API: /top-accounts)
-                if (topAccountData.length > 0) {
-                    const topAccountSorted = [...topAccountData].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
-                    const topAccountValues = topAccountSorted.map(d => 
-                        parseFloat(d.top_account_long_short_ratio || d.ls_ratio_accounts || 0)
-                    );
+            // Top Account Ratio (from Internal API: /top-accounts)
+            if (topAccountData.length > 0) {
+                const topAccountSorted = [...topAccountData].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
+                const topAccountValues = topAccountSorted.map(d => 
+                    parseFloat(d.top_account_long_short_ratio || d.ls_ratio_accounts || 0)
+                );
 
-                    datasets.push({
-                        label: 'Top Account Ratio',
-                        data: topAccountValues,
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.4,
-                        pointRadius: 2,
-                        pointHoverRadius: 5
-                    });
-                }
-
-                // Top Position Ratio
-                if (topPositionData.length > 0) {
-                    const topPositionSorted = [...topPositionData].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
-                    const topPositionValues = topPositionSorted.map(d => 
-                        parseFloat(d.top_position_long_short_ratio || d.ls_ratio_positions || 0)
-                    );
-
-                    datasets.push({
-                        label: 'Top Position Ratio',
-                        data: topPositionValues,
-                        borderColor: '#f59e0b',
-                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.4,
-                        pointRadius: 2,
-                        pointHoverRadius: 5
-                    });
-                }
-
-                const chartOptions = this.getComparisonChartOptions();
-
-                this.chart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: datasets
-                    },
-                    options: chartOptions
+                datasets.push({
+                    label: 'Top Account Ratio',
+                    data: topAccountValues,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.4,
+                    pointRadius: 2,
+                    pointHoverRadius: 5
                 });
-
-                console.log('✅ Comparison chart rendered:', this.canvasId);
-            } catch (error) {
-                console.error('❌ Error rendering comparison chart:', error);
-                this.chart = null;
             }
-        }, 50);
+
+            // Top Position Ratio
+            if (topPositionData.length > 0) {
+                const topPositionSorted = [...topPositionData].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
+                const topPositionValues = topPositionSorted.map(d => 
+                    parseFloat(d.top_position_long_short_ratio || d.ls_ratio_positions || 0)
+                );
+
+                datasets.push({
+                    label: 'Top Position Ratio',
+                    data: topPositionValues,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.4,
+                    pointRadius: 2,
+                    pointHoverRadius: 5
+                });
+            }
+
+            const chartOptions = this.getComparisonChartOptions();
+
+            // Defensive cleanup: if Chart.js still tracks a chart on this canvas, destroy it first
+            try {
+                const existing = Chart.getChart ? Chart.getChart(canvas) : null;
+                if (existing && typeof existing.destroy === 'function') {
+                    existing.destroy();
+                }
+            } catch (e) {
+                console.warn('⚠️ Pre-destroy existing chart failed (safe to ignore):', e);
+            }
+
+            this.chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: chartOptions
+            });
+
+            console.log('✅ Comparison chart rendered:', this.canvasId);
+        } catch (error) {
+            console.error('❌ Error rendering comparison chart:', error);
+            this.chart = null;
+        }
+    }
+
+    /**
+     * Update existing comparison chart data in-place (no re-render)
+     */
+    updateComparisonChartData(globalData = [], topAccountData = [], topPositionData = []) {
+        if (!this.chart || !this.chart.data || !Array.isArray(this.chart.data.datasets)) {
+            return;
+        }
+
+        if (globalData.length === 0 && topAccountData.length === 0 && topPositionData.length === 0) {
+            return;
+        }
+
+        try {
+            // Data is already cloned in controller before being passed here
+            // Use first available dataset as base for timestamps
+            const baseData = topAccountData.length > 0 ? topAccountData : topPositionData;
+            const sorted = [...baseData].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
+            const labels = sorted.map(d => d.time || d.ts);
+
+            // Update labels
+            this.chart.data.labels = labels;
+
+            // Expected dataset order: [Top Account Ratio, Top Position Ratio]
+            let datasetIndex = 0;
+
+            if (topAccountData.length > 0) {
+                const topAccountSorted = [...topAccountData].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
+                const topAccountValues = topAccountSorted.map(d => 
+                    parseFloat(d.top_account_long_short_ratio || d.ls_ratio_accounts || 0)
+                );
+                if (this.chart.data.datasets[datasetIndex]) {
+                    this.chart.data.datasets[datasetIndex].data = topAccountValues;
+                }
+                datasetIndex++;
+            }
+
+            if (topPositionData.length > 0) {
+                const topPositionSorted = [...topPositionData].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
+                const topPositionValues = topPositionSorted.map(d => 
+                    parseFloat(d.top_position_long_short_ratio || d.ls_ratio_positions || 0)
+                );
+                if (this.chart.data.datasets[datasetIndex]) {
+                    this.chart.data.datasets[datasetIndex].data = topPositionValues;
+                }
+            }
+
+            // Smooth update without animation
+            this.chart.update('none');
+            
+            console.log('✅ Comparison chart data updated after refresh (in-place):', {
+                canvas: this.canvasId,
+                points: labels.length
+            });
+        } catch (error) {
+            console.warn('⚠️ Failed to update comparison chart, falling back to re-render:', error);
+            this.renderComparisonChart(globalData, topAccountData, topPositionData);
+        }
     }
 
     /**

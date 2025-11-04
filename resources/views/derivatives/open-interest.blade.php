@@ -10,11 +10,9 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     
     <!-- Preload critical resources for faster initial load -->
-    <link rel="preload" href="{{ asset('js/open-interest-controller.js') }}" as="script" type="module">
+    <link rel="preload" href="{{ asset('js/open-interest-controller.js') }}" as="script" crossorigin="anonymous">
     
-    <!-- Prefetch API endpoints (will fetch in background during hard refresh) -->
-    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/open-interest/history?symbol=BTCUSDT&exchange=Binance&interval=5m&limit=100&with_price=true" as="fetch" crossorigin="anonymous">
-    <link rel="prefetch" href="{{ config('app.api_urls.internal') }}/api/open-interest/analytics?symbol=BTCUSDT&exchange=Binance&interval=5m&limit=100" as="fetch" crossorigin="anonymous">
+    <!-- Removed prefetch links to avoid CORS errors on some environments -->
 @endpush
 
 @section('content')
@@ -40,8 +38,8 @@
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <h1 class="mb-0">Open Interest</h1>
-                        <span class="pulse-dot pulse-success" x-show="historyData.length > 0"></span>
-                        <span class="spinner-border spinner-border-sm text-primary" style="width: 16px; height: 16px;" x-show="historyData.length === 0" x-cloak></span>
+                        <span class="pulse-dot pulse-success" x-show="rawData.length > 0"></span>
+                        <span class="spinner-border spinner-border-sm text-primary" style="width: 16px; height: 16px;" x-show="rawData.length === 0" x-cloak></span>
                     </div>
                     <p class="mb-0 text-secondary">
                         Pantau perubahan open interest untuk melihat arus modal dan membaca kekuatan tren pasar.
@@ -57,35 +55,9 @@
 
                     <!-- Exchange Selector -->
                     <select class="form-select" style="width: 160px;" x-model="selectedExchange" @change="updateExchange($event.target.value)">
-                        <option value="OKX">OKX</option>
                         <option value="Binance">Binance</option>
-                        <option value="HTX">HTX</option>
-                        <option value="Bitmex">Bitmex</option>
-                        <option value="Bitfinex">Bitfinex</option>
                         <option value="Bybit">Bybit</option>
-                        <option value="Deribit">Deribit</option>
-                        <option value="Gate">Gate</option>
-                        <option value="Kraken">Kraken</option>
-                        <option value="KuCoin">KuCoin</option>
-                        <option value="CME">CME</option>
-                        <option value="Bitget">Bitget</option>
-                        <option value="dYdX">dYdX</option>
                         <option value="CoinEx">CoinEx</option>
-                        <option value="BingX">BingX</option>
-                        <option value="Coinbase">Coinbase</option>
-                        <option value="Gemini">Gemini</option>
-                        <option value="Crypto.com">Crypto.com</option>
-                        <option value="Hyperliquid">Hyperliquid</option>
-                        <option value="Bitunix">Bitunix</option>
-                        <option value="MEXC">MEXC</option>
-                        <option value="WhiteBIT">WhiteBIT</option>
-                        <option value="Aster">Aster</option>
-                        <option value="Lighter">Lighter</option>
-                        <option value="EdgeX">EdgeX</option>
-                        <option value="Drift">Drift</option>
-                        <option value="Paradex">Paradex</option>
-                        <option value="Extended">Extended</option>
-                        <option value="ApeX Omni">ApeX Omni</option>
                     </select>
 
                     <!-- Interval Selector -->
@@ -98,14 +70,21 @@
                         <option value="8h">8 Hours</option>
                         <option value="1w">1 Week</option>
                     </select>
+
+                    <!-- Limit Selector -->
+                    <select class="form-select" style="width: 160px;" x-model="selectedLimit" @change="setLimit($event.target.value)">
+                        <template x-for="option in limitOptions" :key="option.value">
+                            <option :value="option.value" x-text="option.label"></option>
+                        </template>
+                    </select>
                 </div>
             </div>
         </div>
 
-        <!-- Summary Cards Row -->
+        <!-- Summary Cards Row (4 Cards Only: Current OI, Min OI, Max OI, Trend) -->
         <div class="row g-3">
             <!-- Current Open Interest -->
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Current OI</span>
@@ -113,64 +92,50 @@
                         <span class="badge text-bg-secondary" x-show="currentOI === null || currentOI === undefined">Loading...</span>
                     </div>
                     <div>
-                        <div class="h3 mb-1" x-text="currentOI !== null && currentOI !== undefined ? formatOI(currentOI) : '--'"></div>
-                        <div class="small" :class="currentOI !== null && currentOI !== undefined && oiChange >= 0 ? 'text-success' : (currentOI !== null && currentOI !== undefined ? 'text-danger' : 'text-secondary')">
-                            <span x-text="currentOI !== null && currentOI !== undefined ? formatChange(oiChange) : '--'"></span> 
-                            <span class="text-secondary ms-1">24h</span>
-                        </div>
+                        <div class="h3 mb-1" x-show="currentOI !== null && currentOI !== undefined" x-text="formatOI(currentOI)"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="currentOI === null || currentOI === undefined">...</div>
                     </div>
                 </div>
             </div>
 
             <!-- Min OI -->
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Min OI</span>
                         <span class="badge" :class="minOI ? 'text-bg-success' : 'text-bg-secondary'" x-text="minOI ? 'Low' : 'Loading...'"></span>
                     </div>
                     <div>
-                        <div class="h3 mb-1" x-text="minOI ? formatOI(minOI) : '--'"></div>
+                        <div class="h3 mb-1" x-show="minOI" x-text="formatOI(minOI)"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="!minOI">...</div>
                     </div>
                 </div>
             </div>
 
             <!-- Max OI -->
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Max OI</span>
                         <span class="badge" :class="maxOI ? 'text-bg-danger' : 'text-bg-secondary'" x-text="maxOI ? 'High' : 'Loading...'"></span>
                     </div>
                     <div>
-                        <div class="h3 mb-1" :class="maxOI ? 'text-danger' : ''" x-text="maxOI ? formatOI(maxOI) : '--'"></div>
+                        <div class="h3 mb-1 text-danger" x-show="maxOI" x-text="formatOI(maxOI)"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="!maxOI">...</div>
                     </div>
                 </div>
             </div>
 
             <!-- Trend -->
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Trend</span>
-                        <span class="badge" :class="trend && trend !== 'stable' ? getTrendBadgeClass(trend) : 'text-bg-secondary'" x-text="trend ? (trend === 'stable' ? 'stable' : trend) : 'Loading...'"></span>
+                        <span class="badge" :class="trend ? getTrendBadgeClass(trend) : 'text-bg-secondary'" x-text="trend || 'Loading...'"></span>
                     </div>
                     <div>
-                        <div class="h3 mb-1" :class="trend && trend !== 'stable' ? getTrendColorClass(trend) : ''" x-text="trend || '--'"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Volatility -->
-            <div class="col-md-2">
-                <div class="df-panel p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Volatility</span>
-                        <span class="badge" :class="volatilityLevel ? getVolatilityBadgeClass(volatilityLevel) : 'text-bg-secondary'" x-text="volatilityLevel || 'Loading...'"></span>
-                    </div>
-                    <div>
-                        <div class="h3 mb-1" x-text="volatilityLevel || '--'"></div>
-                        <div class="small text-secondary" x-text="dataPoints > 0 ? dataPoints + ' data points' : ''"></div>
+                        <div class="h3 mb-1" x-show="trend" :class="trend !== 'stable' ? getTrendColorClass(trend) : ''" x-text="trend"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="!trend">...</div>
                     </div>
                 </div>
             </div>
@@ -183,16 +148,10 @@
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
                             <h5 class="mb-0">Open Interest Chart</h5>
-                            <div class="chart-info">
-                                <div class="d-flex align-items-center gap-3">
-                                    <span class="current-value" x-text="currentOI !== null && currentOI !== undefined ? formatOI(currentOI) : '--'"></span>
-                                    <span class="change-badge" :class="currentOI !== null && currentOI !== undefined && oiChange >= 0 ? 'positive' : (currentOI !== null && currentOI !== undefined ? 'negative' : '')" x-text="currentOI !== null && currentOI !== undefined ? formatChange(oiChange) : '--'"></span>
-                                </div>
-                            </div>
                         </div>
                         <div class="chart-controls">
-                            <!-- Time Range Buttons -->
-                            <div class="time-range-selector me-3">
+                            <!-- COMMENTED OUT: Time Range Buttons (using limit instead) -->
+                            {{-- <div class="time-range-selector me-3">
                                 <template x-for="range in timeRanges" :key="range.value">
                                     <button type="button" 
                                             class="btn btn-sm time-range-btn"
@@ -201,44 +160,26 @@
                                             x-text="range.label">
                                     </button>
                                 </template>
-                            </div>
-
-                            <!-- Chart Type Toggle -->
-                            <div class="btn-group btn-group-sm me-3" role="group">
-                                <button type="button" class="btn" :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType()">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <path d="M2 12l3-3 3 3 6-6" stroke="currentColor" stroke-width="1.5" fill="none"/>
-                                    </svg>
-                                    Line
-                                </button>
-                                <button type="button" class="btn" :class="chartType === 'bar' ? 'btn-primary' : 'btn-outline-secondary'" @click="toggleChartType()">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <rect x="2" y="6" width="3" height="8"/>
-                                        <rect x="6" y="4" width="3" height="10"/>
-                                        <rect x="10" y="8" width="3" height="6"/>
-                                    </svg>
-                                    Bar
-                                </button>
-                            </div>
+                            </div> --}}
 
                             <!-- Interval Dropdown -->
                             <div class="dropdown me-3">
                                 <button class="btn btn-outline-secondary btn-sm dropdown-toggle interval-dropdown-btn" 
                                         type="button" 
                                         data-bs-toggle="dropdown" 
-                                        :title="'Chart Interval: ' + (intervals.find(i => i.value === selectedInterval)?.label || '5m')">
+                                        :title="'Chart Interval: ' + (chartIntervals.find(i => i.value === selectedInterval)?.label || '8 Hours')">
                                     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1">
                                         <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
                                         <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
                                     </svg>
-                                    <span x-text="intervals.find(i => i.value === selectedInterval)?.label || '5m'"></span>
+                                    <span x-text="chartIntervals.find(i => i.value === selectedInterval)?.label || '8 Hours'"></span>
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-dark">
-                                    <template x-for="interval in intervals" :key="interval.value">
+                                <ul class="dropdown-menu">
+                                    <template x-for="interval in chartIntervals" :key="interval.value">
                                         <li>
                                             <a class="dropdown-item" 
                                                href="#" 
-                                               @click.prevent="updateInterval(interval.value)"
+                                               @click.prevent="setChartInterval(interval.value)"
                                                :class="selectedInterval === interval.value ? 'active' : ''"
                                                x-text="interval.label">
                                             </a>
@@ -268,403 +209,6 @@
                 </div>
             </div>
         </div>
-
-        {{-- FASE 2: Section-section tambahan di bawah ini akan diaktifkan nanti --}}
-        {{-- 
-        <!-- EXCHANGE DOMINANCE HEATMAP SECTION -->
-        <div class="row g-3">
-            <div class="col-12">
-                <div class="heatmap-container" x-data="exchangeDominanceHeatmap()" x-init="init()">
-                    <div class="heatmap-header">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                            <div>
-                                <div class="d-flex align-items-center gap-2 mb-2">
-                                    <h5 class="mb-0">🔥 Exchange Dominance Heatmap</h5>
-                                    <span class="pulse-dot pulse-success"></span>
-                                </div>
-                                <p class="mb-0 text-secondary small">
-                                    Visualisasi dominasi exchange berdasarkan Open Interest dalam periode waktu
-                                </p>
-                            </div>
-
-                            <!-- Heatmap Controls -->
-                            <div class="d-flex gap-2 align-items-center flex-wrap">
-                                <!-- Symbol Filter -->
-                                <select class="form-select form-select-sm" style="width: 120px;" x-model="selectedSymbol" @change="updateSymbol()">
-                                    <option value="BTC">BTC</option>
-                                    <option value="ETH">ETH</option>
-                                    <option value="SOL">SOL</option>
-                                    <option value="ADA">ADA</option>
-                                </select>
-
-                                <!-- Time Range (sama seperti chart utama) -->
-                                <div class="time-range-selector me-3">
-                                    <template x-for="range in timeRanges" :key="range.value">
-                                        <button type="button" 
-                                                class="btn btn-sm time-range-btn"
-                                                :class="selectedTimeRange === range.value ? 'btn-primary' : 'btn-outline-secondary'"
-                                                @click="setTimeRange(range.value)"
-                                                x-text="range.label">
-                                        </button>
-                                    </template>
-                                </div>
-
-                                <!-- Refresh Button -->
-                                <button class="btn btn-primary btn-sm" @click="refreshHeatmap()" :disabled="loading">
-                                    <span x-show="!loading">🔄</span>
-                                    <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="heatmap-body">
-                        <!-- Loading State -->
-                        <div x-show="loading" class="heatmap-loading">
-                            <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
-                                <div class="text-center">
-                                    <div class="spinner-border text-primary mb-3"></div>
-                                    <div class="text-secondary">Loading exchange dominance data...</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- CoinGlass-Style Comprehensive Table -->
-                        <div x-show="!loading" class="coinglass-table-container">
-                            <div class="table-responsive">
-                                <table class="table table-dark coinglass-table">
-                                    <thead>
-                                        <tr>
-                                            <th class="rank-col">Rank</th>
-                                            <th class="exchange-col">Exchange</th>
-                                            <th class="oi-btc-col">OI(BTC)</th>
-                                            <th class="oi-usd-col">OI($)</th>
-                                            <th class="rate-col">Rate %</th>
-                                            <th class="change-1h-col">OI Change (1h)</th>
-                                            <th class="change-4h-col">OI Change (4h)</th>
-                                            <th class="change-24h-col">OI Change (24h)</th>
-                                            <th class="dominance-col">Dominance</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <!-- All Row -->
-                                        <tr class="all-row">
-                                            <td class="rank-cell">
-                                                <span class="all-badge">All</span>
-                                            </td>
-                                            <td class="exchange-cell">
-                                                <div class="exchange-info">
-                                                    <span class="exchange-name">All Exchanges</span>
-                                                </div>
-                                            </td>
-                                            <td class="oi-btc-cell" x-text="formatBTC(totalMarketOI / 95000)">--</td>
-                                            <td class="oi-usd-cell" x-text="formatOI(totalMarketOI)">--</td>
-                                            <td class="rate-cell">100%</td>
-                                            <td class="change-cell positive">+0.49%</td>
-                                            <td class="change-cell positive">+1.03%</td>
-                                            <td class="change-cell negative">-0.50%</td>
-                                            <td class="dominance-cell">
-                                                <div class="dominance-bar full">
-                                                    <span class="dominance-text">100%</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        
-                                        <!-- Exchange Rows -->
-                                        <template x-for="(exchange, index) in topExchanges.slice(0, 8)" :key="'exchange-' + index">
-                                            <tr class="exchange-row">
-                                                <td class="rank-cell">
-                                                    <span class="rank-number" x-text="index + 1"></span>
-                                                </td>
-                                                <td class="exchange-cell">
-                                                    <div class="exchange-info">
-                                                        <div class="exchange-icon" :style="'background-color: ' + getExchangeColor(exchange.name)"></div>
-                                                        <span class="exchange-name" x-text="exchange.name"></span>
-                                                    </div>
-                                                </td>
-                                                <td class="oi-btc-cell" x-text="formatBTC(exchange.openInterest / 95000)"></td>
-                                                <td class="oi-usd-cell" x-text="formatOI(exchange.openInterest)"></td>
-                                                <td class="rate-cell" x-text="exchange.marketShare + '%'"></td>
-                                                <td class="change-cell" :class="getChangeClass(Math.random() * 2 - 1)" x-text="formatChange(Math.random() * 2 - 1)"></td>
-                                                <td class="change-cell" :class="getChangeClass(Math.random() * 3 - 1.5)" x-text="formatChange(Math.random() * 3 - 1.5)"></td>
-                                                <td class="change-cell" :class="getChangeClass(exchange.change24h)" x-text="formatChange(exchange.change24h)"></td>
-                                                <td class="dominance-cell">
-                                                    <div class="dominance-bar" :style="'background: linear-gradient(90deg, ' + getExchangeColor(exchange.name) + ' 0%, ' + getExchangeColor(exchange.name) + '80 ' + exchange.marketShare + '%, transparent ' + exchange.marketShare + '%)'">
-                                                        <span class="dominance-text" x-text="exchange.marketShare + '%'"></span>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Exchange Rankings -->
-                    <div x-show="!loading" class="heatmap-rankings">
-                        <div class="row g-3">
-                            <div class="col-md-8">
-                                <div class="rankings-table">
-                                    <h6 class="mb-3">📊 Current Market Leaders</h6>
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-dark">
-                                            <thead>
-                                                <tr>
-                                                    <th>Rank</th>
-                                                    <th>Exchange</th>
-                                                    <th>Market Share</th>
-                                                    <th>Open Interest</th>
-                                                    <th>24h Change</th>
-                                                    <th>Trend</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <template x-for="(exchange, index) in topExchanges" :key="'rank-' + index">
-                                                    <tr>
-                                                        <td>
-                                                            <span class="rank-badge" :class="getRankBadgeClass(index + 1)" x-text="index + 1"></span>
-                                                        </td>
-                                                        <td>
-                                                            <div class="d-flex align-items-center gap-2">
-                                                                <div class="exchange-indicator" :style="'background-color: ' + getExchangeColor(exchange.name)"></div>
-                                                                <strong x-text="exchange.name"></strong>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div class="market-share-bar">
-                                                                <div class="share-percentage" x-text="exchange.marketShare + '%'"></div>
-                                                                <div class="share-bar">
-                                                                    <div class="share-fill" 
-                                                                         :style="'width: ' + exchange.marketShare + '%; background-color: ' + getExchangeColor(exchange.name)">
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="fw-bold" x-text="formatOI(exchange.openInterest)"></td>
-                                                        <td>
-                                                            <span :class="getChangeClass(exchange.change24h)" x-text="formatChange(exchange.change24h)"></span>
-                                                        </td>
-                                                        <td>
-                                                            <span class="trend-indicator" x-text="getTrendIcon(exchange.trend)"></span>
-                                                        </td>
-                                                    </tr>
-                                                </template>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="market-insights">
-                                    <h6 class="mb-3">💡 Market Insights</h6>
-                                    <div class="insights-list">
-                                        <template x-for="(insight, index) in marketInsights" :key="'insight-' + index">
-                                            <div class="insight-item" :class="getInsightClass(insight.type)">
-                                                <div class="insight-icon" x-text="getInsightIcon(insight.type)"></div>
-                                                <div class="insight-content">
-                                                    <div class="insight-title" x-text="insight.title"></div>
-                                                    <div class="insight-description" x-text="insight.description"></div>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {{-- INTERNAL API DATA SECTION - TEMPORARILY HIDDEN
-        <div class="row g-3">
-            <div class="col-12">
-                <div class="df-panel p-3">
-                    <h5 class="mb-3">🏦 Analisis Detail (Internal Data)</h5>
-                    <p class="text-secondary small mb-3">Data Open Interest komprehensif dari data tim internal</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Analytics Summary -->
-        <div class="row g-3">
-            <!-- Analytics Data -->
-            <div class="col-lg-6">
-                <div class="df-panel p-4 h-100" x-data="analyticsPanel()" x-init="init()">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <div>
-                            <h5 class="mb-0">📊 Analytics Summary</h5>
-                            <small class="text-secondary">Analisis dan insight Open Interest</small>
-                        </div>
-                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
-                    </div>
-
-                    <!-- Analytics Table -->
-                    <div class="table-responsive">
-                        <table class="table table-sm table-dark">
-                            <tbody>
-                                <tr>
-                                    <td><strong>Current OI (USD)</strong></td>
-                                    <td x-text="formatOI(analytics?.open_interest?.current_usd)">--</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Average OI (USD)</strong></td>
-                                    <td x-text="formatOI(analytics?.open_interest?.average_usd)">--</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Max OI (USD)</strong></td>
-                                    <td x-text="formatOI(analytics?.open_interest?.max_usd)">--</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Min OI (USD)</strong></td>
-                                    <td x-text="formatOI(analytics?.open_interest?.min_usd)">--</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Recent Change %</strong></td>
-                                    <td :class="getChangeClass(analytics?.open_interest?.recent_change_pct)" x-text="formatChange(analytics?.open_interest?.recent_change_pct)">--</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Total Change %</strong></td>
-                                    <td :class="getChangeClass(analytics?.open_interest?.total_change_pct)" x-text="formatChange(analytics?.open_interest?.total_change_pct)">--</td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Trend</strong></td>
-                                    <td><span class="badge" :class="getTrendClass(analytics?.open_interest?.trend)" x-text="analytics?.open_interest?.trend || '--'">--</span></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Data Points</strong></td>
-                                    <td x-text="analytics?.data_points || '--'">--</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Insights Panel -->
-            <div class="col-lg-6">
-                <div class="df-panel p-4 h-100" x-data="insightsPanel()" x-init="init()">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <div>
-                            <h5 class="mb-0">🚨 Insights & Alerts</h5>
-                            <small class="text-secondary">Insight pasar dan peringatan</small>
-                        </div>
-                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
-                    </div>
-
-                    <!-- Insights List -->
-                    <div x-show="insights && insights.length > 0">
-                        <template x-for="(insight, index) in insights" :key="'insight-' + index + '-' + insight.type">
-                            <div class="alert" :class="getInsightClass(insight.severity)" role="alert">
-                                <div class="d-flex align-items-start">
-                                    <div class="me-2">
-                                        <span x-text="getInsightIcon(insight.severity)">⚠️</span>
-                                    </div>
-                                    <div>
-                                        <strong x-text="insight.type">Insight Type</strong>
-                                        <p class="mb-0 mt-1" x-text="insight.message">Insight message</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-
-                    <div x-show="!insights || insights.length === 0" class="text-center text-muted py-4">
-                        <div>📊</div>
-                        <div>Tidak ada insight tersedia</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Data Tables -->
-        <div class="row g-3">
-            <!-- Exchange Data Table -->
-            <div class="col-lg-6">
-                <div class="df-panel p-3" x-data="exchangeDataTable()" x-init="init()">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <div>
-                            <h5 class="mb-0">🏦 Exchange Data</h5>
-                            <small class="text-secondary">Open Interest berdasarkan exchange</small>
-                        </div>
-                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
-                    </div>
-
-                    <!-- Exchange Table -->
-                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                        <table class="table table-sm table-striped table-dark">
-                            <thead class="sticky-top bg-dark">
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Exchange</th>
-                                    <th>Symbol</th>
-                                    <th>OI USD</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="(item, index) in exchangeData" :key="'exchange-' + index + '-' + item.ts">
-                                    <tr>
-                                        <td x-text="formatTimestamp(item.ts)">--</td>
-                                        <td x-text="item.exchange">--</td>
-                                        <td x-text="item.symbol_coin">--</td>
-                                        <td class="fw-bold" x-text="formatOI(item.oi_usd)">--</td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div x-show="!exchangeData || exchangeData.length === 0" class="text-center text-muted py-4">
-                        <div>📊</div>
-                        <div>Tidak ada data exchange tersedia</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- History Data Table -->
-            <div class="col-lg-6">
-                <div class="df-panel p-3" x-data="historyDataTable()" x-init="init()">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <div>
-                            <h5 class="mb-0">📈 History Data</h5>
-                            <small class="text-secondary">Riwayat Open Interest berdasarkan pair</small>
-                        </div>
-                        <span x-show="loading" class="spinner-border spinner-border-sm text-primary"></span>
-                    </div>
-
-                    <!-- History Table -->
-                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                        <table class="table table-sm table-striped table-dark">
-                            <thead class="sticky-top bg-dark">
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Exchange</th>
-                                    <th>Pair</th>
-                                    <th>OI USD</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="(item, index) in historyData" :key="'history-' + index + '-' + item.ts">
-                                    <tr>
-                                        <td x-text="formatTimestamp(item.ts)">--</td>
-                                        <td x-text="item.exchange">--</td>
-                                        <td x-text="item.pair">--</td>
-                                        <td class="fw-bold" x-text="formatOI(item.oi_usd)">--</td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div x-show="!historyData || historyData.length === 0" class="text-center text-muted py-4">
-                        <div>📊</div>
-                        <div>Tidak ada data riwayat tersedia</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        --}}
 
         <!-- Trading Interpretation -->
         <div class="row g-3">
@@ -795,11 +339,11 @@
         }
         /* Light Theme Chart Container */
         .tradingview-chart-container {
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            background: #ffffff;
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: none;
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
 
         .chart-header {
@@ -850,27 +394,39 @@
         }
 
         .chart-controls .btn-group {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(241, 245, 249, 0.8);
             border-radius: 6px;
             padding: 2px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
 
         .chart-controls .btn {
             border: none;
             padding: 6px 12px;
-            color: #94a3b8;
+            color: #64748b;
             background: transparent;
             transition: all 0.2s;
         }
 
         .chart-controls .btn:hover {
-            color: #fff;
-            background: rgba(255, 255, 255, 0.05);
+            color: #1e293b;
+            background: rgba(241, 245, 249, 1);
         }
 
-        .chart-controls .btn-primary {
+        .chart-controls .btn-primary,
+        .chart-controls .btn.btn-primary {
             background: #3b82f6;
             color: #fff;
+        }
+
+        .chart-controls .btn-outline-secondary {
+            color: #64748b;
+            border-color: rgba(226, 232, 240, 0.8);
+        }
+
+        .chart-controls .btn-outline-secondary:hover {
+            background: rgba(241, 245, 249, 1);
+            color: #1e293b;
         }
 
         .chart-body {
@@ -931,79 +487,40 @@
         /* Professional Time Range Controls */
         .time-range-selector {
             display: flex;
-            gap: 0.125rem;
+            gap: 6px;
+            flex-wrap: wrap;
             background: linear-gradient(135deg, 
-                rgba(30, 41, 59, 0.8) 0%, 
-                rgba(51, 65, 85, 0.8) 100%);
-            border: 1px solid rgba(59, 130, 246, 0.2);
+                rgba(241, 245, 249, 0.8) 0%, 
+                rgba(226, 232, 240, 0.8) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.15);
             border-radius: 8px;
             padding: 0.25rem;
-            box-shadow: 
-                0 4px 12px rgba(0, 0, 0, 0.2),
-                inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
 
         .time-range-btn {
-            padding: 0.5rem 0.875rem !important;
-            font-size: 0.75rem !important;
-            font-weight: 600 !important;
-            border: none !important;
-            border-radius: 6px !important;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            min-width: 44px;
-            position: relative;
-            overflow: hidden;
-            color: #94a3b8 !important;
-            background: transparent !important;
-        }
-
-        .time-range-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.1) 0%, 
-                rgba(139, 92, 246, 0.1) 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 6px;
+            transition: all 0.2s;
+            white-space: nowrap;
+            color: #64748b;
+            background: transparent;
         }
 
         .time-range-btn:hover {
-            color: #e2e8f0 !important;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.2) !important;
-        }
-
-        .time-range-btn:hover::before {
-            opacity: 1;
+            color: #1e293b;
+            background: rgba(241, 245, 249, 1);
         }
 
         .time-range-btn.btn-primary {
-            background: linear-gradient(135deg, 
-                #3b82f6 0%, 
-                #2563eb 100%) !important;
+            background: #3b82f6 !important;
             color: white !important;
-            box-shadow: 
-                0 4px 12px rgba(59, 130, 246, 0.4),
-                0 2px 4px rgba(59, 130, 246, 0.3) !important;
-            transform: translateY(-1px);
-        }
-
-        .time-range-btn.btn-primary::before {
-            background: linear-gradient(135deg, 
-                rgba(255, 255, 255, 0.1) 0%, 
-                rgba(255, 255, 255, 0.05) 100%);
-            opacity: 1;
         }
 
         .time-range-btn.btn-primary:hover {
-            box-shadow: 
-                0 6px 16px rgba(59, 130, 246, 0.5),
-                0 3px 6px rgba(59, 130, 246, 0.4) !important;
-            transform: translateY(-2px);
+            background: #2563eb !important;
+            color: white !important;
         }
 
         .scale-toggle-btn {
@@ -1021,20 +538,20 @@
         }
 
         .chart-controls .btn-group {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(241, 245, 249, 0.8);
             border-radius: 6px;
             padding: 2px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
 
         .chart-controls .btn-outline-secondary {
-            border-color: rgba(148, 163, 184, 0.3) !important;
-            color: #94a3b8 !important;
+            color: #64748b;
+            border-color: rgba(226, 232, 240, 0.8);
         }
 
         .chart-controls .btn-outline-secondary:hover {
-            background: rgba(59, 130, 246, 0.1) !important;
-            border-color: rgba(59, 130, 246, 0.4) !important;
-            color: #3b82f6 !important;
+            background: rgba(241, 245, 249, 1);
+            color: #1e293b;
         }
 
         /* Enhanced Chart Tools */
@@ -1109,102 +626,9 @@
             color: #60a5fa !important;
         }
 
-        /* Professional Chart Container - CryptoQuant Level */
-        .tradingview-chart-container {
-            background: linear-gradient(135deg, 
-                rgba(15, 23, 42, 0.98) 0%, 
-                rgba(30, 41, 59, 0.98) 50%,
-                rgba(15, 23, 42, 0.98) 100%);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(59, 130, 246, 0.25);
-            box-shadow: 
-                0 10px 40px rgba(0, 0, 0, 0.4),
-                0 4px 16px rgba(59, 130, 246, 0.1),
-                inset 0 1px 0 rgba(255, 255, 255, 0.08);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .tradingview-chart-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(59, 130, 246, 0.5) 50%, 
-                transparent 100%);
-            z-index: 1;
-        }
-
-        .tradingview-chart-container:hover {
-            box-shadow: 
-                0 16px 48px rgba(0, 0, 0, 0.5),
-                0 6px 20px rgba(59, 130, 246, 0.15),
-                inset 0 1px 0 rgba(255, 255, 255, 0.12);
-            border-color: rgba(59, 130, 246, 0.4);
-            transform: translateY(-1px);
-        }
-
-        .chart-header {
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.08) 0%, 
-                rgba(139, 92, 246, 0.06) 100%);
-            border-bottom: 1px solid rgba(59, 130, 246, 0.25);
-            position: relative;
-            z-index: 2;
-        }
-
-        .chart-header::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(59, 130, 246, 0.3) 50%, 
-                transparent 100%);
-        }
-
-        .chart-header h5 {
-            color: #f1f5f9;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-            font-weight: 600;
-            letter-spacing: 0.025em;
-        }
-
-        .current-value {
-            color: #60a5fa;
-            text-shadow: 0 0 12px rgba(96, 165, 250, 0.4);
-            font-weight: 700;
-            letter-spacing: -0.025em;
-        }
-
-        .chart-body {
-            background: linear-gradient(135deg, 
-                rgba(15, 23, 42, 0.9) 0%, 
-                rgba(30, 41, 59, 0.85) 50%,
-                rgba(15, 23, 42, 0.9) 100%);
-            position: relative;
-        }
-
-        .chart-body::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: radial-gradient(circle at 50% 50%, 
-                rgba(59, 130, 246, 0.03) 0%, 
-                transparent 70%);
-            pointer-events: none;
-        }
+        /* Professional Chart Container - Light Theme (matches Funding Rate) */
+        /* Dark theme styling removed - using light theme only */
+        /* chart-body styling is already defined above at line 888 */
 
         .chart-footer {
             background: linear-gradient(135deg, 
@@ -1228,17 +652,6 @@
         }
 
         /* Professional Animations */
-        @keyframes chartLoad {
-            0% {
-                opacity: 0;
-                transform: translateY(20px) scale(0.95);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
         @keyframes pulseGlow {
             0%, 100% {
                 box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
@@ -1248,9 +661,7 @@
             }
         }
 
-        .tradingview-chart-container {
-            animation: chartLoad 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        }
+        /* Animation removed - no floating effect */
 
         .pulse-dot.pulse-success {
             animation: pulse 2s ease-in-out infinite, pulseGlow 2s ease-in-out infinite;
@@ -1281,17 +692,7 @@
             100% { left: 100%; }
         }
 
-        /* Enhanced Hover Effects */
-        .df-panel {
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .df-panel:hover {
-            transform: translateY(-4px) scale(1.02);
-            box-shadow: 
-                0 12px 32px rgba(59, 130, 246, 0.2),
-                0 4px 16px rgba(59, 130, 246, 0.1);
-        }
+        /* Enhanced Hover Effects - Match Funding Rate (already defined above at line 931) */
 
         /* Responsive adjustments */
         @media (max-width: 768px) {
@@ -1336,7 +737,7 @@
             }
 
             .df-panel:hover {
-                transform: translateY(-2px) scale(1.01);
+                transform: translateY(-2px);
             }
         }
 
@@ -1349,46 +750,31 @@
         /* Light mode chart styling */
         @media (prefers-color-scheme: light) {
             .tradingview-chart-container {
-                background: linear-gradient(135deg, 
-                    rgba(248, 250, 252, 0.98) 0%, 
-                    rgba(241, 245, 249, 0.98) 50%,
-                    rgba(248, 250, 252, 0.98) 100%);
-                border: 1px solid rgba(59, 130, 246, 0.2);
-                box-shadow: 
-                    0 10px 40px rgba(0, 0, 0, 0.1),
-                    0 4px 16px rgba(59, 130, 246, 0.05),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+                background: #ffffff;
+                border: 1px solid rgba(226, 232, 240, 0.8);
+                box-shadow: none;
             }
 
             .chart-header {
-                background: linear-gradient(135deg, 
-                    rgba(59, 130, 246, 0.05) 0%, 
-                    rgba(139, 92, 246, 0.03) 100%);
-                border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+                background: rgba(59, 130, 246, 0.03);
+                border-bottom: 1px solid rgba(0, 0, 0, 0.08);
             }
 
             .chart-header h5 {
                 color: #1e293b;
-                text-shadow: none;
             }
 
             .current-value {
-                color: #2563eb;
-                text-shadow: none;
+                color: #3b82f6;
             }
 
             .chart-body {
-                background: linear-gradient(135deg, 
-                    rgba(248, 250, 252, 0.9) 0%, 
-                    rgba(241, 245, 249, 0.85) 50%,
-                    rgba(248, 250, 252, 0.9) 100%);
+                background: #ffffff;
             }
 
             .chart-footer {
-                background: linear-gradient(135deg, 
-                    rgba(59, 130, 246, 0.03) 0%, 
-                    rgba(139, 92, 246, 0.02) 100%);
-                border-top: 1px solid rgba(59, 130, 246, 0.15);
+                background: rgba(59, 130, 246, 0.02);
+                border-top: 1px solid rgba(0, 0, 0, 0.08);
             }
 
             .chart-footer-text {
@@ -1408,6 +794,7 @@
 
             .time-range-btn:hover {
                 color: #1e293b !important;
+                background: rgba(241, 245, 249, 1) !important;
             }
 
             .chart-tools {
@@ -1429,10 +816,7 @@
         /* Dark mode enhancements */
         @media (prefers-color-scheme: dark) {
             .tradingview-chart-container {
-                box-shadow: 
-                    0 12px 48px rgba(0, 0, 0, 0.6),
-                    0 4px 16px rgba(59, 130, 246, 0.1),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                box-shadow: none;
             }
 
             .chart-footer-text {
@@ -1440,9 +824,9 @@
             }
         }
 
-        /* ===== EXCHANGE DOMINANCE HEATMAP STYLES ===== */
-        
-        /* Heatmap Container - Professional CryptoQuant Level */
+        /* ===== EXCHANGE DOMINANCE HEATMAP STYLES - COMMENTED OUT (section removed) ===== */
+        /* 
+        Heatmap Container - Professional CryptoQuant Level */
         .heatmap-container {
             background: linear-gradient(135deg, 
                 rgba(15, 23, 42, 0.98) 0%, 
@@ -2739,6 +2123,7 @@
                 color: #1e293b !important;
             }
         }
+        */
 
         /* Interval Dropdown Styling */
         .interval-dropdown-btn {
@@ -2747,39 +2132,19 @@
             padding: 0.5rem 0.75rem !important;
             min-width: 70px;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            border: 1px solid rgba(59, 130, 246, 0.2) !important;
-            background: linear-gradient(135deg, 
-                rgba(30, 41, 59, 0.6) 0%, 
-                rgba(51, 65, 85, 0.6) 100%) !important;
-            color: #94a3b8 !important;
+            border: 1px solid rgba(59, 130, 246, 0.15) !important;
+            background: rgba(241, 245, 249, 0.8) !important;
+            color: #64748b !important;
         }
 
         .interval-dropdown-btn:hover {
-            color: #e2e8f0 !important;
-            border-color: rgba(59, 130, 246, 0.4) !important;
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.1) 0%, 
-                rgba(139, 92, 246, 0.1) 100%) !important;
+            color: #1e293b !important;
+            border-color: rgba(59, 130, 246, 0.3) !important;
+            background: rgba(241, 245, 249, 1) !important;
         }
 
         .interval-dropdown-btn:focus {
             box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25) !important;
-        }
-
-        /* Light mode interval dropdown */
-        @media (prefers-color-scheme: light) {
-            .interval-dropdown-btn {
-                background: linear-gradient(135deg, 
-                    rgba(241, 245, 249, 0.8) 0%, 
-                    rgba(226, 232, 240, 0.8) 100%) !important;
-                border: 1px solid rgba(59, 130, 246, 0.15) !important;
-                color: #64748b !important;
-            }
-
-            .interval-dropdown-btn:hover {
-                color: #1e293b !important;
-                border-color: rgba(59, 130, 246, 0.3) !important;
-            }
         }
     </style>
 @endsection

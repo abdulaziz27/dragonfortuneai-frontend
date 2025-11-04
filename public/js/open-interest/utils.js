@@ -1,169 +1,120 @@
 /**
  * Open Interest Utilities
- * Helper functions for formatting, calculations, and date handling
+ * Helper functions for date handling, formatting, calculations
  */
 
 export const OpenInterestUtils = {
+
     /**
-     * Format Open Interest value (1.5B, 800M, etc)
+     * Capitalize exchange name (binance -> Binance)
+     */
+    capitalizeExchange(exchange) {
+        if (exchange === 'all_exchange') return 'all_exchange';
+        return exchange.charAt(0).toUpperCase() + exchange.slice(1);
+    },
+
+    /**
+     * Calculate median from array of values
+     */
+    calculateMedian(values) {
+        if (values.length === 0) return 0;
+        const sorted = [...values].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 === 0
+            ? (sorted[mid - 1] + sorted[mid]) / 2
+            : sorted[mid];
+    },
+
+    /**
+     * Calculate standard deviation
+     */
+    calculateStdDev(values) {
+        if (values.length === 0) return 0;
+        if (values.length === 1) return 0;
+        
+        const avg = values.reduce((a, b) => a + b, 0) / values.length;
+        const squareDiffs = values.map(v => Math.pow(v - avg, 2));
+        const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / squareDiffs.length;
+        return Math.sqrt(avgSquareDiff);
+    },
+
+    /**
+     * Calculate moving average
+     */
+    calculateMA(values, period) {
+        if (values.length === 0) return 0;
+        const effectivePeriod = Math.min(period, values.length);
+        const slice = values.slice(-effectivePeriod);
+        return slice.reduce((a, b) => a + b, 0) / slice.length;
+    },
+
+    /**
+     * Calculate MA array for all points
+     */
+    calculateMAArray(values, period) {
+        if (values.length === 0) return [];
+        
+        const effectivePeriod = Math.min(period, values.length);
+        
+        return values.map((_, i) => {
+            if (i < effectivePeriod - 1) {
+                // For early points, use available data (expanding window)
+                const slice = values.slice(0, i + 1);
+                return slice.reduce((a, b) => a + b, 0) / slice.length;
+            }
+            const slice = values.slice(i - effectivePeriod + 1, i + 1);
+            return slice.reduce((a, b) => a + b, 0) / slice.length;
+        });
+    },
+
+    /**
+     * Format Open Interest value for display
      */
     formatOI(value) {
         if (value === null || value === undefined || isNaN(value)) return 'N/A';
         const num = parseFloat(value);
-        
         if (num >= 1e9) {
-            return `$${(num / 1e9).toFixed(2)}B`;
+            return '$' + (num / 1e9).toFixed(2) + 'B';
         } else if (num >= 1e6) {
-            return `$${(num / 1e6).toFixed(2)}M`;
+            return '$' + (num / 1e6).toFixed(2) + 'M';
         } else if (num >= 1e3) {
-            return `$${(num / 1e3).toFixed(2)}K`;
+            return '$' + (num / 1e3).toFixed(2) + 'K';
         }
-        return `$${num.toFixed(2)}`;
+        return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     },
 
     /**
-     * Format price value in USD
+     * Format price value
      */
     formatPrice(value) {
         if (value === null || value === undefined || isNaN(value)) return 'N/A';
         const num = parseFloat(value);
-        
-        if (num >= 1e6) {
-            return `$${(num / 1e6).toFixed(2)}M`;
-        } else if (num >= 1e3) {
-            return `$${(num / 1e3).toFixed(2)}K`;
-        }
-        return `$${num.toFixed(2)}`;
+        return '$' + num.toLocaleString('en-US', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        });
     },
 
     /**
-     * Format change percentage
+     * Format change (percentage for Open Interest)
      */
     formatChange(value) {
         if (value === null || value === undefined || isNaN(value)) return 'N/A';
-        const num = parseFloat(value);
-        const sign = num >= 0 ? '+' : '';
-        return `${sign}${num.toFixed(2)}%`;
+        const sign = value >= 0 ? '+' : '';
+        return `${sign}${value.toFixed(2)}%`;
     },
 
     /**
-     * Format volume numbers
+     * Format date string
      */
-    formatVolume(value) {
-        if (value === null || value === undefined || isNaN(value)) return 'N/A';
-        const num = parseFloat(value);
-        
-        if (num >= 1e9) {
-            return `${(num / 1e9).toFixed(2)}B`;
-        } else if (num >= 1e6) {
-            return `${(num / 1e6).toFixed(2)}M`;
-        } else if (num >= 1e3) {
-            return `${(num / 1e3).toFixed(2)}K`;
-        }
-        return num.toFixed(2);
+    formatDate(dateStr) {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
     },
 
-    /**
-     * Get badge class for trend
-     */
-    getTrendBadgeClass(trend) {
-        if (!trend) return 'text-bg-secondary';
-        const trendLower = trend.toLowerCase();
-        
-        if (trendLower === 'increasing' || trendLower === 'bullish') {
-            return 'text-bg-success';
-        } else if (trendLower === 'decreasing' || trendLower === 'bearish') {
-            return 'text-bg-danger';
-        }
-        return 'text-bg-secondary';
-    },
-
-    /**
-     * Get color class for trend
-     */
-    getTrendColorClass(trend) {
-        if (!trend) return 'text-secondary';
-        const trendLower = trend.toLowerCase();
-        
-        if (trendLower === 'increasing' || trendLower === 'bullish') {
-            return 'text-success';
-        } else if (trendLower === 'decreasing' || trendLower === 'bearish') {
-            return 'text-danger';
-        }
-        return 'text-secondary';
-    },
-
-    /**
-     * Get badge class for volatility level
-     */
-    getVolatilityBadgeClass(level) {
-        if (!level) return 'text-bg-secondary';
-        const levelLower = level.toLowerCase();
-        
-        if (levelLower === 'high') {
-            return 'text-bg-danger';
-        } else if (levelLower === 'moderate') {
-            return 'text-bg-warning';
-        } else if (levelLower === 'low') {
-            return 'text-bg-success';
-        }
-        return 'text-bg-secondary';
-    },
-
-    /**
-     * Calculate API limit based on date range and interval
-     */
-    calculateLimit(days, interval) {
-        const pointsPerDayMap = {
-            '1m': 1440,
-            '5m': 288,
-            '15m': 96,
-            '1h': 24,
-            '4h': 6,
-            '8h': 3,
-            '1w': 1 / 7 // approx one point per 7 days
-        };
-        const perDay = pointsPerDayMap[interval] || 288; // default to 5m density
-        const rawNeeded = Math.ceil(perDay * days);
-        const headroom = Math.ceil(rawNeeded * 1.25); // 25% headroom for gaps
-        const maxLimit = 20000;
-        return Math.max(500, Math.min(headroom, maxLimit));
-    },
-
-    /**
-     * Get date range object (startDate, endDate) from period
-     */
-    getDateRange(period, timeRanges) {
-        const now = new Date();
-        let startDate = new Date();
-        let endDate = new Date();
-
-        if (period === 'all') {
-            // All time: 2 years back to end of today
-            startDate = new Date(now.getTime() - (730 * 24 * 60 * 60 * 1000));
-        } else {
-            const range = timeRanges.find(r => r.value === period);
-            const days = range ? range.days : 1;
-            startDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
-        }
-        // Normalize end to end-of-day for inclusive range
-        endDate.setHours(23, 59, 59, 999);
-
-        return { startDate, endDate };
-    },
-
-    /**
-     * Get time range in milliseconds
-     */
-    getTimeRange(period, timeRanges) {
-        const range = timeRanges.find(r => r.value === period);
-        if (!range) return 24 * 60 * 60 * 1000; // Default 1 day
-        
-        if (period === 'all') {
-            return 730 * 24 * 60 * 60 * 1000; // 2 years
-        }
-        
-        return range.days * 24 * 60 * 60 * 1000;
-    }
 };
 

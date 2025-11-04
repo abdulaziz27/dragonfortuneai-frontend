@@ -21,23 +21,47 @@ Mengambil data analisis komprehensif Open Interest termasuk tren, volatilitas, d
 
 ### Contoh cURL Request
 ```bash
-curl -X GET "https://test.dragonfortune.ai/api/open-interest/analytics?symbol=BTCUSDT&exchange=Binance&interval=5m&limit=500&with_price=true"
+curl -X GET "https://test.dragonfortune.ai/api/open-interest/analytics?symbol=BTCUSDT&exchange=Binance&interval=5m&limit=5&with_price=true"
 ```
 
 ### Contoh Response Body
 ```json
 [
   {
-    "open_interest": 1500000000.0,
-    "trend": "increasing",
-    "insights": {
-      "volatility_level": "moderate",
-      "data_points": 500,
-      "min_oi": 1200000000.0,
-      "max_oi": 1800000000.0
-    },
+    "current_price": "0E-8",
     "exchange": "Binance",
-    "current_price": 45000.0
+    "insights": {
+      "data_points": 8200,
+      "max_oi": "9059647758.00000000",
+      "min_oi": "7915300148.00000000",
+      "volatility_level": "low_volatility"
+    },
+    "open_interest": "8421994649.944155951220",
+    "trend": "stable"
+  },
+  {
+    "current_price": "0E-8",
+    "exchange": "Bybit",
+    "insights": {
+      "data_points": 8202,
+      "max_oi": "6304361492.00000000",
+      "min_oi": "5354768394.00000000",
+      "volatility_level": "low_volatility"
+    },
+    "open_interest": "5642343545.085366983663",
+    "trend": "stable"
+  },
+  {
+    "current_price": "0E-8",
+    "exchange": "CoinEx",
+    "insights": {
+      "data_points": 3151,
+      "max_oi": "153609475.00000000",
+      "min_oi": "119715929.00000000",
+      "volatility_level": "moderate_volatility"
+    },
+    "open_interest": "139299818.433536337671",
+    "trend": "stable"
   }
 ]
 ```
@@ -114,25 +138,46 @@ Mengambil data historis Open Interest untuk analisis tren dan pembuatan chart ti
 
 ### Contoh cURL Request
 ```bash
-curl -X GET "https://test.dragonfortune.ai/api/open-interest/history?symbol=BTCUSDT&exchange=Binance&interval=15m&limit=200&with_price=true"
+curl -X GET "https://test.dragonfortune.ai/api/open-interest/history?symbol=BTCUSDT&exchange=Binance&interval=15m&limit=5&with_price=true"
 ```
 
 ### Contoh Response Body
 ```json
 [
   {
-    "ts": 1704067200000,
     "exchange": "Binance",
+    "oi_usd": "8230487962.44420000",
     "pair": "BTCUSDT",
-    "oi_usd": 1500000000.0,
-    "price": 45000.0
+    "price": "0E-8",
+    "ts": 1762208100000
   },
   {
-    "ts": 1704066300000,
     "exchange": "Binance",
+    "oi_usd": "8230487962.44420000",
     "pair": "BTCUSDT",
-    "oi_usd": 1480000000.0,
-    "price": 44950.0
+    "price": "0E-8",
+    "ts": 1762208100000
+  },
+  {
+    "exchange": "Binance",
+    "oi_usd": "8214321984.00000000",
+    "pair": "BTCUSDT",
+    "price": "0E-8",
+    "ts": 1762208040000
+  },
+  {
+    "exchange": "Binance",
+    "oi_usd": "8214321984.00000000",
+    "pair": "BTCUSDT",
+    "price": "0E-8",
+    "ts": 1762207980000
+  },
+  {
+    "exchange": "Binance",
+    "oi_usd": "8214321984.00000000",
+    "pair": "BTCUSDT",
+    "price": "0E-8",
+    "ts": 1762207920000
   }
 ]
 ```

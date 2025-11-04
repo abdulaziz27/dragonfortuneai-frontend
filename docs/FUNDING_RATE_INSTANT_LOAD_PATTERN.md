@@ -190,6 +190,179 @@ calculateMetrics() {
 }
 ```
 
+### ✅ Phase 1.5: Analytics-Only Pattern (Jika Analytics Hanya dari API)
+
+**Use Case**: Jika analytics tidak bisa dihitung dari rawData (harus dari API), gunakan pattern ini untuk instant load.
+
+#### 1.5.1 Parallel Fetch Pattern
+```javascript
+async loadData(isAutoRefresh = false) {
+    if (this.isLoading) return;
+    this.isLoading = true;
+    
+    const isInitialLoad = this.rawData.length === 0;
+    const shouldShowLoading = isInitialLoad && !isAutoRefresh;
+    
+    if (shouldShowLoading) {
+        this.globalLoading = true;
+    }
+    
+    try {
+        // ⚡ CRITICAL: Fetch history AND analytics PARALLEL (not sequential)
+        // This ensures both finish faster, analytics appears as soon as API responds
+        const [historyData, analyticsData] = await Promise.allSettled([
+            this.apiService.fetchHistory({...}),
+            this.apiService.fetchAnalytics({...}) // Fetch parallel, not sequential
+        ]);
+        
+        // Handle history data
+        if (historyData.status === 'fulfilled' && historyData.value) {
+            this.rawData = historyData.value;
+            this.dataLoaded = true;
+            
+            // Render chart immediately
+            if (this.chartManager && this.rawData.length > 0) {
+                this.chartManager.renderChart(this.rawData, this.priceData);
+            }
+        }
+        
+        // Handle analytics data (from API only, no calculation)
+        if (analyticsData.status === 'fulfilled' && analyticsData.value) {
+            this.analyticsData = analyticsData.value;
+            this.mapAnalyticsToState(); // Map analytics to summary cards
+            console.log('✅ Analytics loaded from API (parallel fetch)');
+        } else {
+            // Analytics failed, use defaults or cached values
+            console.warn('⚠️ Analytics fetch failed, using defaults');
+            this.setDefaultAnalytics();
+        }
+        
+        // Save to cache (includes analytics)
+        this.saveToCache();
+        
+    } catch (error) {
+        if (error.name === 'AbortError') return;
+        console.error('❌ Error loading data:', error);
+    } finally {
+        this.isLoading = false;
+        if (shouldShowLoading) {
+            this.globalLoading = false;
+        }
+    }
+}
+```
+
+#### 1.5.2 Cache Analytics Pattern
+```javascript
+loadFromCache() {
+    try {
+        const cacheKey = this.getCacheKey();
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+            const data = JSON.parse(cached);
+            const cacheAge = Date.now() - data.timestamp;
+            const maxAge = 5 * 60 * 1000; // 5 minutes
+            
+            if (cacheAge < maxAge && data.rawData && data.rawData.length > 0) {
+                // Load raw data
+                this.rawData = data.rawData;
+                this.priceData = data.priceData || [];
+                
+                // ⚡ CRITICAL: Load analytics from cache (instant, no API call)
+                this.analyticsData = data.analyticsData || null;
+                
+                if (this.analyticsData) {
+                    // Map analytics to summary cards immediately
+                    this.mapAnalyticsToState();
+                    console.log('✅ Analytics loaded from cache (instant)');
+                } else {
+                    // No cached analytics, use defaults
+                    this.setDefaultAnalytics();
+                }
+                
+                this.dataLoaded = true;
+                this.summaryDataLoaded = true;
+                
+                // IMPORTANT: Hide loading skeletons immediately after cache loaded
+                this.globalLoading = false;
+                this.analyticsLoading = false;
+                
+                console.log('✅ Cache loaded:', {
+                    records: this.rawData.length,
+                    analyticsCached: !!this.analyticsData,
+                    age: Math.round(cacheAge / 1000) + 's'
+                });
+                return true;
+            } else {
+                localStorage.removeItem(cacheKey);
+            }
+        }
+    } catch (error) {
+        console.warn('⚠️ Cache load error:', error);
+    }
+    return false;
+}
+
+saveToCache() {
+    try {
+        const cacheKey = this.getCacheKey();
+        const data = {
+            timestamp: Date.now(),
+            rawData: this.rawData,
+            priceData: this.priceData,
+            analyticsData: this.analyticsData, // ⚡ CRITICAL: Save analytics too
+            // ... other summary card values if needed
+        };
+        localStorage.setItem(cacheKey, JSON.stringify(data));
+        console.log('💾 Data saved to cache (including analytics):', cacheKey);
+    } catch (error) {
+        console.warn('⚠️ Cache save error:', error);
+    }
+}
+```
+
+#### 1.5.3 Default Values Pattern (Fallback)
+```javascript
+setDefaultAnalytics() {
+    // Set safe defaults if analytics API fails or not available
+    // This ensures summary cards never show "--" or null
+    this.avgValue = 0;
+    this.maxValue = 0;
+    this.minValue = 0;
+    this.volatility = 0;
+    this.marketSignal = 'Neutral';
+    this.signalStrength = 'Normal';
+    
+    // OR: Calculate from rawData if possible (fallback calculation)
+    if (this.rawData.length > 0) {
+        const values = this.rawData.map(d => parseFloat(d.value));
+        this.avgValue = values.reduce((a, b) => a + b, 0) / values.length;
+        this.maxValue = Math.max(...values);
+        this.minValue = Math.min(...values);
+        console.log('✅ Default values calculated from rawData (fallback)');
+    }
+}
+
+mapAnalyticsToState() {
+    if (!this.analyticsData) {
+        this.setDefaultAnalytics();
+        return;
+    }
+    
+    // Map analytics API response to UI state
+    this.avgValue = this.analyticsData.average ?? this.avgValue;
+    this.maxValue = this.analyticsData.max ?? this.maxValue;
+    this.minValue = this.analyticsData.min ?? this.minValue;
+    this.volatility = this.analyticsData.volatility ?? this.volatility;
+    this.marketSignal = this.analyticsData.bias ? 
+        (this.analyticsData.bias === 'long_pays_short' ? 'Long' : 'Short') : 
+        'Neutral';
+    this.signalStrength = this.analyticsData.biasStrength ? 
+        `${(this.analyticsData.biasStrength * 100).toFixed(2)}%` : 
+        'Normal';
+}
+```
+
 ### ✅ Phase 2: Auto-Refresh (Silent)
 
 #### 2.1 Auto-Refresh Setup
@@ -448,6 +621,7 @@ saveToCache() {
 
 ### Checklist for Open Interest / Long-Short / Liquidations / Basis / Perp
 
+#### Option A: Analytics Dapat Dihitung dari RawData (seperti Funding Rate)
 1. ✅ **Controller Structure**
    - [ ] Add `isLoading` flag
    - [ ] Add `refreshInterval` for auto-refresh
@@ -459,26 +633,64 @@ saveToCache() {
    - [ ] Call `calculateMetrics()` IMMEDIATELY after `rawData` set
    - [ ] Render chart before analytics fetch
 
-3. ✅ **Auto-Refresh**
-   - [ ] Implement `startAutoRefresh()` with 5s interval
-   - [ ] Pass `isAutoRefresh = true` to `loadData()`
-   - [ ] Safety checks (hidden tab, isLoading, errorCount)
-   - [ ] Stop refresh on tab hidden, restart on visible
-
-4. ✅ **Metrics Calculation**
+3. ✅ **Metrics Calculation**
    - [ ] Always calculate from `rawData` (don't wait for analytics)
    - [ ] Calculate avg, max, min, median from rawData
    - [ ] Analytics API only for enhancement (market signal, bias)
+
+4. ✅ **Auto-Refresh**
+   - [ ] Implement `startAutoRefresh()` with 5s interval
+   - [ ] Pass `isAutoRefresh = true` to `loadData()`
+   - [ ] Safety checks (hidden tab, isLoading, errorCount)
 
 5. ✅ **Filter Changes**
    - [ ] All filter methods pass `isAutoRefresh = true`
    - [ ] No skeleton during filter changes
    - [ ] Instant metrics calculation after filter change
 
-6. ✅ **Cache (Optional)**
+6. ✅ **Cache**
    - [ ] Implement `loadFromCache()` and `saveToCache()`
    - [ ] Cache key includes all filter parameters
    - [ ] Cache age check (5 minutes max)
+
+#### Option B: Analytics Hanya dari API (seperti Open Interest)
+1. ✅ **Controller Structure**
+   - [ ] Add `isLoading` flag
+   - [ ] Add `refreshInterval` for auto-refresh
+   - [ ] Add `analyticsData` state variable
+   - [ ] Add `setDefaultAnalytics()` method
+
+2. ✅ **Initial Load**
+   - [ ] `globalLoading = false` initially (optimistic UI)
+   - [ ] Try `loadFromCache()` first (includes analytics)
+   - [ ] **Fetch history AND analytics PARALLEL** (Promise.allSettled)
+   - [ ] Render chart immediately after history loads
+   - [ ] Map analytics to state when API responds
+
+3. ✅ **Parallel Fetch Pattern**
+   - [ ] Use `Promise.allSettled()` for history + analytics
+   - [ ] Don't await analytics - render chart first
+   - [ ] Analytics updates summary cards when ready
+
+4. ✅ **Cache Analytics**
+   - [ ] Save `analyticsData` to cache
+   - [ ] Load `analyticsData` from cache (instant)
+   - [ ] Map analytics to state from cache immediately
+
+5. ✅ **Default Values**
+   - [ ] Implement `setDefaultAnalytics()` for fallback
+   - [ ] Use defaults if analytics API fails
+   - [ ] OR: Calculate from rawData if possible (fallback)
+
+6. ✅ **Auto-Refresh**
+   - [ ] Fetch analytics parallel with history refresh
+   - [ ] Pass `isAutoRefresh = true` (silent update)
+   - [ ] Safety checks (hidden tab, isLoading, errorCount)
+
+7. ✅ **Filter Changes**
+   - [ ] All filter methods pass `isAutoRefresh = true`
+   - [ ] Fetch analytics parallel with history
+   - [ ] No skeleton during filter changes
 
 ## 🎯 Expected Results
 
