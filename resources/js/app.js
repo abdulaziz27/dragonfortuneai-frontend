@@ -4,7 +4,6 @@ import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import jQuery from "jquery";
 window.$ = window.jQuery = jQuery;
 
-import Alpine from "alpinejs";
 import { 
     Chart, 
     CategoryScale,
@@ -44,11 +43,18 @@ Chart.defaults.dataset.clip = false;
 
 // Make Chart.js available globally
 window.Chart = Chart;
-window.Alpine = Alpine;
 
 // Alpine.js data and components
-// Note: Alpine.js is already loaded by Livewire
-document.addEventListener("alpine:init", () => {
+// Note: Livewire already loads Alpine on window; reuse that singleton.
+const registerAlpineModules = () => {
+    const Alpine = window.Alpine;
+    if (!Alpine) {
+        console.error(
+            "Alpine.js is not available on window.Alpine; dashboard modules cannot be registered."
+        );
+        return;
+    }
+
     const themePalette = {
         bullish: "#22c55e",
         bearish: "#ef4444",
@@ -324,10 +330,20 @@ document.addEventListener("alpine:init", () => {
     };
 
     const createGradientFill = (ctx, color, alpha = 0.18) => {
+        if (!ctx || !ctx.canvas) {
+            return hexToRgba(color, alpha);
+        }
         const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
         gradient.addColorStop(0, hexToRgba(color, alpha));
         gradient.addColorStop(1, hexToRgba(color, 0));
         return gradient;
+    };
+
+    const getCanvasContext = (canvas, type = "2d") => {
+        if (!canvas || typeof canvas.getContext !== "function") {
+            return null;
+        }
+        return canvas.getContext(type);
     };
 
     Alpine.store("onchainMetrics", {
@@ -673,7 +689,13 @@ document.addEventListener("alpine:init", () => {
             if (!canvas) {
                 return;
             }
-            const ctx = canvas.getContext("2d");
+            const ctx = getCanvasContext(canvas);
+            if (!ctx) {
+                console.warn(
+                    "MVRV chart canvas context is unavailable; skipping render."
+                );
+                return;
+            }
             if (!this.charts.mvrv) {
                 const zonePlugin = {
                     id: "mvrvZones",
@@ -790,7 +812,13 @@ document.addEventListener("alpine:init", () => {
             if (!canvas) {
                 return;
             }
-            const ctx = canvas.getContext("2d");
+            const ctx = getCanvasContext(canvas);
+            if (!ctx) {
+                console.warn(
+                    "SOPR chart canvas context is unavailable; skipping render."
+                );
+                return;
+            }
             if (!this.charts.sopr) {
                 this.charts.sopr = new Chart(ctx, {
                     type: "line",
@@ -846,7 +874,13 @@ document.addEventListener("alpine:init", () => {
             if (!canvas) {
                 return;
             }
-            const ctx = canvas.getContext("2d");
+            const ctx = getCanvasContext(canvas);
+            if (!ctx) {
+                console.warn(
+                    "Fund Flow chart canvas context is unavailable; skipping render."
+                );
+                return;
+            }
             if (!this.charts.fundFlow) {
                 this.charts.fundFlow = new Chart(ctx, {
                     type: "bar",
@@ -1044,7 +1078,13 @@ document.addEventListener("alpine:init", () => {
             if (!canvas) {
                 return;
             }
-            const ctx = canvas.getContext("2d");
+            const ctx = getCanvasContext(canvas);
+            if (!ctx) {
+                console.warn(
+                    "Market cap chart canvas context is unavailable; skipping render."
+                );
+                return;
+            }
             if (!this.charts.market) {
                 this.charts.market = new Chart(ctx, {
                     type: "line",
@@ -1117,7 +1157,13 @@ document.addEventListener("alpine:init", () => {
             if (!canvas) {
                 return;
             }
-            const ctx = canvas.getContext("2d");
+            const ctx = getCanvasContext(canvas);
+            if (!ctx) {
+                console.warn(
+                    "Secondary market chart canvas context is unavailable; skipping render."
+                );
+                return;
+            }
             if (!this.charts.secondary) {
                 this.charts.secondary = new Chart(ctx, {
                     type: "line",
@@ -1180,7 +1226,13 @@ document.addEventListener("alpine:init", () => {
             if (!canvas) {
                 return;
             }
-            const ctx = canvas.getContext("2d");
+            const ctx = getCanvasContext(canvas);
+            if (!ctx) {
+                console.warn(
+                    "Thermo cap chart canvas context is unavailable; skipping render."
+                );
+                return;
+            }
             if (!this.charts.thermo) {
                 this.charts.thermo = new Chart(ctx, {
                     type: "line",
@@ -1494,7 +1546,13 @@ document.addEventListener("alpine:init", () => {
             if (!canvas) {
                 return;
             }
-            const ctx = canvas.getContext("2d");
+            const ctx = getCanvasContext(canvas);
+            if (!ctx) {
+                console.warn(
+                    "Netflow chart canvas context is unavailable; skipping render."
+                );
+                return;
+            }
             if (!this.charts.netflow) {
                 this.charts.netflow = new Chart(ctx, {
                     type: "line",
@@ -1555,7 +1613,13 @@ document.addEventListener("alpine:init", () => {
             if (!canvas) {
                 return;
             }
-            const ctx = canvas.getContext("2d");
+            const ctx = getCanvasContext(canvas);
+            if (!ctx) {
+                console.warn(
+                    "Stablecoin flow chart canvas context is unavailable; skipping render."
+                );
+                return;
+            }
             if (!this.charts.flowSplit) {
                 this.charts.flowSplit = new Chart(ctx, {
                     type: "line",
@@ -1630,7 +1694,13 @@ document.addEventListener("alpine:init", () => {
             if (!canvas) {
                 return;
             }
-            const ctx = canvas.getContext("2d");
+            const ctx = getCanvasContext(canvas);
+            if (!ctx) {
+                console.warn(
+                    "Exchange comparison chart canvas context is unavailable; skipping render."
+                );
+                return;
+            }
             if (!this.charts.exchangeBar) {
                 this.charts.exchangeBar = new Chart(ctx, {
                     type: "bar",
@@ -1776,7 +1846,13 @@ document.addEventListener("alpine:init", () => {
             if (!canvas) {
                 return;
             }
-            const ctx = canvas.getContext("2d");
+            const ctx = getCanvasContext(canvas);
+            if (!ctx) {
+                console.warn(
+                    "Puell Multiple chart canvas context is unavailable; skipping render."
+                );
+                return;
+            }
             if (!this.charts.puell) {
                 this.charts.puell = new Chart(ctx, {
                     type: "line",
@@ -1984,7 +2060,6 @@ document.addEventListener("alpine:init", () => {
             }
         },
     }));
-});
 
 // Note: Alpine.start() is already called by Livewire
 
@@ -2062,3 +2137,13 @@ window.DFUtils = {
         return (number >= 0 ? "+" : "") + number.toFixed(decimals) + "%";
     },
 };
+
+};
+
+if (window.Alpine) {
+    registerAlpineModules();
+} else {
+    document.addEventListener("alpine:init", registerAlpineModules, {
+        once: true,
+    });
+}
