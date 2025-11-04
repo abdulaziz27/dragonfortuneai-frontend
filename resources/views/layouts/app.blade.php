@@ -184,23 +184,14 @@
                             </a>
                         </li>
                         <li class="df-sidebar-menu-item">
-                            <button class="df-sidebar-menu-button" @click="toggleSubmenu('onchain-metrics')">
+                            <a href="/onchain-metrics" class="df-sidebar-menu-button {{ request()->routeIs('onchain-metrics.*') ? 'active' : '' }}" @click="closeSidebar()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                                     <path d="M8 12h8"/>
                                     <path d="M12 8v8"/>
                                 </svg>
-                                <span>On‑Chain Metrics</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ms-auto" :class="{ 'rotate-90': openSubmenus['onchain-metrics'] }">
-                                    <path d="M9 18l6-6-6-6"/>
-                                </svg>
-                            </button>
-                            <div class="df-submenu{{ request()->routeIs('onchain-metrics.*') || request()->routeIs('onchain-ethereum.*') || request()->routeIs('onchain-exchange.*') || request()->routeIs('onchain-mining-price.*') ? ' show' : '' }}" :class="{ 'show': openSubmenus['onchain-metrics'] }">
-                                <a href="/onchain-metrics" class="df-submenu-item {{ request()->routeIs('onchain-metrics.index') || request()->routeIs('onchain-metrics.dashboard') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Core Metrics (with CQ)</a>
-                                <a href="/onchain-ethereum" class="df-submenu-item {{ request()->routeIs('onchain-ethereum.*') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Ethereum Network</a>
-                                <a href="/onchain-exchange" class="df-submenu-item {{ request()->routeIs('onchain-exchange.*') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Exchange Reserves</a>
-                                <a href="/onchain-mining-price" class="df-submenu-item {{ request()->routeIs('onchain-mining-price.*') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Mining & Price</a>
-                            </div>
+                                <span>On-Chain Metrics</span>
+                            </a>
                         </li>
                         <li class="df-sidebar-menu-item">
                             <a href="/options-metrics/dashboard" class="df-sidebar-menu-button {{ request()->routeIs('options-metrics.dashboard') ? 'active' : '' }}" @click="closeSidebar()">
@@ -479,19 +470,6 @@
     </div>
 
     @livewireScripts
-
-    {{-- OnChain Shared State Management --}}
-    <script src="{{ asset('js/onchain-shared-state.js') }}"></script>
-    
-    {{-- OnChain Cache Helper --}}
-    <script src="{{ asset('js/onchain-cache-helper.js') }}"></script>
-    
-    {{-- OnChain Error Handler --}}
-    <script src="{{ asset('js/onchain-error-handler.js') }}"></script>
-    
-    {{-- OnChain Chart Optimizer --}}
-    <script src="{{ asset('js/onchain-chart-optimizer.js') }}"></script>
-
 
     {{-- Additional Scripts from Views --}}
     @yield('scripts')
