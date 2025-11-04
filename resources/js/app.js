@@ -697,48 +697,6 @@ const registerAlpineModules = () => {
                 return;
             }
             if (!this.charts.mvrv) {
-                const zonePlugin = {
-                    id: "mvrvZones",
-                    beforeDraw: (chart) => {
-                        const context = chart?.ctx ?? null;
-                        const chartArea = chart?.chartArea ?? null;
-                        const axis = chart?.scales?.mvrv ?? null;
-                        if (!context || typeof context.save !== "function" || !chartArea || !axis) {
-                            return;
-                        }
-                        if (typeof axis.getPixelForValue !== "function") {
-                            return;
-                        }
-                        const sections = [
-                            {
-                                limit: Math.min(1, axis.max ?? 1),
-                                color: hexToRgba(themePalette.bullish, 0.12),
-                            },
-                            {
-                                limit: Math.min(3, axis.max ?? 3),
-                                color: hexToRgba(themePalette.neutral, 0.08),
-                            },
-                            {
-                                limit: axis.max ?? 4,
-                                color: hexToRgba(themePalette.bearish, 0.08),
-                            },
-                        ];
-                        let start = axis.getPixelForValue(axis.min ?? 0);
-                        sections.forEach((section) => {
-                            const top = axis.getPixelForValue(section.limit);
-                            context.save();
-                            context.fillStyle = section.color;
-                            context.fillRect(
-                                chartArea.left,
-                                Math.min(start, top),
-                                chartArea.right - chartArea.left,
-                                Math.abs(start - top)
-                            );
-                            context.restore();
-                            start = top;
-                        });
-                    },
-                };
                 this.charts.mvrv = new Chart(ctx, {
                     type: "line",
                     data: {
@@ -794,7 +752,6 @@ const registerAlpineModules = () => {
                             },
                         },
                     },
-                    plugins: [zonePlugin],
                 });
             }
             const labels = this.series.mvrv.map((item) => item.date);
