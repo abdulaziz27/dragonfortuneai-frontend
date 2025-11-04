@@ -66,6 +66,43 @@ document.addEventListener("alpine:init", () => {
         slate: "#1f2937",
     };
 
+    const apiBaseMeta = document.querySelector('meta[name="api-base-url"]');
+    const apiBaseUrl = (apiBaseMeta?.content || "").replace(/\/+$/, "");
+
+    const buildApiUrl = (path) => {
+        if (!path.startsWith("/")) {
+            path = `/${path}`;
+        }
+        return `${apiBaseUrl}${path}`;
+    };
+
+    const fetchJson = async (path, params = {}, { signal } = {}) => {
+        const url = new URL(buildApiUrl(path), window.location.origin);
+        url.search = new URLSearchParams(
+            Object.entries(params).reduce((acc, [key, value]) => {
+                if (value === undefined || value === null || value === "") {
+                    return acc;
+                }
+                acc[key] = value;
+                return acc;
+            }, {})
+        ).toString();
+
+        const response = await fetch(url.toString(), {
+            headers: { Accept: "application/json" },
+            signal,
+        });
+        if (!response.ok) {
+            const message = await response
+                .json()
+                .catch(() => ({ error: response.statusText }));
+            throw new Error(
+                message?.error || `Request failed with status ${response.status}`
+            );
+        }
+        return response.json();
+    };
+
     const assetProfiles = {
         BTC: {
             label: "Bitcoin",
@@ -303,7 +340,7 @@ document.addEventListener("alpine:init", () => {
     };
 
     Alpine.store("onchainMetrics", {
-        assets: ["BTC", "ETH", "SOL", "STABLECOINS"],
+        assets: ["BTC"],
         ranges: ["7D", "30D", "90D", "180D"],
         theme: themePalette,
         selectedAsset: "BTC",
@@ -312,7 +349,7 @@ document.addEventListener("alpine:init", () => {
         refreshTick: 0,
 
         setAsset(asset) {
-            if (this.selectedAsset === asset || !assetProfiles[asset]) {
+            if (!asset || this.selectedAsset === asset || !this.assets.includes(asset)) {
                 return;
             }
             this.selectedAsset = asset;
@@ -320,7 +357,7 @@ document.addEventListener("alpine:init", () => {
         },
 
         setRange(range) {
-            if (this.selectedRange === range || !rangeToDays[range]) {
+            if (this.selectedRange === range || !this.ranges.includes(range)) {
                 return;
             }
             this.selectedRange = range;
@@ -342,252 +379,208 @@ document.addEventListener("alpine:init", () => {
             }, 420);
         },
 
-        assetProfile() {
-            return assetProfiles[this.selectedAsset];
-        },
-
         assetLabel() {
-            return assetProfiles[this.selectedAsset].label;
+            return this.selectedAsset;
         },
 
-        generateValuationData(
-            asset = this.selectedAsset,
-            range = this.selectedRange
-        ) {
-            const profile = assetProfiles[asset] ?? assetProfiles.BTC;
-            const dates = generateDateRange(range);
-            const length = dates.length;
-            const mvrv = generateSeries(
-                length,
-                profile.mvrv.base,
-                profile.mvrv.amplitude,
-                profile.mvrv.noise,
-                profile.mvrv.min
-            );
-            const zScore = generateSeries(
-                length,
-                profile.zScore.base,
-                profile.zScore.amplitude,
-                profile.zScore.noise,
-                profile.zScore.min
-            );
-            const reserveRisk = generateSeries(
-                length,
-                profile.reserveRisk.base,
-                profile.reserveRisk.amplitude,
-                profile.reserveRisk.noise,
-                profile.reserveRisk.min
-            );
-            const sopr = generateSeries(
-                length,
-                profile.sopr.base,
-                profile.sopr.amplitude,
-                profile.sopr.noise,
-                profile.sopr.min
-            );
-            const dormancy = generateSeries(
-                length,
-                profile.dormancy.base,
-                profile.dormancy.amplitude,
-                profile.dormancy.noise,
-                profile.dormancy.min
-            );
-            const cdd = generateSeries(
-                length,
-                profile.cdd.base,
-                profile.cdd.amplitude,
-                profile.cdd.noise,
-                profile.cdd.min
-            );
+        assetSlug(asset = this.selectedAsset) {
+            return (asset || "").toLowerCase();
+        },
 
-            return {
-                dates,
-                mvrv,
-                zScore,
-                reserveRisk,
-                sopr,
-                dormancy,
-                cdd,
+        rangeLimit(range = this.selectedRange) {
+            return Math.min(rangeToDays[range] ?? 30, 365);
+        },
+
+        async fetchOnchainSeries(
+            metric,
+            { asset = this.selectedAsset, limit, valueKey } = {}
+        ) {
+            const params = {
+                asset: this.assetSlug(asset),
+                metric_type: metric,
+                limit: limit ?? this.rangeLimit(),
             };
-        },
-
-        generateSupplyData(
-            asset = this.selectedAsset,
-            range = this.selectedRange
-        ) {
-            const profile = assetProfiles[asset] ?? assetProfiles.BTC;
-            const dates = generateDateRange(range);
-            const length = dates.length;
-
-            const lthPercent = generateSeries(
-                length,
-                profile.lthBase * 100,
-                6,
-                3,
-                20
-            ).map((val) => clamp(val, 20, 92));
-            const sthPercent = lthPercent.map((val) =>
-                Number((100 - val).toFixed(2))
-            );
-
-            const totalSupplyUnits =
-                profile.totalSupply *
-                (asset === "STABLECOINS" ? 1_000_000_000 : 1_000_000);
-            const lthSupply = lthPercent.map((val) =>
-                Number(((val / 100) * totalSupplyUnits).toFixed(0))
-            );
-            const sthSupply = sthPercent.map((val) =>
-                Number(((val / 100) * totalSupplyUnits).toFixed(0))
-            );
-
-            const realizedCap = generateSeries(
-                length,
-                profile.realizedCap.base,
-                profile.realizedCap.amplitude,
-                profile.realizedCap.noise,
-                profile.realizedCap.base * 0.6
-            ).map((val) => Number(val.toFixed(2)));
-
-            const hodlDistributions = createDistributionSeries(
-                length,
-                profile.hodlBands
-            );
-
-            return {
-                dates,
-                lthPercent,
-                sthPercent,
-                lthSupply,
-                sthSupply,
-                realizedCap,
-                hodlDistributions,
-            };
-        },
-
-        generateFlowsData(
-            asset = this.selectedAsset,
-            range = this.selectedRange
-        ) {
-            const profile = assetProfiles[asset] ?? assetProfiles.BTC;
-            const dates = generateDateRange(range);
-            const length = dates.length;
-            const baseNetflow = profile.flowIntensity;
-
-            const inflow = generateSeries(
-                length,
-                baseNetflow.inflow,
-                baseNetflow.volatility,
-                baseNetflow.volatility / 2
-            );
-            const outflow = generateSeries(
-                length,
-                baseNetflow.outflow,
-                baseNetflow.volatility,
-                baseNetflow.volatility / 2
-            );
-            const netflow = inflow.map((value, idx) =>
-                Number((outflow[idx] - value).toFixed(2))
-            );
-
-            const stablecoinInflow = generateSeries(
-                length,
-                baseNetflow.inflow * 1.28,
-                baseNetflow.volatility * 1.1
-            );
-            const stablecoinOutflow = generateSeries(
-                length,
-                baseNetflow.outflow * 0.92,
-                baseNetflow.volatility * 0.9
-            );
-            const stablecoinNetflow = stablecoinInflow.map((value, idx) =>
-                Number((value - stablecoinOutflow[idx]).toFixed(2))
-            );
-
-            const heatmapData = buildHeatmapDataset(dates, profile);
-
-            const exchangeBreakdown = exchangeVenues.map((venue, idx) => {
-                const bias =
-                    idx % 2 === 0
-                        ? -(profile.flowIntensity.volatility * 0.6)
-                        : profile.flowIntensity.volatility * 0.6;
-                const venueNet =
-                    bias +
-                    (Math.random() - 0.5) *
-                        profile.flowIntensity.volatility *
-                        1.4;
-                return {
-                    venue,
-                    netflow: Number(venueNet.toFixed(2)),
-                    balance: Number(
-                        (Math.random() * 150 + 50 + idx * 35).toFixed(2)
-                    ),
-                };
-            });
-
-            return {
-                dates,
-                inflow,
-                outflow,
-                netflow,
-                stablecoinInflow,
-                stablecoinOutflow,
-                stablecoinNetflow,
-                heatmapData,
-                exchangeBreakdown,
-            };
-        },
-
-        generateMinerData(
-            asset = this.selectedAsset,
-            range = this.selectedRange
-        ) {
-            const profile = assetProfiles[asset] ?? assetProfiles.BTC;
-            const dates = generateDateRange(range);
-            const length = dates.length;
-
-            const minerReserve = generateSeries(
-                length,
-                profile.minerReserve.base,
-                profile.minerReserve.amplitude,
-                profile.minerReserve.noise,
-                profile.minerReserve.base * 0.4
-            );
-            const puellMultiple = generateSeries(
-                length,
-                profile.puell.base,
-                profile.puell.amplitude,
-                profile.puell.noise,
-                profile.puell.min
-            );
-
-            const whaleCohorts = {};
-            Object.entries(profile.whaleHoldings).forEach(([cohort, base]) => {
-                whaleCohorts[cohort] = generateSeries(
-                    length,
-                    base,
-                    base * 0.18,
-                    base * 0.08,
-                    base * 0.3
+            try {
+                const response = await fetchJson("/api/onchain/metrics", params);
+                const rows = Array.isArray(response?.data) ? response.data : [];
+                const key = valueKey || metric.replace(/-/g, "_");
+                const byDate = new Map();
+                rows.forEach((row) => {
+                    const date = row?.date;
+                    const values = row?.values || {};
+                    const rawValue = values[key];
+                    const value =
+                        typeof rawValue === "number" ? rawValue : Number(rawValue);
+                    if (!date || Number.isNaN(value)) {
+                        return;
+                    }
+                    if (!byDate.has(date)) {
+                        byDate.set(date, {
+                            date,
+                            value,
+                            values,
+                            raw: row,
+                        });
+                    }
+                });
+                return Array.from(byDate.values()).sort((a, b) =>
+                    a.date.localeCompare(b.date)
                 );
-            });
+            } catch (error) {
+                console.error("Failed to fetch on-chain metric", metric, error);
+                return [];
+            }
+        },
 
-            return {
-                dates,
-                minerReserve,
-                puellMultiple,
-                whaleCohorts,
+        async fetchMarketSeries(
+            metric,
+            { asset = this.selectedAsset, limit } = {}
+        ) {
+            const params = {
+                asset: this.assetSlug(asset),
+                metric_type: metric,
+                limit: limit ?? this.rangeLimit(),
             };
+            try {
+                const response = await fetchJson("/api/onchain/market-data", params);
+                const rows = Array.isArray(response?.data) ? response.data : [];
+                const aggregates = new Map();
+                rows.forEach((row) => {
+                    const date = row?.date;
+                    const values = row?.values || {};
+                    if (!date) {
+                        return;
+                    }
+                    const bucket = aggregates.get(date) || {
+                        date,
+                        totals: {},
+                        counts: {},
+                    };
+                    Object.entries(values).forEach(([field, raw]) => {
+                        let numeric = raw;
+                        if (typeof numeric !== "number") {
+                            numeric = Number(numeric);
+                        }
+                        if (!Number.isFinite(numeric)) {
+                            return;
+                        }
+                        bucket.totals[field] = (bucket.totals[field] || 0) + numeric;
+                        bucket.counts[field] = (bucket.counts[field] || 0) + 1;
+                    });
+                    aggregates.set(date, bucket);
+                });
+                return Array.from(aggregates.values())
+                    .map((entry) => {
+                        const averaged = {};
+                        Object.entries(entry.totals).forEach(([field, total]) => {
+                            const count = entry.counts[field] || 1;
+                            averaged[field] = total / count;
+                        });
+                        return {
+                            date: entry.date,
+                            values: averaged,
+                        };
+                    })
+                    .sort((a, b) => a.date.localeCompare(b.date));
+            } catch (error) {
+                console.error("Failed to fetch market data", metric, error);
+                return [];
+            }
         },
 
-        cohortBands() {
-            return cohortBands;
+        async fetchExchangeFlowSeries(
+            metric,
+            { asset = this.selectedAsset, limit, valueKey } = {}
+        ) {
+            const params = {
+                asset: this.assetSlug(asset),
+                metric_type: metric,
+                limit: limit ?? this.rangeLimit(),
+            };
+            try {
+                const response = await fetchJson(
+                    "/api/onchain/exchange-flows",
+                    params
+                );
+                const rows = Array.isArray(response?.data) ? response.data : [];
+                const key =
+                    valueKey ||
+                    (metric.includes("flow")
+                        ? `${metric.replace(/-/g, "_")}_total`
+                        : `${metric}_total`);
+                const dedup = new Map();
+                rows.forEach((row) => {
+                    const date = row?.date;
+                    const exchange = row?.exchange || "unknown";
+                    const values = row?.values || {};
+                    let value = values[key];
+                    if (typeof value !== "number") {
+                        value = Number(value);
+                    }
+                    if (!date || Number.isNaN(value)) {
+                        return;
+                    }
+                    const uniqueKey = `${exchange}:${date}`;
+                    if (!dedup.has(uniqueKey)) {
+                        dedup.set(uniqueKey, {
+                            date,
+                            exchange,
+                            value,
+                            values,
+                            raw: row,
+                        });
+                    }
+                });
+                return Array.from(dedup.values()).sort((a, b) => {
+                    if (a.date === b.date) {
+                        return a.exchange.localeCompare(b.exchange);
+                    }
+                    return a.date.localeCompare(b.date);
+                });
+            } catch (error) {
+                console.error("Failed to fetch exchange flow", metric, error);
+                return [];
+            }
         },
 
-        exchangeVenues() {
-            return exchangeVenues;
+        async fetchStablecoinFlows({ limit, exchange } = {}) {
+            const params = {
+                limit: limit ?? this.rangeLimit(),
+            };
+            if (exchange) {
+                params.exchange = exchange;
+            }
+            try {
+                const response = await fetchJson(
+                    "/api/onchain/stablecoin-flows",
+                    params
+                );
+                const rows = Array.isArray(response?.data) ? response.data : [];
+                return rows
+                    .map((row) => {
+                        const date = row?.date;
+                        if (!date) {
+                            return null;
+                        }
+                        return {
+                            date,
+                            exchange: row?.exchange || "unknown",
+                            inflow: Number(row?.inflow_usd ?? 0),
+                            outflow: Number(row?.outflow_usd ?? 0),
+                            netflow: Number(row?.netflow_usd ?? 0),
+                        };
+                    })
+                    .filter(Boolean);
+            } catch (error) {
+                console.error("Failed to fetch stablecoin flows", error);
+                return [];
+            }
         },
 
         formatNumber(value, decimals = 2) {
+            if (value === null || value === undefined || Number.isNaN(value)) {
+                return "--";
+            }
             return Number(value).toLocaleString("en-US", {
                 minimumFractionDigits: decimals,
                 maximumFractionDigits: decimals,
@@ -595,7 +588,10 @@ document.addEventListener("alpine:init", () => {
         },
 
         formatPercent(value, decimals = 2) {
-            return `${value.toFixed(decimals)}%`;
+            if (value === null || value === undefined || Number.isNaN(value)) {
+                return "--";
+            }
+            return `${Number(value).toFixed(decimals)}%`;
         },
 
         formatCompact,
@@ -604,1763 +600,1248 @@ document.addEventListener("alpine:init", () => {
         store: Alpine.store("onchainMetrics"),
         charts: {
             mvrv: null,
-            reserve: null,
-            cdd: null,
+            sopr: null,
+            fundFlow: null,
         },
-        insights: {
-            mvrv: "",
-            reserve: "",
-            cdd: "",
+        series: {
+            mvrv: [],
+            sopr: [],
+            fundFlow: [],
         },
         metrics: {
             mvrv: "--",
             mvrvDelta: "",
-            zScore: "--",
-            zScoreDelta: "",
             sopr: "--",
-            soprNarrative: "",
+            soprDelta: "",
+            fundFlow: "--",
+            fundFlowDelta: "",
         },
+        insights: {
+            mvrv: "",
+            sopr: "",
+            fundFlow: "",
+        },
+        state: {
+            loading: false,
+            error: null,
+        },
+        requestId: 0,
         init() {
-            queueMicrotask(() => {
-                this.renderCharts();
-            });
+            queueMicrotask(() => this.load());
             this.$watch(
                 () => [this.store.selectedAsset, this.store.selectedRange],
-                () => this.updateCharts()
+                () => this.load()
             );
             this.$watch(
                 () => this.store.refreshTick,
-                () => this.updateCharts()
+                () => this.load()
             );
         },
-        renderCharts() {
-            const data = this.store.generateValuationData();
-            this.buildMvrvChart(data);
-            this.buildReserveChart(data);
-            this.buildCddChart(data);
-            this.updateInsights(data);
+        async load() {
+            const current = ++this.requestId;
+            this.state.loading = true;
+            this.state.error = null;
+            try {
+                const limit = this.store.rangeLimit();
+                const [mvrv, sopr, fundFlow] = await Promise.all([
+                    this.store.fetchOnchainSeries("mvrv", { limit }),
+                    this.store.fetchOnchainSeries("sopr", {
+                        limit,
+                        valueKey: "sopr",
+                    }),
+                    this.store.fetchOnchainSeries("fund-flow-ratio", {
+                        limit,
+                        valueKey: "fund_flow_ratio",
+                    }),
+                ]);
+                if (this.requestId !== current) {
+                    return;
+                }
+                this.series = { mvrv, sopr, fundFlow };
+                this.renderOrUpdateCharts();
+                this.updateMetrics();
+            } catch (error) {
+                if (this.requestId !== current) {
+                    return;
+                }
+                console.error("Failed to load valuation metrics", error);
+                this.state.error = error.message || "Gagal memuat data.";
+            } finally {
+                if (this.requestId === current) {
+                    this.state.loading = false;
+                }
+            }
         },
-        updateCharts() {
-            if (!this.charts.mvrv || !this.charts.reserve || !this.charts.cdd) {
-                this.renderCharts();
+        renderOrUpdateCharts() {
+            this.renderMvrvChart();
+            this.renderSoprChart();
+            this.renderFundFlowChart();
+        },
+        renderMvrvChart() {
+            const canvas = this.$refs.mvrvChart;
+            if (!canvas) {
                 return;
             }
-            const data = this.store.generateValuationData();
-            this.applyMvrvData(data);
-            this.applyReserveData(data);
-            this.applyCddData(data);
-            this.updateInsights(data);
-        },
-        buildMvrvChart(data) {
-            const ctx = this.$refs.mvrvChart.getContext("2d");
-            const zonePlugin = {
-                id: "mvrvZones",
-                beforeDraw: (chart) => {
-                    const { ctx, chartArea, scales } = chart;
-                    const axis = scales.mvrv;
-                    if (!axis) {
-                        return;
-                    }
-                    const sections = [
-                        {
-                            limit: Math.min(1, axis.max),
-                            color: hexToRgba(themePalette.bullish, 0.12),
-                        },
-                        {
-                            limit: Math.min(3, axis.max),
-                            color: hexToRgba(themePalette.neutral, 0.08),
-                        },
-                        {
-                            limit: axis.max,
-                            color: hexToRgba(themePalette.bearish, 0.08),
-                        },
-                    ];
-                    let start = axis.getPixelForValue(axis.min);
-                    sections.forEach((section) => {
-                        const top = axis.getPixelForValue(section.limit);
-                        ctx.save();
-                        ctx.fillStyle = section.color;
-                        ctx.fillRect(
-                            chartArea.left,
-                            Math.min(start, top),
-                            chartArea.right - chartArea.left,
-                            Math.abs(start - top)
-                        );
-                        ctx.restore();
-                        start = top;
-                    });
-                },
-            };
-            this.charts.mvrv = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: data.dates,
-                    datasets: [
-                        {
-                            label: "MVRV Ratio",
-                            data: data.mvrv,
-                            borderColor: themePalette.bullish,
-                            backgroundColor: createGradientFill(
-                                ctx,
-                                themePalette.bullish,
-                                0.22
-                            ),
-                            borderWidth: 2,
-                            tension: 0.35,
-                            fill: true,
-                            pointRadius: 0,
-                            yAxisID: "mvrv",
-                        },
-                        {
-                            label: "Z-Score",
-                            data: data.zScore,
-                            borderColor: "#f97316",
-                            borderWidth: 2,
-                            borderDash: [5, 4],
-                            tension: 0.35,
-                            fill: false,
-                            pointRadius: 0,
-                            yAxisID: "zscore",
-                        },
-                    ],
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    interaction: { mode: "index", intersect: false },
-                    animation: { duration: 520, easing: "easeOutQuart" },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            align: "start",
-                            labels: { usePointStyle: true, boxWidth: 10 },
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) => {
-                                    const label = context.dataset.label ?? "";
-                                    return `${label}: ${context.parsed.y.toFixed(
-                                        2
-                                    )}`;
-                                },
+            const ctx = canvas.getContext("2d");
+            if (!this.charts.mvrv) {
+                const zonePlugin = {
+                    id: "mvrvZones",
+                    beforeDraw: (chart) => {
+                        const { ctx, chartArea, scales } = chart;
+                        const axis = scales.mvrv;
+                        if (!axis) return;
+                        const sections = [
+                            {
+                                limit: Math.min(1, axis.max ?? 1),
+                                color: hexToRgba(themePalette.bullish, 0.12),
                             },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                        },
-                        mvrv: {
-                            position: "left",
-                            title: { display: true, text: "MVRV" },
-                            grid: {
-                                color: hexToRgba(themePalette.slate, 0.08),
+                            {
+                                limit: Math.min(3, axis.max ?? 3),
+                                color: hexToRgba(themePalette.neutral, 0.08),
                             },
-                        },
-                        zscore: {
-                            position: "right",
-                            title: { display: true, text: "Z-Score" },
-                            grid: { drawOnChartArea: false },
-                        },
-                    },
-                },
-                plugins: [zonePlugin],
-            });
-            this.applyMvrvData(data);
-        },
-        applyMvrvData(data) {
-            const chart = this.charts.mvrv;
-            if (!chart) {
-                return;
-            }
-            chart.data.labels = data.dates;
-            chart.data.datasets[0].data = data.mvrv;
-            chart.data.datasets[1].data = data.zScore;
-            const mvrvMin = Math.min(...data.mvrv);
-            const mvrvMax = Math.max(...data.mvrv);
-            chart.options.scales.mvrv.suggestedMin = Math.min(0, mvrvMin - 0.4);
-            chart.options.scales.mvrv.suggestedMax = mvrvMax + 0.4;
-            const zMin = Math.min(...data.zScore);
-            const zMax = Math.max(...data.zScore);
-            chart.options.scales.zscore.suggestedMin = zMin - 0.6;
-            chart.options.scales.zscore.suggestedMax = zMax + 0.6;
-            chart.update();
-        },
-        buildReserveChart(data) {
-            const ctx = this.$refs.reserveChart.getContext("2d");
-            this.charts.reserve = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: data.dates,
-                    datasets: [
-                        {
-                            label: "Reserve Risk",
-                            data: data.reserveRisk,
-                            borderColor: "#0ea5e9",
-                            backgroundColor: createGradientFill(
-                                ctx,
-                                "#0ea5e9",
-                                0.18
-                            ),
-                            borderWidth: 2,
-                            tension: 0.35,
-                            fill: true,
-                            pointRadius: 0,
-                            yAxisID: "confidence",
-                        },
-                        {
-                            label: "SOPR",
-                            data: data.sopr,
-                            borderColor: themePalette.bearish,
-                            borderWidth: 2,
-                            borderDash: [4, 3],
-                            tension: 0.3,
-                            fill: false,
-                            pointRadius: 0,
-                            yAxisID: "sopr",
-                        },
-                        {
-                            label: "Dormancy",
-                            data: data.dormancy,
-                            borderColor: "#14b8a6",
-                            borderWidth: 2,
-                            tension: 0.3,
-                            fill: false,
-                            pointRadius: 0,
-                            yAxisID: "confidence",
-                        },
-                    ],
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    interaction: { mode: "index", intersect: false },
-                    animation: { duration: 520, easing: "easeOutQuart" },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            align: "start",
-                            labels: { usePointStyle: true, boxWidth: 10 },
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) => {
-                                    const label = context.dataset.label ?? "";
-                                    return `${label}: ${context.parsed.y.toFixed(
-                                        2
-                                    )}`;
-                                },
+                            {
+                                limit: axis.max ?? 4,
+                                color: hexToRgba(themePalette.bearish, 0.08),
                             },
-                        },
+                        ];
+                        let start = axis.getPixelForValue(axis.min ?? 0);
+                        sections.forEach((section) => {
+                            const top = axis.getPixelForValue(section.limit);
+                            ctx.save();
+                            ctx.fillStyle = section.color;
+                            ctx.fillRect(
+                                chartArea.left,
+                                Math.min(start, top),
+                                chartArea.right - chartArea.left,
+                                Math.abs(start - top)
+                            );
+                            ctx.restore();
+                            start = top;
+                        });
                     },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                        },
-                        confidence: {
-                            position: "left",
-                            title: {
+                };
+                this.charts.mvrv = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: "MVRV Ratio",
+                                data: [],
+                                borderColor: themePalette.bullish,
+                                backgroundColor: createGradientFill(
+                                    ctx,
+                                    themePalette.bullish,
+                                    0.22
+                                ),
+                                borderWidth: 2,
+                                tension: 0.35,
+                                fill: true,
+                                pointRadius: 0,
+                                yAxisID: "mvrv",
+                            },
+                        ],
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        interaction: { mode: "index", intersect: false },
+                        animation: { duration: 520, easing: "easeOutQuart" },
+                        plugins: {
+                            legend: {
                                 display: true,
-                                text: "Confidence Indicators",
+                                align: "start",
+                                labels: { usePointStyle: true, boxWidth: 10 },
                             },
-                            grid: {
-                                color: hexToRgba(themePalette.slate, 0.08),
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => {
+                                        const label = context.dataset.label ?? "";
+                                        return `${label}: ${context.parsed.y.toFixed(2)}`;
+                                    },
+                                },
                             },
                         },
-                        sopr: {
-                            position: "right",
-                            title: { display: true, text: "SOPR" },
-                            grid: { drawOnChartArea: false },
-                        },
-                    },
-                },
-            });
-            this.applyReserveData(data);
-        },
-        applyReserveData(data) {
-            const chart = this.charts.reserve;
-            if (!chart) {
-                return;
-            }
-            chart.data.labels = data.dates;
-            chart.data.datasets[0].data = data.reserveRisk;
-            chart.data.datasets[1].data = data.sopr;
-            chart.data.datasets[2].data = data.dormancy;
-            const reserveMin = Math.min(...data.reserveRisk, ...data.dormancy);
-            const reserveMax = Math.max(...data.reserveRisk, ...data.dormancy);
-            chart.options.scales.confidence.suggestedMin = Math.max(
-                0,
-                reserveMin - 0.2
-            );
-            chart.options.scales.confidence.suggestedMax = reserveMax + 0.2;
-            const soprMin = Math.min(...data.sopr);
-            const soprMax = Math.max(...data.sopr);
-            chart.options.scales.sopr.suggestedMin = soprMin - 0.1;
-            chart.options.scales.sopr.suggestedMax = soprMax + 0.1;
-            chart.update();
-        },
-        buildCddChart(data) {
-            const ctx = this.$refs.cddChart.getContext("2d");
-            this.charts.cdd = new Chart(ctx, {
-                type: "bar",
-                data: {
-                    labels: data.dates,
-                    datasets: [
-                        {
-                            label: "CDD (Coin Days Destroyed)",
-                            data: data.cdd,
-                            backgroundColor: hexToRgba("#f59e0b", 0.6),
-                            borderColor: "#f59e0b",
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            yAxisID: "cdd",
-                        },
-                        {
-                            label: "Dormancy",
-                            data: data.dormancy,
-                            borderColor: "#14b8a6",
-                            backgroundColor: createGradientFill(
-                                ctx,
-                                "#14b8a6",
-                                0.18
-                            ),
-                            borderWidth: 2,
-                            tension: 0.32,
-                            fill: true,
-                            pointRadius: 0,
-                            type: "line",
-                            yAxisID: "dormancy",
-                        },
-                    ],
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    interaction: { mode: "index", intersect: false },
-                    animation: { duration: 520, easing: "easeOutQuart" },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            align: "start",
-                            labels: { usePointStyle: true, boxWidth: 10 },
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) => {
-                                    const label = context.dataset.label ?? "";
-                                    return `${label}: ${context.parsed.y.toFixed(
-                                        2
-                                    )}`;
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                            },
+                            mvrv: {
+                                position: "left",
+                                title: { display: true, text: "MVRV" },
+                                grid: {
+                                    color: hexToRgba(themePalette.slate, 0.08),
                                 },
                             },
                         },
                     },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                        },
-                        cdd: {
-                            position: "left",
-                            title: {
-                                display: true,
-                                text: "Coin Days Destroyed",
-                            },
-                            grid: {
-                                color: hexToRgba(themePalette.slate, 0.08),
-                            },
-                        },
-                        dormancy: {
-                            position: "right",
-                            title: { display: true, text: "Dormancy" },
-                            grid: { drawOnChartArea: false },
-                        },
-                    },
-                },
-            });
-            this.applyCddData(data);
+                    plugins: [zonePlugin],
+                });
+            }
+            const labels = this.series.mvrv.map((item) => item.date);
+            this.charts.mvrv.data.labels = labels;
+            this.charts.mvrv.data.datasets[0].data = this.series.mvrv.map(
+                (item) => item.value
+            );
+            this.charts.mvrv.update();
         },
-        applyCddData(data) {
-            const chart = this.charts.cdd;
-            if (!chart) {
+        renderSoprChart() {
+            const canvas = this.$refs.reserveChart;
+            if (!canvas) {
                 return;
             }
-            chart.data.labels = data.dates;
-            chart.data.datasets[0].data = data.cdd;
-            chart.data.datasets[1].data = data.dormancy;
-            const cddMin = Math.min(...data.cdd);
-            const cddMax = Math.max(...data.cdd);
-            chart.options.scales.cdd.suggestedMin = Math.max(
-                0,
-                cddMin - cddMin * 0.2
+            const ctx = canvas.getContext("2d");
+            if (!this.charts.sopr) {
+                this.charts.sopr = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: "SOPR",
+                                data: [],
+                                borderColor: themePalette.bearish,
+                                borderWidth: 2,
+                                tension: 0.3,
+                                fill: false,
+                                pointRadius: 0,
+                            },
+                        ],
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        interaction: { mode: "index", intersect: false },
+                        animation: { duration: 520, easing: "easeOutQuart" },
+                        plugins: {
+                            legend: { display: true, align: "start" },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) =>
+                                        `SOPR: ${context.parsed.y.toFixed(3)}`,
+                                },
+                            },
+                        },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: {
+                                title: { display: true, text: "SOPR" },
+                                grid: {
+                                    color: hexToRgba(themePalette.slate, 0.08),
+                                },
+                            },
+                        },
+                    },
+                });
+            }
+            const labels = this.series.sopr.map((item) => item.date);
+            this.charts.sopr.data.labels = labels;
+            this.charts.sopr.data.datasets[0].data = this.series.sopr.map(
+                (item) => item.value
             );
-            chart.options.scales.cdd.suggestedMax = cddMax + cddMax * 0.2;
-            const dormancyMin = Math.min(...data.dormancy);
-            const dormancyMax = Math.max(...data.dormancy);
-            chart.options.scales.dormancy.suggestedMin = Math.max(
-                0,
-                dormancyMin - dormancyMin * 0.2
-            );
-            chart.options.scales.dormancy.suggestedMax =
-                dormancyMax + dormancyMax * 0.2;
-            chart.update();
+            this.charts.sopr.update();
         },
-        updateInsights(data) {
-            const asset = this.store.assetLabel();
-            const mvrvLatest = data.mvrv.at(-1) ?? 0;
-            const mvrvPrev = data.mvrv.at(-2) ?? mvrvLatest;
-            const zLatest = data.zScore.at(-1) ?? 0;
-            const reserveLatest = data.reserveRisk.at(-1) ?? 0;
-            const soprLatest = data.sopr.at(-1) ?? 1;
-            const cddLatest = data.cdd.at(-1) ?? 0;
-            const cddPrev = data.cdd.at(-2) ?? cddLatest;
-            const dormancyLatest = data.dormancy.at(-1) ?? 0;
-
-            let zTone;
-            if (zLatest > 1.4) {
-                zTone = `Z-Score ${asset} melonjak ke ${zLatest.toFixed(
-                    2
-                )} sehingga risiko pasar overheating meningkat.`;
-            } else if (zLatest < 0) {
-                zTone = `Z-Score ${asset} berada di ${zLatest.toFixed(
-                    2
-                )}, mencerminkan valuasi relatif dingin dan akumulatif.`;
-            } else {
-                zTone = `Z-Score ${asset} stabil di ${zLatest.toFixed(
-                    2
-                )}, menandakan valuasi berada di kisaran wajar.`;
+        renderFundFlowChart() {
+            const canvas = this.$refs.cddChart;
+            if (!canvas) {
+                return;
             }
-            let valuationTone;
-            if (mvrvLatest < 1) {
-                valuationTone = `MVRV ${asset} di ${mvrvLatest.toFixed(
-                    2
-                )} menegaskan kondisi undervaluation dan peluang akumulasi.`;
-            } else if (mvrvLatest < 2) {
-                valuationTone = `MVRV ${asset} di ${mvrvLatest.toFixed(
-                    2
-                )} masih netral; monitor konfirmasi tren sebelum agresif.`;
-            } else {
-                valuationTone = `MVRV ${asset} mencapai ${mvrvLatest.toFixed(
-                    2
-                )} sehingga potensi distribusi jangka pendek meningkat.`;
+            const ctx = canvas.getContext("2d");
+            if (!this.charts.fundFlow) {
+                this.charts.fundFlow = new Chart(ctx, {
+                    type: "bar",
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: "Fund Flow Ratio",
+                                data: [],
+                                backgroundColor: hexToRgba(
+                                    themePalette.neutral,
+                                    0.5
+                                ),
+                                borderColor: themePalette.neutral,
+                                borderWidth: 1,
+                            },
+                        ],
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) =>
+                                        `Fund Flow: ${context.parsed.y.toFixed(2)}`,
+                                },
+                            },
+                        },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: hexToRgba(themePalette.slate, 0.08),
+                                },
+                            },
+                        },
+                    },
+                });
             }
-            this.insights.mvrv = `${zTone} ${valuationTone}`;
-            const soprTone =
-                soprLatest > 1
-                    ? `SOPR ${asset} di ${soprLatest.toFixed(
-                          2
-                      )} menunjukkan profit-taking pelaku pasar masih dominan.`
-                    : `SOPR ${asset} di ${soprLatest.toFixed(
-                          2
-                      )} menandakan tekanan jual dapat diserap oleh demand on-chain.`;
-            const reserveTone =
-                reserveLatest < 0.4
-                    ? `Reserve Risk ${asset} rendah (${reserveLatest.toFixed(
-                          2
-                      )}) sehingga kepercayaan holder jangka panjang tetap kuat.`
-                    : `Reserve Risk ${asset} naik ke ${reserveLatest.toFixed(
-                          2
-                      )}; perhatikan risiko distribusi saat momentum melemah.`;
-            this.insights.reserve = `${soprTone} ${reserveTone}`;
+            const labels = this.series.fundFlow.map((item) => item.date);
+            this.charts.fundFlow.data.labels = labels;
+            this.charts.fundFlow.data.datasets[0].data =
+                this.series.fundFlow.map((item) => item.value);
+            this.charts.fundFlow.update();
+        },
+        computeChange(series) {
+            if (!Array.isArray(series) || series.length === 0) {
+                return {
+                    latest: null,
+                    previous: null,
+                    change: null,
+                    changePct: null,
+                };
+            }
+            const latest = series[series.length - 1]?.value ?? null;
+            const previous =
+                series.length > 1 ? series[series.length - 2]?.value ?? null : null;
+            const change =
+                latest !== null && previous !== null ? latest - previous : null;
+            const changePct =
+                change !== null && previous !== 0 && previous !== null
+                    ? (change / previous) * 100
+                    : null;
+            return { latest, previous, change, changePct };
+        },
+        updateMetrics() {
+            const mvrvStats = this.computeChange(this.series.mvrv);
+            const soprStats = this.computeChange(this.series.sopr);
+            const fundFlowStats = this.computeChange(this.series.fundFlow);
 
-            const cddDirection = cddLatest >= cddPrev ? "meningkat" : "menurun";
-            const cddAvg =
-                data.cdd.reduce((a, b) => a + b, 0) / data.cdd.length;
-            const cddTone =
-                cddLatest > cddAvg
-                    ? `Lonjakan CDD ke ${cddLatest.toFixed(
-                          0
-                      )} menandakan pergerakan supply lama — potensi distribusi pada fase puncak pasar.`
-                    : `CDD ${asset} ${cddDirection} ke ${cddLatest.toFixed(
-                          0
-                      )}, mengindikasikan supply lama masih tertahan.`;
-            const dormancyTone =
-                dormancyLatest > 70
-                    ? `Dormancy tinggi (${dormancyLatest.toFixed(
-                          0
-                      )}) menunjukkan coin tertahan lama; holder tidak tergoda jual.`
-                    : `Dormancy rendah (${dormancyLatest.toFixed(
-                          0
-                      )}) mengindikasikan pergerakan supply aktif meningkat.`;
-            this.insights.cdd = `${cddTone} ${dormancyTone}`;
+            this.metrics.mvrv = this.store.formatNumber(mvrvStats.latest, 2);
+            this.metrics.mvrvDelta =
+                mvrvStats.change !== null
+                    ? `${mvrvStats.change >= 0 ? "+" : ""}${mvrvStats.change.toFixed(3)}`
+                    : "--";
 
-            const direction = mvrvLatest >= mvrvPrev ? "Higher" : "Lower";
-            this.metrics.mvrv = mvrvLatest.toFixed(2);
-            this.metrics.mvrvDelta = `Prev: ${mvrvPrev.toFixed(
+            this.metrics.sopr = this.store.formatNumber(soprStats.latest, 3);
+            this.metrics.soprDelta =
+                soprStats.changePct !== null
+                    ? `${soprStats.changePct >= 0 ? "+" : ""}${soprStats.changePct.toFixed(2)}%`
+                    : "--";
+
+            this.metrics.fundFlow = this.store.formatNumber(
+                fundFlowStats.latest,
                 2
-            )} (${direction})`;
-            this.metrics.zScore = zLatest.toFixed(2);
-            this.metrics.zScoreDelta =
-                zLatest > 1.4
-                    ? "Hot zone watchlist"
-                    : zLatest < 0
-                    ? "Accumulation comfort"
-                    : "Neutral regime";
-            this.metrics.sopr = soprLatest.toFixed(2);
-            this.metrics.soprNarrative =
-                soprLatest > 1
-                    ? "Profit pressure building"
-                    : "Healthy absorption";
+            );
+            this.metrics.fundFlowDelta =
+                fundFlowStats.changePct !== null
+                    ? `${fundFlowStats.changePct >= 0 ? "+" : ""}${fundFlowStats.changePct.toFixed(2)}%`
+                    : "--";
+
+            this.insights.mvrv =
+                mvrvStats.latest === null
+                    ? "Data belum tersedia."
+                    : mvrvStats.latest >= 3
+                    ? "MVRV berada di zona panas. Waspadai risiko koreksi."
+                    : mvrvStats.latest <= 1
+                    ? "MVRV mendekati undervalued historis. Perhatikan peluang akumulasi."
+                    : "MVRV berada di zona netral.";
+
+            this.insights.sopr =
+                soprStats.latest === null
+                    ? "Menunggu data SOPR terbaru."
+                    : soprStats.latest > 1
+                    ? "SOPR > 1 menunjukkan dominasi take-profit."
+                    : "SOPR < 1 biasanya menandakan fase kapitulasai dan potensi akumulasi.";
+
+            this.insights.fundFlow =
+                fundFlowStats.latest === null
+                    ? "Fund flow ratio belum tersedia."
+                    : fundFlowStats.latest > 1
+                    ? "Fund flow ratio menunjukkan tekanan inflow ke bursa."
+                    : "Fund flow ratio rendah, tekanan jual relatif ringan.";
         },
     }));
+
+
     Alpine.data("supplyModule", () => ({
         store: Alpine.store("onchainMetrics"),
         charts: {
-            supply: null,
-            realizedCap: null,
-            hodl: null,
+            market: null,
+            secondary: null,
+            thermo: null,
         },
-        insights: {
-            supply: "",
-            realizedCap: "",
-            hodl: "",
-        },
+        series: [],
         metrics: {
-            lthShare: "--",
-            lthTrend: "",
-            sthShare: "--",
-            sthTrend: "",
+            marketCap: "--",
+            marketCapChange: "",
             realizedCap: "--",
-            realizedCapTrend: "",
+            realizedCapChange: "",
+            thermoCap: "--",
         },
+        state: {
+            loading: false,
+            error: null,
+        },
+        requestId: 0,
         init() {
-            queueMicrotask(() => {
-                this.renderCharts();
-            });
+            queueMicrotask(() => this.load());
             this.$watch(
                 () => [this.store.selectedAsset, this.store.selectedRange],
-                () => this.updateCharts()
+                () => this.load()
             );
             this.$watch(
                 () => this.store.refreshTick,
-                () => this.updateCharts()
+                () => this.load()
             );
         },
-        renderCharts() {
-            const data = this.store.generateSupplyData();
-            this.buildSupplyChart(data);
-            this.buildRealizedCapChart(data);
-            this.buildHodlChart(data);
-            this.updateInsights(data);
+        async load() {
+            const current = ++this.requestId;
+            this.state.loading = true;
+            this.state.error = null;
+            try {
+                const limit = this.store.rangeLimit();
+                const series = await this.store.fetchMarketSeries(
+                    "capitalization",
+                    { limit }
+                );
+                if (this.requestId !== current) {
+                    return;
+                }
+                this.series = series;
+                this.renderMarketChart();
+                this.renderSecondaryChart();
+                this.renderThermoChart();
+                this.updateMetrics();
+            } catch (error) {
+                if (this.requestId !== current) {
+                    return;
+                }
+                console.error("Failed to load market capitalization data", error);
+                this.state.error = error.message || "Gagal memuat data.";
+            } finally {
+                if (this.requestId === current) {
+                    this.state.loading = false;
+                }
+            }
         },
-        updateCharts() {
-            if (
-                !this.charts.supply ||
-                !this.charts.realizedCap ||
-                !this.charts.hodl
-            ) {
-                this.renderCharts();
+        numericSeries(valueKey) {
+            return this.series
+                .map(({ date, values }) => {
+                    const raw = values?.[valueKey];
+                    if (typeof raw !== "number" || Number.isNaN(raw)) {
+                        return null;
+                    }
+                    return { date, value: raw };
+                })
+                .filter(Boolean);
+        },
+        renderMarketChart() {
+            const canvas = this.$refs.supplyChart;
+            if (!canvas) {
                 return;
             }
-            const data = this.store.generateSupplyData();
-            this.applySupplyData(data);
-            this.applyRealizedCapData(data);
-            this.applyHodlData(data);
-            this.updateInsights(data);
-        },
-        buildSupplyChart(data) {
-            const ctx = this.$refs.supplyChart.getContext("2d");
-            this.charts.supply = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: data.dates,
-                    datasets: [
-                        {
-                            label: "Long-Term Holders",
-                            data: data.lthPercent,
-                            borderColor: themePalette.bullish,
-                            backgroundColor: createGradientFill(
-                                ctx,
-                                themePalette.bullish,
-                                0.32
-                            ),
-                            borderWidth: 2,
-                            tension: 0.35,
-                            fill: true,
-                            pointRadius: 0,
-                            yAxisID: "supply",
-                            stack: "holders",
-                        },
-                        {
-                            label: "Short-Term Holders",
-                            data: data.sthPercent,
-                            borderColor: themePalette.neutral,
-                            backgroundColor: createGradientFill(
-                                ctx,
-                                themePalette.neutral,
-                                0.24
-                            ),
-                            borderWidth: 2,
-                            tension: 0.35,
-                            fill: true,
-                            pointRadius: 0,
-                            yAxisID: "supply",
-                            stack: "holders",
-                        },
-                        {
-                            label: "Realized Cap (USD Bn)",
-                            data: data.realizedCap,
-                            borderColor: "#8b5cf6",
-                            borderWidth: 2,
-                            tension: 0.3,
-                            fill: false,
-                            pointRadius: 0,
-                            yAxisID: "cap",
-                        },
-                    ],
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    interaction: { mode: "index", intersect: false },
-                    animation: { duration: 520, easing: "easeOutQuart" },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            align: "start",
-                            labels: { usePointStyle: true, boxWidth: 10 },
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) => {
-                                    const label = context.dataset.label ?? "";
-                                    const value = context.parsed.y;
-                                    if (context.dataset.yAxisID === "cap") {
-                                        return `${label}: $${value.toFixed(
-                                            1
-                                        )}B`;
-                                    }
-                                    return `${label}: ${value.toFixed(1)}%`;
+            const ctx = canvas.getContext("2d");
+            if (!this.charts.market) {
+                this.charts.market = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: "Market Cap (Bn USD)",
+                                data: [],
+                                borderColor: themePalette.neutral,
+                                backgroundColor: createGradientFill(
+                                    ctx,
+                                    themePalette.neutral,
+                                    0.18
+                                ),
+                                tension: 0.35,
+                                borderWidth: 2,
+                                fill: true,
+                                pointRadius: 0,
+                            },
+                            {
+                                label: "Realized Cap (Bn USD)",
+                                data: [],
+                                borderColor: themePalette.bullish,
+                                borderWidth: 2,
+                                tension: 0.35,
+                                fill: false,
+                                pointRadius: 0,
+                            },
+                        ],
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        interaction: { mode: "index", intersect: false },
+                        plugins: {
+                            legend: { display: true, align: "start" },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) =>
+                                        `${context.dataset.label}: $${context.parsed.y.toFixed(2)}B`,
                                 },
                             },
                         },
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                        },
-                        supply: {
-                            min: 0,
-                            max: 100,
-                            position: "left",
-                            stacked: true,
-                            title: { display: true, text: "Supply Share (%)" },
-                            ticks: {
-                                callback: (value) => `${value}%`,
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: {
+                                title: { display: true, text: "USD (Billions)" },
+                                grid: { color: hexToRgba(themePalette.slate, 0.08) },
                             },
-                            grid: {
-                                color: hexToRgba(themePalette.slate, 0.08),
-                            },
-                        },
-                        cap: {
-                            position: "right",
-                            title: {
-                                display: true,
-                                text: "Realized Cap (USD Bn)",
-                            },
-                            grid: { drawOnChartArea: false },
                         },
                     },
-                },
-            });
-            this.applySupplyData(data);
-        },
-        applySupplyData(data) {
-            const chart = this.charts.supply;
-            if (!chart) {
-                return;
+                });
             }
-            chart.data.labels = data.dates;
-            chart.data.datasets[0].data = data.lthPercent;
-            chart.data.datasets[1].data = data.sthPercent;
-            chart.data.datasets[2].data = data.realizedCap;
-            chart.update();
-        },
-        buildRealizedCapChart(data) {
-            const ctx = this.$refs.realizedCapChart.getContext("2d");
-            this.charts.realizedCap = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: data.dates,
-                    datasets: [
-                        {
-                            label: "Realized Cap (USD Bn)",
-                            data: data.realizedCap,
-                            borderColor: "#8b5cf6",
-                            backgroundColor: createGradientFill(
-                                ctx,
-                                "#8b5cf6",
-                                0.22
-                            ),
-                            borderWidth: 2,
-                            tension: 0.35,
-                            fill: true,
-                            pointRadius: 0,
-                        },
-                    ],
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    interaction: { mode: "index", intersect: false },
-                    animation: { duration: 520, easing: "easeOutQuart" },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            align: "start",
-                            labels: { usePointStyle: true, boxWidth: 10 },
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) =>
-                                    `Realized Cap: $${context.parsed.y.toFixed(
-                                        1
-                                    )}B`,
-                            },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: "Realized Cap (USD Bn)",
-                            },
-                            grid: {
-                                color: hexToRgba(themePalette.slate, 0.08),
-                            },
-                            ticks: {
-                                callback: (value) => `$${value}B`,
-                            },
-                        },
-                    },
-                },
-            });
-            this.applyRealizedCapData(data);
-        },
-        applyRealizedCapData(data) {
-            const chart = this.charts.realizedCap;
-            if (!chart) {
-                return;
-            }
-            chart.data.labels = data.dates;
-            chart.data.datasets[0].data = data.realizedCap;
-            const capMin = Math.min(...data.realizedCap);
-            const capMax = Math.max(...data.realizedCap);
-            chart.options.scales.y.suggestedMin = Math.max(
-                0,
-                capMin - capMin * 0.1
+            const market = this.numericSeries("market_cap");
+            const realized = this.numericSeries("realized_cap");
+            const labels = market.map((item) => item.date);
+            const toBn = (value) => value / 1_000_000_000;
+            this.charts.market.data.labels = labels;
+            this.charts.market.data.datasets[0].data = market.map((item) =>
+                toBn(item.value)
             );
-            chart.options.scales.y.suggestedMax = capMax + capMax * 0.1;
-            chart.update();
-        },
-        buildHodlChart(data) {
-            const ctx = this.$refs.hodlChart.getContext("2d");
-            const gradients = hodlPalette.map((color) =>
-                createGradientFill(ctx, color, 0.28)
+            this.charts.market.data.datasets[1].data = realized.map((item) =>
+                toBn(item.value)
             );
-            const datasets = this.store.cohortBands().map((cohort, index) => ({
-                label: cohort,
-                data: data.hodlDistributions.map((entry) => entry[index]),
-                borderColor: hodlPalette[index],
-                backgroundColor: gradients[index],
-                fill: true,
-                tension: 0.32,
-                pointRadius: 0,
-                stack: "hodl",
-                yAxisID: "hodl",
-            }));
-            this.charts.hodl = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: data.dates,
-                    datasets,
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    interaction: { mode: "index", intersect: false },
-                    animation: { duration: 520, easing: "easeOutQuart" },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: "top",
-                            align: "start",
-                            labels: { usePointStyle: true, boxWidth: 8 },
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) =>
-                                    `${
-                                        context.dataset.label
-                                    }: ${context.parsed.y.toFixed(1)}%`,
-                            },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                        },
-                        hodl: {
-                            stacked: true,
-                            position: "left",
-                            min: 0,
-                            max: 100,
-                            title: {
-                                display: true,
-                                text: "Supply Cohorts (%)",
-                            },
-                            ticks: {
-                                callback: (value) => `${value}%`,
-                            },
-                            grid: {
-                                color: hexToRgba(themePalette.slate, 0.08),
-                            },
-                        },
-                    },
-                },
-            });
-            this.applyHodlData(data);
+            this.charts.market.update();
         },
-        applyHodlData(data) {
-            const chart = this.charts.hodl;
-            if (!chart) {
+        renderSecondaryChart() {
+            const canvas = this.$refs.realizedCapChart;
+            if (!canvas) {
                 return;
             }
-            chart.data.labels = data.dates;
-            chart.data.datasets.forEach((dataset, index) => {
-                dataset.data = data.hodlDistributions.map(
-                    (entry) => entry[index]
-                );
-            });
-            chart.update();
+            const ctx = canvas.getContext("2d");
+            if (!this.charts.secondary) {
+                this.charts.secondary = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: "Delta Cap (Bn USD)",
+                                data: [],
+                                borderColor: themePalette.bearish,
+                                borderWidth: 2,
+                                tension: 0.35,
+                                fill: false,
+                                pointRadius: 0,
+                            },
+                            {
+                                label: "Average Cap (Bn USD)",
+                                data: [],
+                                borderColor: "#8b5cf6",
+                                borderWidth: 2,
+                                borderDash: [6, 4],
+                                tension: 0.35,
+                                fill: false,
+                                pointRadius: 0,
+                            },
+                        ],
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        interaction: { mode: "index", intersect: false },
+                        plugins: {
+                            legend: { display: true, align: "start" },
+                        },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: {
+                                title: { display: true, text: "USD (Billions)" },
+                                grid: { color: hexToRgba(themePalette.slate, 0.08) },
+                            },
+                        },
+                    },
+                });
+            }
+            const delta = this.numericSeries("delta_cap");
+            const average = this.numericSeries("average_cap");
+            const labels = delta.map((item) => item.date);
+            const toBn = (value) => value / 1_000_000_000;
+            this.charts.secondary.data.labels = labels;
+            this.charts.secondary.data.datasets[0].data = delta.map((item) =>
+                toBn(item.value)
+            );
+            this.charts.secondary.data.datasets[1].data = average.map((item) =>
+                toBn(item.value)
+            );
+            this.charts.secondary.update();
         },
-        updateInsights(data) {
-            const asset = this.store.assetLabel();
-            const lthLatest = data.lthPercent.at(-1) ?? 0;
-            const lthPrev = data.lthPercent.at(-2) ?? lthLatest;
-            const sthLatest = data.sthPercent.at(-1) ?? 0;
-            const realizedLatest = data.realizedCap.at(-1) ?? 0;
-            const realizedPrev = data.realizedCap.at(-2) ?? realizedLatest;
-            const hodlLatest = data.hodlDistributions.at(-1) ?? [];
-            const stickyCohort = hodlLatest
-                .slice(3)
-                .reduce((acc, value) => acc + value, 0);
-            const lthTrend = lthLatest >= lthPrev ? "akumulasi" : "distribusi";
-            this.insights.supply = `Dominasi LTH ${asset} berada di ${lthLatest.toFixed(
-                1
-            )}% yang menandakan fase ${lthTrend}. STH tersisa ${sthLatest.toFixed(
-                1
-            )}% sehingga supply berputar tetap terkendali.`;
+        renderThermoChart() {
+            const canvas = this.$refs.hodlChart;
+            if (!canvas) {
+                return;
+            }
+            const ctx = canvas.getContext("2d");
+            if (!this.charts.thermo) {
+                this.charts.thermo = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: "Thermo Cap (Bn USD)",
+                                data: [],
+                                borderColor: "#f97316",
+                                borderWidth: 2,
+                                tension: 0.35,
+                                fill: false,
+                                pointRadius: 0,
+                            },
+                        ],
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        interaction: { mode: "index", intersect: false },
+                        plugins: {
+                            legend: { display: true, align: "start" },
+                        },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: {
+                                title: { display: true, text: "USD (Billions)" },
+                                grid: { color: hexToRgba(themePalette.slate, 0.08) },
+                            },
+                        },
+                    },
+                });
+            }
+            const thermo = this.numericSeries("thermo_cap");
+            const toBn = (value) => value / 1_000_000_000;
+            this.charts.thermo.data.labels = thermo.map((item) => item.date);
+            this.charts.thermo.data.datasets[0].data = thermo.map((item) =>
+                toBn(item.value)
+            );
+            this.charts.thermo.update();
+        },
+        computeChange(series) {
+            if (!series.length) {
+                return { latest: null, change: null, changePct: null };
+            }
+            const latest = series[series.length - 1].value;
+            const previous =
+                series.length > 1 ? series[series.length - 2].value : null;
+            const change =
+                previous !== null ? latest - previous : null;
+            const changePct =
+                change !== null && previous
+                    ? (change / previous) * 100
+                    : null;
+            return { latest, change, changePct };
+        },
+        updateMetrics() {
+            const marketStats = this.computeChange(
+                this.numericSeries("market_cap")
+            );
+            const realizedStats = this.computeChange(
+                this.numericSeries("realized_cap")
+            );
+            const thermoStats = this.computeChange(
+                this.numericSeries("thermo_cap")
+            );
+            const toBn = (value) =>
+                value === null ? null : value / 1_000_000_000;
 
-            const realizedGrowth = (
-                ((realizedLatest - realizedPrev) / realizedPrev) *
-                100
-            ).toFixed(1);
-            const realizedTone =
-                realizedLatest >= realizedPrev
-                    ? `Kenaikan realized cap ${asset} sebesar ${realizedGrowth}% ke $${realizedLatest.toFixed(
-                          1
-                      )}B menunjukkan aliran modal baru dan meningkatnya valuasi fundamental.`
-                    : `Realized cap ${asset} turun ${Math.abs(
-                          parseFloat(realizedGrowth)
-                      ).toFixed(1)}% ke $${realizedLatest.toFixed(
-                          1
-                      )}B; perhatikan potensi realisasi laba oleh holder.`;
-            this.insights.realizedCap = realizedTone;
+            this.metrics.marketCap =
+                marketStats.latest === null
+                    ? "--"
+                    : `$${toBn(marketStats.latest).toFixed(2)}B`;
+            this.metrics.marketCapChange =
+                marketStats.changePct === null
+                    ? ""
+                    : `${marketStats.changePct >= 0 ? "+" : ""}${marketStats.changePct.toFixed(2)}%`; 
 
-            const stickyTone =
-                stickyCohort >= 55
-                    ? "Gelombang supply berumur >6 bulan mendominasi dan menekan tekanan jual."
-                    : "Proporsi supply berumur panjang menurun; awasi potensi distribusi baru.";
-            this.insights.hodl = `Peningkatan supply berumur >1 tahun ${asset} mencapai ${stickyCohort.toFixed(
-                1
-            )}% - ${stickyTone} Hal ini menunjukkan berkurangnya tekanan jual dan keengganan melepas posisi.`;
-            this.metrics.lthShare = `${lthLatest.toFixed(1)}%`;
-            this.metrics.lthTrend =
-                lthLatest >= lthPrev
-                    ? "Bias: accumulation"
-                    : "Bias: distribution";
-            this.metrics.sthShare = `${sthLatest.toFixed(1)}%`;
-            this.metrics.sthTrend =
-                sthLatest <= 40 ? "Float tightening" : "Float expanding";
-            this.metrics.realizedCap = `$${realizedLatest.toFixed(1)}B`;
-            this.metrics.realizedCapTrend = `Prev: $${realizedPrev.toFixed(
-                1
-            )}B`;
+            this.metrics.realizedCap =
+                realizedStats.latest === null
+                    ? "--"
+                    : `$${toBn(realizedStats.latest).toFixed(2)}B`;
+            this.metrics.realizedCapChange =
+                realizedStats.changePct === null
+                    ? ""
+                    : `${realizedStats.changePct >= 0 ? "+" : ""}${realizedStats.changePct.toFixed(2)}%`;
+
+            this.metrics.thermoCap =
+                thermoStats.latest === null
+                    ? "--"
+                    : `$${toBn(thermoStats.latest).toFixed(2)}B`;
         },
     }));
+
+
     Alpine.data("flowsModule", () => ({
         store: Alpine.store("onchainMetrics"),
         charts: {
             netflow: null,
-            stablecoin: null,
-            heatmap: null,
+            flowSplit: null,
+            exchangeBar: null,
         },
-        insights: {
-            netflow: "",
-            liquidity: "",
-            heatmap: "",
-        },
-        metrics: {
-            netflow: "--",
-            netflowTone: "",
-            stablecoinNet: "--",
-            stablecoinTone: "",
-            dominantVenue: "",
+        series: {
+            netflow: [],
+            inflow: [],
+            outflow: [],
+            exchanges: { dates: [], datasets: [] },
+            stablecoin: {
+                inflow: [],
+                outflow: [],
+                netflow: [],
+            },
         },
         exchangeRows: [],
+        metrics: {
+            btcNetflow: "--",
+            btcNetflowTone: "",
+            stablecoinNet: "--",
+            stablecoinTone: "",
+            dominantVenue: "--",
+        },
+        state: {
+            loading: false,
+            error: null,
+        },
+        requestId: 0,
         init() {
-            queueMicrotask(() => {
-                this.renderCharts();
-            });
+            queueMicrotask(() => this.load());
             this.$watch(
                 () => [this.store.selectedAsset, this.store.selectedRange],
-                () => this.updateCharts()
+                () => this.load()
             );
             this.$watch(
                 () => this.store.refreshTick,
-                () => this.updateCharts()
+                () => this.load()
             );
         },
-        renderCharts() {
-            const data = this.store.generateFlowsData();
-            this.buildNetflowChart(data);
-            this.buildStablecoinChart(data);
-            this.buildHeatmapChart(data);
-            this.updateInsights(data);
-        },
-        updateCharts() {
-            if (
-                !this.charts.netflow ||
-                !this.charts.stablecoin ||
-                !this.charts.heatmap
-            ) {
-                this.renderCharts();
-                return;
-            }
-            const data = this.store.generateFlowsData();
-            this.applyNetflowData(data);
-            this.applyStablecoinData(data);
-            this.applyHeatmapData(data);
-            this.updateInsights(data);
-        },
-        buildNetflowChart(data) {
-            const ctx = this.$refs.netflowChart.getContext("2d");
-            this.charts.netflow = new Chart(ctx, {
-                type: "bar",
-                data: {
-                    labels: data.dates,
-                    datasets: [
-                        {
-                            label: "Exchange Netflow",
-                            data: data.netflow,
-                            backgroundColor: (context) => {
-                                const value = context.parsed.y ?? 0;
-                                const intensity = Math.min(
-                                    1,
-                                    Math.abs(value) / 12
-                                );
-                                return value >= 0
-                                    ? hexToRgba(
-                                          themePalette.bearish,
-                                          0.3 + intensity * 0.6
-                                      )
-                                    : hexToRgba(
-                                          themePalette.bullish,
-                                          0.3 + intensity * 0.6
-                                      );
-                            },
-                            borderRadius: 6,
-                            borderSkipped: false,
-                        },
-                    ],
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    interaction: { mode: "index", intersect: false },
-                    animation: { duration: 480, easing: "easeOutQuart" },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) =>
-                                    `Netflow: ${context.parsed.y.toFixed(2)}%`,
-                            },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: "Netflow (Relative %)",
-                            },
-                            grid: {
-                                color: hexToRgba(themePalette.slate, 0.08),
-                            },
-                            ticks: {
-                                callback: (value) => `${value}%`,
-                            },
-                        },
-                    },
-                },
-            });
-            this.applyNetflowData(data);
-        },
-        applyNetflowData(data) {
-            const chart = this.charts.netflow;
-            if (!chart) {
-                return;
-            }
-            chart.data.labels = data.dates;
-            chart.data.datasets[0].data = data.netflow;
-            chart.update();
-        },
-        buildStablecoinChart(data) {
-            const ctx = this.$refs.stablecoinChart.getContext("2d");
-            this.charts.stablecoin = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: data.dates,
-                    datasets: [
-                        {
-                            label: "Stablecoin Netflow",
-                            data: data.stablecoinNetflow,
-                            borderColor: "#f59e0b",
-                            backgroundColor: createGradientFill(
-                                ctx,
-                                "#f59e0b",
-                                0.22
-                            ),
-                            borderWidth: 2,
-                            tension: 0.32,
-                            fill: true,
-                            pointRadius: 0,
-                        },
-                        {
-                            label: "Stablecoin Inflow",
-                            data: data.stablecoinInflow,
-                            borderColor: themePalette.neutral,
-                            borderWidth: 1.5,
-                            borderDash: [6, 4],
-                            tension: 0.3,
-                            fill: false,
-                            pointRadius: 0,
-                        },
-                        {
-                            label: "Stablecoin Outflow",
-                            data: data.stablecoinOutflow,
-                            borderColor: themePalette.bearish,
-                            borderWidth: 1.5,
-                            borderDash: [4, 4],
-                            tension: 0.3,
-                            fill: false,
-                            pointRadius: 0,
-                        },
-                    ],
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    interaction: { mode: "index", intersect: false },
-                    animation: { duration: 480, easing: "easeOutQuart" },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: "top",
-                            align: "start",
-                            labels: { usePointStyle: true, boxWidth: 10 },
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) =>
-                                    `${
-                                        context.dataset.label
-                                    }: ${context.parsed.y.toFixed(2)}%`,
-                            },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: "Netflow (Relative %)",
-                            },
-                            grid: {
-                                color: hexToRgba(themePalette.slate, 0.08),
-                            },
-                            ticks: {
-                                callback: (value) => `${value}%`,
-                            },
-                        },
-                    },
-                },
-            });
-            this.applyStablecoinData(data);
-        },
-        applyStablecoinData(data) {
-            const chart = this.charts.stablecoin;
-            if (!chart) {
-                return;
-            }
-            chart.data.labels = data.dates;
-            chart.data.datasets[0].data = data.stablecoinNetflow;
-            chart.data.datasets[1].data = data.stablecoinInflow;
-            chart.data.datasets[2].data = data.stablecoinOutflow;
-            chart.update();
-        },
-        buildHeatmapChart(data) {
-            const ctx = this.$refs.heatmapChart.getContext("2d");
-            this.charts.heatmap = new Chart(ctx, {
-                type: "matrix",
-                data: {
-                    datasets: [
-                        {
-                            label: "Exchange Comparison",
-                            data: data.heatmapData,
-                            backgroundColor: (context) => {
-                                const value = context.raw.v ?? 0;
-                                const intensity = Math.min(
-                                    1,
-                                    Math.abs(value) / 12
-                                );
-                                return value >= 0
-                                    ? hexToRgba(
-                                          themePalette.bearish,
-                                          0.25 + intensity * 0.6
-                                      )
-                                    : hexToRgba(
-                                          themePalette.bullish,
-                                          0.25 + intensity * 0.6
-                                      );
-                            },
-                            borderColor: hexToRgba(themePalette.slate, 0.08),
-                            borderWidth: 1,
-                            width: (ctx) => {
-                                const chartArea = ctx.chart.chartArea;
-                                const count = ctx.chart.scales.x.ticks.length;
-                                return count ? chartArea.width / count - 4 : 0;
-                            },
-                            height: (ctx) => {
-                                const chartArea = ctx.chart.chartArea;
-                                const count = ctx.chart.scales.y.ticks.length;
-                                return count ? chartArea.height / count - 4 : 0;
-                            },
-                        },
-                    ],
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    interaction: { mode: "nearest", intersect: true },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                title: (items) => {
-                                    const item = items[0];
-                                    return `${item.raw.y} • ${item.raw.x}`;
-                                },
-                                label: (context) =>
-                                    `Netflow: ${context.raw.v.toFixed(2)}%`,
-                            },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            type: "category",
-                            offset: true,
-                            ticks: { maxRotation: 0 },
-                            grid: { display: false },
-                        },
-                        y: {
-                            type: "category",
-                            offset: true,
-                            grid: { display: false },
-                        },
-                    },
-                },
-            });
-            this.applyHeatmapData(data);
-        },
-        applyHeatmapData(data) {
-            const chart = this.charts.heatmap;
-            if (!chart) {
-                return;
-            }
-            chart.data.datasets[0].data = data.heatmapData;
-            chart.update();
-        },
-        updateInsights(data) {
-            const asset = this.store.assetLabel();
-            const netLatest = data.netflow.at(-1) ?? 0;
-            const netPrev = data.netflow.at(-2) ?? netLatest;
-            const stableNet = data.stablecoinNetflow.at(-1) ?? 0;
-            const stablePrev = data.stablecoinNetflow.at(-2) ?? stableNet;
-            const leadVenue = data.exchangeBreakdown.reduce(
-                (top, item) =>
-                    Math.abs(item.netflow) > Math.abs(top.netflow) ? item : top,
-                data.exchangeBreakdown[0] ?? {
-                    venue: "-",
-                    netflow: 0,
-                    balance: 0,
+        async load() {
+            const current = ++this.requestId;
+            this.state.loading = true;
+            this.state.error = null;
+            try {
+                const limit = this.store.rangeLimit();
+                const [netflowRaw, inflowRaw, outflowRaw, stablecoinRaw] = await Promise.all([
+                    this.store.fetchExchangeFlowSeries("netflow", {
+                        limit,
+                        valueKey: "netflow_total",
+                    }),
+                    this.store.fetchExchangeFlowSeries("inflow", {
+                        limit,
+                        valueKey: "inflow_total",
+                    }),
+                    this.store.fetchExchangeFlowSeries("outflow", {
+                        limit,
+                        valueKey: "outflow_total",
+                    }),
+                    this.store.fetchStablecoinFlows({
+                        limit,
+                    }),
+                ]);
+                if (this.requestId !== current) {
+                    return;
                 }
+                this.series.netflow = this.aggregateByDate(netflowRaw);
+                this.series.inflow = this.aggregateByDate(inflowRaw);
+                this.series.outflow = this.aggregateByDate(outflowRaw);
+                this.series.exchanges = this.buildExchangeDatasets(netflowRaw);
+                this.series.stablecoin = this.aggregateStablecoinFlows(stablecoinRaw);
+                this.exchangeRows = this.buildExchangeRows(netflowRaw);
+                this.renderNetflowChart();
+                this.renderFlowSplitChart();
+                this.renderExchangeBarChart();
+                this.updateMetrics();
+            } catch (error) {
+                if (this.requestId !== current) {
+                    return;
+                }
+                console.error("Failed to load exchange flow data", error);
+                this.state.error = error.message || "Gagal memuat data.";
+            } finally {
+                if (this.requestId === current) {
+                    this.state.loading = false;
+                }
+            }
+        },
+        aggregateByDate(records) {
+            const totals = new Map();
+            records.forEach(({ date, value }) => {
+                if (!date || typeof value !== "number" || Number.isNaN(value)) {
+                    return;
+                }
+                totals.set(date, (totals.get(date) || 0) + value);
+            });
+            return Array.from(totals.entries())
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([date, value]) => ({ date, value }));
+        },
+
+        aggregateStablecoinFlows(records) {
+            const totals = new Map();
+            records.forEach(({ date, inflow, outflow, netflow }) => {
+                if (!date) {
+                    return;
+                }
+                const bucket =
+                    totals.get(date) || { inflow: 0, outflow: 0, netflow: 0 };
+                if (typeof inflow === "number" && !Number.isNaN(inflow)) {
+                    bucket.inflow += inflow;
+                }
+                if (typeof outflow === "number" && !Number.isNaN(outflow)) {
+                    bucket.outflow += outflow;
+                }
+                if (typeof netflow === "number" && !Number.isNaN(netflow)) {
+                    bucket.netflow += netflow;
+                } else {
+                    bucket.netflow +=
+                        (typeof inflow === "number" ? inflow : 0) -
+                        (typeof outflow === "number" ? outflow : 0);
+                }
+                totals.set(date, bucket);
+            });
+            const ordered = Array.from(totals.entries()).sort((a, b) =>
+                a[0].localeCompare(b[0])
             );
-            const pressureTone =
-                netLatest >= 0
-                    ? `Net inflow ${asset} mencapai ${netLatest.toFixed(
-                          2
-                      )}% sehingga tekanan jual jangka pendek meningkat.`
-                    : `Net outflow ${asset} sebesar ${Math.abs(
-                          netLatest
-                      ).toFixed(2)}% menandakan akumulasi dari exchange.`;
-            const deltaTone =
-                Math.abs(netLatest) >= Math.abs(netPrev)
-                    ? "Momentum aliran semakin kuat."
-                    : "Momentum aliran melemah dibanding periode sebelumnya.";
-            this.insights.netflow = `${pressureTone} ${deltaTone}`;
-            const liquidityTone =
-                stableNet >= 0
-                    ? `Stablecoin netflow positif ${stableNet.toFixed(
-                          2
-                      )}% menunjukkan likuiditas siap mendukung kenaikan ${asset}.`
-                    : `Stablecoin netflow negatif ${Math.abs(stableNet).toFixed(
-                          2
-                      )}% menandakan likuiditas berpindah keluar dari pasar ${asset}.`;
-            const stableDelta =
-                Math.abs(stableNet) >= Math.abs(stablePrev)
-                    ? "Perubahan volume memperkuat sinyal likuiditas."
-                    : "Perubahan netflow melambat dibanding periode sebelumnya.";
-            this.insights.liquidity = `${liquidityTone} ${stableDelta}`;
-            this.insights.heatmap = `Exchange ${
-                leadVenue.venue
-            } mendominasi arus ${asset} dengan netflow ${leadVenue.netflow.toFixed(
-                2
-            )}% - amati peluang arbitrase lintas venue.`;
-            this.metrics.netflow = `${netLatest.toFixed(2)}%`;
-            this.metrics.netflowTone =
-                netLatest >= 0 ? "Bias: sell pressure" : "Bias: accumulation";
-            this.metrics.stablecoinNet = `${stableNet.toFixed(2)}%`;
+            return {
+                inflow: ordered.map(([date, values]) => ({
+                    date,
+                    value: values.inflow,
+                })),
+                outflow: ordered.map(([date, values]) => ({
+                    date,
+                    value: values.outflow,
+                })),
+                netflow: ordered.map(([date, values]) => ({
+                    date,
+                    value: values.netflow,
+                })),
+            };
+        },
+
+        formatUsd(value, decimals = 2) {
+            if (value === null || value === undefined || Number.isNaN(value)) {
+                return "--";
+            }
+            return `$${this.store.formatCompact(value, decimals)}`;
+        },
+        buildExchangeDatasets(records) {
+            const exchangeMap = new Map();
+            const totals = new Map();
+            const dateSet = new Set();
+            records.forEach(({ date, exchange, value }) => {
+                if (!date || !exchange || typeof value !== "number") {
+                    return;
+                }
+                dateSet.add(date);
+                const perDate = exchangeMap.get(exchange) || new Map();
+                perDate.set(date, (perDate.get(date) || 0) + value);
+                exchangeMap.set(exchange, perDate);
+                totals.set(
+                    exchange,
+                    (totals.get(exchange) || 0) + Math.abs(value)
+                );
+            });
+            const dates = Array.from(dateSet).sort((a, b) => a.localeCompare(b));
+            const topExchanges = Array.from(totals.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([name]) => name);
+            const palette = [
+                "#22c55e",
+                "#ef4444",
+                "#3b82f6",
+                "#f97316",
+                "#8b5cf6",
+            ];
+            const datasets = topExchanges.map((exchange, idx) => {
+                const perDate = exchangeMap.get(exchange) || new Map();
+                return {
+                    label: exchange,
+                    data: dates.map((date) => perDate.get(date) || 0),
+                    backgroundColor: hexToRgba(palette[idx % palette.length], 0.7),
+                };
+            });
+            return { dates, datasets };
+        },
+        buildExchangeRows(records) {
+            if (!records.length) {
+                return [];
+            }
+            const latestDate = records.reduce((acc, cur) =>
+                acc > cur.date ? acc : cur.date
+            , records[0].date);
+            const perExchange = new Map();
+            records.forEach(({ date, exchange, value }) => {
+                if (date !== latestDate || !exchange || typeof value !== "number") {
+                    return;
+                }
+                perExchange.set(exchange, (perExchange.get(exchange) || 0) + value);
+            });
+            return Array.from(perExchange.entries())
+                .map(([venue, netflow]) => ({
+                    venue,
+                    netflow,
+                    balance: Math.abs(netflow),
+                }))
+                .sort((a, b) => Math.abs(b.netflow) - Math.abs(a.netflow));
+        },
+        renderNetflowChart() {
+            const canvas = this.$refs.netflowChart;
+            if (!canvas) {
+                return;
+            }
+            const ctx = canvas.getContext("2d");
+            if (!this.charts.netflow) {
+                this.charts.netflow = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: "Aggregated Netflow",
+                                data: [],
+                                borderColor: themePalette.bearish,
+                                backgroundColor: createGradientFill(
+                                    ctx,
+                                    themePalette.bearish,
+                                    0.18
+                                ),
+                                borderWidth: 2,
+                                tension: 0.35,
+                                fill: true,
+                                pointRadius: 0,
+                            },
+                        ],
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        interaction: { mode: "index", intersect: false },
+                        plugins: {
+                            legend: { display: true, align: "start" },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) =>
+                                        `Netflow: ${context.parsed.y.toFixed(2)} BTC`,
+                                },
+                            },
+                        },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: {
+                                title: { display: true, text: "BTC" },
+                                grid: {
+                                    color: hexToRgba(themePalette.slate, 0.08),
+                                },
+                            },
+                        },
+                    },
+                });
+            }
+            this.charts.netflow.data.labels = this.series.netflow.map(
+                (item) => item.date
+            );
+            this.charts.netflow.data.datasets[0].data = this.series.netflow.map(
+                (item) => item.value
+            );
+            this.charts.netflow.update();
+        },
+        renderFlowSplitChart() {
+            const canvas = this.$refs.stablecoinChart;
+            if (!canvas) {
+                return;
+            }
+            const ctx = canvas.getContext("2d");
+            if (!this.charts.flowSplit) {
+                this.charts.flowSplit = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: "Stablecoin Inflow (USD)",
+                                data: [],
+                                borderColor: themePalette.bearish,
+                                tension: 0.3,
+                                fill: false,
+                                pointRadius: 0,
+                            },
+                            {
+                                label: "Stablecoin Outflow (USD)",
+                                data: [],
+                                borderColor: themePalette.bullish,
+                                tension: 0.3,
+                                fill: false,
+                                pointRadius: 0,
+                            },
+                        ],
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        interaction: { mode: "index", intersect: false },
+                        plugins: {
+                            legend: { display: true, align: "start" },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => {
+                                        const value = context.parsed.y;
+                                        return `${context.dataset.label}: $${value.toLocaleString("en-US", {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                        })}`;
+                                    },
+                                },
+                            },
+                        },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: {
+                                title: { display: true, text: "USD" },
+                                ticks: {
+                                    callback: (value) =>
+                                        `$${(value / 1_000_000_000).toFixed(2)}B`,
+                                },
+                                grid: {
+                                    color: hexToRgba(themePalette.slate, 0.08),
+                                },
+                            },
+                        },
+                    },
+                });
+            }
+            const stablecoin = this.series.stablecoin;
+            const labels = stablecoin.inflow.map((item) => item.date);
+            this.charts.flowSplit.data.labels = labels;
+            this.charts.flowSplit.data.datasets[0].data = stablecoin.inflow.map(
+                (item) => item.value
+            );
+            this.charts.flowSplit.data.datasets[1].data = stablecoin.outflow.map(
+                (item) => item.value
+            );
+            this.charts.flowSplit.update();
+        },
+        renderExchangeBarChart() {
+            const canvas = this.$refs.heatmapChart;
+            if (!canvas) {
+                return;
+            }
+            const ctx = canvas.getContext("2d");
+            if (!this.charts.exchangeBar) {
+                this.charts.exchangeBar = new Chart(ctx, {
+                    type: "bar",
+                    data: {
+                        labels: [],
+                        datasets: [],
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        scales: {
+                            x: {
+                                stacked: true,
+                                grid: { display: false },
+                            },
+                            y: {
+                                stacked: true,
+                                title: { display: true, text: "Netflow (BTC)" },
+                                grid: {
+                                    color: hexToRgba(themePalette.slate, 0.08),
+                                },
+                            },
+                        },
+                        plugins: {
+                            legend: { display: true, align: "start" },
+                        },
+                    },
+                });
+            }
+            this.charts.exchangeBar.data.labels = this.series.exchanges.dates;
+            this.charts.exchangeBar.data.datasets = this.series.exchanges.datasets;
+            this.charts.exchangeBar.update();
+        },
+        updateMetrics() {
+            const btcSeries = this.series.netflow;
+            if (!btcSeries.length) {
+                this.metrics.btcNetflow = "--";
+                this.metrics.btcNetflowTone = "Belum ada data netflow.";
+            } else {
+                const latest = btcSeries.at(-1);
+                const previous =
+                    btcSeries.length > 1 ? btcSeries.at(-2) : null;
+                this.metrics.btcNetflow = `${latest.value >= 0 ? "+" : ""}${latest.value.toFixed(2)} BTC`;
+                const change = previous ? latest.value - previous.value : null;
+                this.metrics.btcNetflowTone =
+                    change === null
+                        ? ""
+                        : change > 0
+                        ? "Tekanan inflow meningkat dibanding periode sebelumnya."
+                        : change < 0
+                        ? "Inflow mereda dibanding periode sebelumnya."
+                        : "Netflow relatif stabil.";
+            }
+
+            this.metrics.dominantVenue = this.exchangeRows[0]?.venue ?? "--";
+
+            const stablecoinSeries = this.series.stablecoin?.netflow ?? [];
+            if (!stablecoinSeries.length) {
+                this.metrics.stablecoinNet = "--";
+                this.metrics.stablecoinTone = "Data stablecoin belum tersedia.";
+                return;
+            }
+
+            const latestStable = stablecoinSeries.at(-1)?.value ?? null;
+            const previousStable =
+                stablecoinSeries.length > 1
+                    ? stablecoinSeries.at(-2)?.value ?? null
+                    : null;
+
+            this.metrics.stablecoinNet = this.formatUsd(latestStable, 2);
+            if (previousStable === null) {
+                this.metrics.stablecoinTone = "";
+                return;
+            }
+
+            const delta = latestStable - previousStable;
             this.metrics.stablecoinTone =
-                stableNet >= 0 ? "Liquidity building" : "Liquidity draining";
-            this.metrics.dominantVenue = `${
-                leadVenue.venue
-            } (${leadVenue.netflow.toFixed(2)}%)`;
-            this.exchangeRows = data.exchangeBreakdown.map((item) => ({
-                ...item,
-                netflow: item.netflow,
-                balance: item.balance,
-            }));
+                delta > 0
+                    ? "Stablecoin inflow ke exchange meningkat."
+                    : delta < 0
+                    ? "Stablecoin cenderung keluar dari exchange."
+                    : "Stablecoin netflow relatif stabil.";
         },
     }));
+
+
     Alpine.data("minersWhalesModule", () => ({
         store: Alpine.store("onchainMetrics"),
         charts: {
-            miner: null,
-            whale: null,
-            whaleChange: null,
+            puell: null,
         },
-        insights: {
-            miner: "",
-            whale: "",
-            whaleChange: "",
-        },
+        series: [],
         metrics: {
-            minerReserve: "--",
-            minerTrend: "",
-            puell: "--",
-            puellTone: "",
-            whaleLeader: "",
+            puellMultiple: "--",
+            puellChange: "",
         },
+        state: {
+            loading: false,
+            error: null,
+        },
+        requestId: 0,
         init() {
-            queueMicrotask(() => {
-                this.renderCharts();
-            });
+            queueMicrotask(() => this.load());
             this.$watch(
                 () => [this.store.selectedAsset, this.store.selectedRange],
-                () => this.updateCharts()
+                () => this.load()
             );
             this.$watch(
                 () => this.store.refreshTick,
-                () => this.updateCharts()
+                () => this.load()
             );
         },
-        renderCharts() {
-            const data = this.store.generateMinerData();
-            this.buildMinerChart(data);
-            this.buildWhaleChart(data);
-            this.buildWhaleChangeChart(data);
-            this.updateInsights(data);
-        },
-        updateCharts() {
-            if (
-                !this.charts.miner ||
-                !this.charts.whale ||
-                !this.charts.whaleChange
-            ) {
-                this.renderCharts();
-                return;
-            }
-            const data = this.store.generateMinerData();
-            this.applyMinerData(data);
-            this.applyWhaleData(data);
-            this.applyWhaleChangeData(data);
-            this.updateInsights(data);
-        },
-        buildMinerChart(data) {
-            const ctx = this.$refs.minerChart.getContext("2d");
-            this.charts.miner = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: data.dates,
-                    datasets: [
-                        {
-                            label: "Miner Reserve (M units)",
-                            data: data.minerReserve,
-                            borderColor: themePalette.neutral,
-                            backgroundColor: createGradientFill(
-                                ctx,
-                                themePalette.neutral,
-                                0.24
-                            ),
-                            borderWidth: 2,
-                            tension: 0.32,
-                            fill: true,
-                            pointRadius: 0,
-                            yAxisID: "reserve",
-                        },
-                        {
-                            label: "Puell Multiple",
-                            data: data.puellMultiple,
-                            borderColor: themePalette.bearish,
-                            borderWidth: 2,
-                            borderDash: [5, 4],
-                            tension: 0.3,
-                            fill: false,
-                            pointRadius: 0,
-                            yAxisID: "puell",
-                        },
-                    ],
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    interaction: { mode: "index", intersect: false },
-                    animation: { duration: 500, easing: "easeOutQuart" },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: "top",
-                            align: "start",
-                            labels: { usePointStyle: true, boxWidth: 10 },
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) =>
-                                    `${
-                                        context.dataset.label
-                                    }: ${context.parsed.y.toFixed(2)}`,
-                            },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                        },
-                        reserve: {
-                            position: "left",
-                            title: {
-                                display: true,
-                                text: "Miner Reserve (M units)",
-                            },
-                            grid: {
-                                color: hexToRgba(themePalette.slate, 0.08),
-                            },
-                        },
-                        puell: {
-                            position: "right",
-                            title: { display: true, text: "Puell Multiple" },
-                            grid: { drawOnChartArea: false },
-                        },
-                    },
-                },
-            });
-            this.applyMinerData(data);
-        },
-        applyMinerData(data) {
-            const chart = this.charts.miner;
-            if (!chart) {
-                return;
-            }
-            chart.data.labels = data.dates;
-            chart.data.datasets[0].data = data.minerReserve;
-            chart.data.datasets[1].data = data.puellMultiple;
-            const reserveUnit =
-                this.store.selectedAsset === "STABLECOINS" ? "B" : "M";
-            chart.data.datasets[0].label = `Miner Reserve (${reserveUnit} units)`;
-            chart.options.scales.reserve.title.text = `Miner Reserve (${reserveUnit} units)`;
-            const reserveMin = Math.min(...data.minerReserve);
-            const reserveMax = Math.max(...data.minerReserve);
-            chart.options.scales.reserve.suggestedMin = Math.max(
-                0,
-                reserveMin - reserveMin * 0.2
-            );
-            chart.options.scales.reserve.suggestedMax =
-                reserveMax + reserveMax * 0.2;
-            const puellMin = Math.min(...data.puellMultiple);
-            const puellMax = Math.max(...data.puellMultiple);
-            chart.options.scales.puell.suggestedMin = Math.max(
-                0,
-                puellMin - 0.4
-            );
-            chart.options.scales.puell.suggestedMax = puellMax + 0.4;
-            chart.update();
-        },
-        buildWhaleChart(data) {
-            const ctx = this.$refs.whaleChart.getContext("2d");
-            const cohorts = Object.keys(data.whaleCohorts);
-            const datasets = cohorts.map((cohort, index) => ({
-                label: cohort,
-                data: data.whaleCohorts[cohort],
-                borderColor: whalePalette[index % whalePalette.length],
-                borderWidth: 2,
-                tension: 0.32,
-                fill: false,
-                pointRadius: 0,
-            }));
-            this.charts.whale = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: data.dates,
-                    datasets,
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    interaction: { mode: "index", intersect: false },
-                    animation: { duration: 500, easing: "easeOutQuart" },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: "top",
-                            align: "start",
-                            labels: { usePointStyle: true, boxWidth: 10 },
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) =>
-                                    `${
-                                        context.dataset.label
-                                    }: ${context.parsed.y.toFixed(2)} ${
-                                        this.store.selectedAsset ===
-                                        "STABLECOINS"
-                                            ? "B"
-                                            : "M"
-                                    }`,
-                            },
-                        },
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text:
-                                    this.store.selectedAsset === "STABLECOINS"
-                                        ? "Holdings (B units)"
-                                        : "Holdings (M units)",
-                            },
-                            grid: {
-                                color: hexToRgba(themePalette.slate, 0.08),
-                            },
-                        },
-                    },
-                },
-            });
-            this.applyWhaleData(data);
-        },
-        applyWhaleData(data) {
-            const chart = this.charts.whale;
-            if (!chart) {
-                return;
-            }
-            chart.data.labels = data.dates;
-            chart.data.datasets.forEach((dataset) => {
-                dataset.data = data.whaleCohorts[dataset.label];
-            });
-            chart.options.scales.y.title.text =
-                this.store.selectedAsset === "STABLECOINS"
-                    ? "Holdings (B units)"
-                    : "Holdings (M units)";
-            chart.update();
-        },
-        buildWhaleChangeChart(data) {
-            const ctx = this.$refs.whaleChangeChart.getContext("2d");
-            const cohorts = Object.keys(data.whaleCohorts);
-            const firstCohort = cohorts[0];
-
-            // Calculate daily changes
-            const dailyChanges = data.whaleCohorts[firstCohort].map(
-                (val, idx, arr) => {
-                    if (idx === 0) return 0;
-                    return Number((val - arr[idx - 1]).toFixed(2));
+        async load() {
+            const current = ++this.requestId;
+            this.state.loading = true;
+            this.state.error = null;
+            try {
+                const limit = this.store.rangeLimit();
+                const series = await this.store.fetchOnchainSeries(
+                    "puell-multiple",
+                    { limit, valueKey: "puell_multiple" }
+                );
+                if (this.requestId !== current) {
+                    return;
                 }
-            );
-
-            // Calculate cumulative changes
-            const cumulativeChanges = dailyChanges.reduce((acc, val) => {
-                const prev = acc.length > 0 ? acc[acc.length - 1] : 0;
-                acc.push(Number((prev + val).toFixed(2)));
-                return acc;
-            }, []);
-
-            this.charts.whaleChange = new Chart(ctx, {
-                type: "bar",
-                data: {
-                    labels: data.dates,
-                    datasets: [
-                        {
-                            label: "Daily Change",
-                            data: dailyChanges,
-                            backgroundColor: (context) => {
-                                const value = context.parsed.y ?? 0;
-                                return value >= 0
-                                    ? hexToRgba(themePalette.bullish, 0.7)
-                                    : hexToRgba(themePalette.bearish, 0.7);
+                this.series = series;
+                this.renderPuellChart();
+                this.updateMetrics();
+            } catch (error) {
+                if (this.requestId !== current) {
+                    return;
+                }
+                console.error("Failed to load miner metrics", error);
+                this.state.error = error.message || "Gagal memuat data.";
+            } finally {
+                if (this.requestId === current) {
+                    this.state.loading = false;
+                }
+            }
+        },
+        renderPuellChart() {
+            const canvas = this.$refs.minerReserveChart;
+            if (!canvas) {
+                return;
+            }
+            const ctx = canvas.getContext("2d");
+            if (!this.charts.puell) {
+                this.charts.puell = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: "Puell Multiple",
+                                data: [],
+                                borderColor: themePalette.bullish,
+                                borderWidth: 2,
+                                tension: 0.35,
+                                fill: false,
+                                pointRadius: 0,
                             },
-                            borderColor: (context) => {
-                                const value = context.parsed.y ?? 0;
-                                return value >= 0
-                                    ? themePalette.bullish
-                                    : themePalette.bearish;
-                            },
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            yAxisID: "change",
-                        },
-                        {
-                            label: "Cumulative Change",
-                            data: cumulativeChanges,
-                            type: "line",
-                            borderColor: "#8b5cf6",
-                            backgroundColor: createGradientFill(
-                                ctx,
-                                "#8b5cf6",
-                                0.15
-                            ),
-                            borderWidth: 2,
-                            tension: 0.3,
-                            fill: true,
-                            pointRadius: 0,
-                            yAxisID: "cumulative",
-                        },
-                    ],
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    interaction: { mode: "index", intersect: false },
-                    animation: { duration: 500, easing: "easeOutQuart" },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: "top",
-                            align: "start",
-                            labels: { usePointStyle: true, boxWidth: 10 },
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) => {
-                                    const unit =
-                                        this.store.selectedAsset ===
-                                        "STABLECOINS"
-                                            ? "B"
-                                            : "M";
-                                    return `${context.dataset.label}: ${
-                                        context.parsed.y >= 0 ? "+" : ""
-                                    }${context.parsed.y.toFixed(2)} ${unit}`;
+                        ],
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        responsive: true,
+                        interaction: { mode: "index", intersect: false },
+                        plugins: {
+                            legend: { display: true, align: "start" },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) =>
+                                        `Puell Multiple: ${context.parsed.y.toFixed(3)}`,
                                 },
                             },
                         },
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                        },
-                        change: {
-                            position: "left",
-                            title: {
-                                display: true,
-                                text:
-                                    this.store.selectedAsset === "STABLECOINS"
-                                        ? "Daily Change (B units)"
-                                        : "Daily Change (M units)",
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: {
+                                title: { display: true, text: "Multiple" },
+                                grid: { color: hexToRgba(themePalette.slate, 0.08) },
                             },
-                            grid: {
-                                color: hexToRgba(themePalette.slate, 0.08),
-                            },
-                        },
-                        cumulative: {
-                            position: "right",
-                            title: {
-                                display: true,
-                                text:
-                                    this.store.selectedAsset === "STABLECOINS"
-                                        ? "Cumulative (B units)"
-                                        : "Cumulative (M units)",
-                            },
-                            grid: { drawOnChartArea: false },
                         },
                     },
-                },
-            });
-            this.applyWhaleChangeData(data);
+                });
+            }
+            this.charts.puell.data.labels = this.series.map((item) => item.date);
+            this.charts.puell.data.datasets[0].data = this.series.map(
+                (item) => item.value
+            );
+            this.charts.puell.update();
         },
-        applyWhaleChangeData(data) {
-            const chart = this.charts.whaleChange;
-            if (!chart) {
+        updateMetrics() {
+            if (!this.series.length) {
+                this.metrics.puellMultiple = "--";
+                this.metrics.puellChange = "Data Puell Multiple belum tersedia.";
                 return;
             }
-
-            const cohorts = Object.keys(data.whaleCohorts);
-            const firstCohort = cohorts[0];
-
-            const dailyChanges = data.whaleCohorts[firstCohort].map(
-                (val, idx, arr) => {
-                    if (idx === 0) return 0;
-                    return Number((val - arr[idx - 1]).toFixed(2));
-                }
-            );
-
-            const cumulativeChanges = dailyChanges.reduce((acc, val) => {
-                const prev = acc.length > 0 ? acc[acc.length - 1] : 0;
-                acc.push(Number((prev + val).toFixed(2)));
-                return acc;
-            }, []);
-
-            chart.data.labels = data.dates;
-            chart.data.datasets[0].data = dailyChanges;
-            chart.data.datasets[1].data = cumulativeChanges;
-
-            const unit =
-                this.store.selectedAsset === "STABLECOINS"
-                    ? "B units"
-                    : "M units";
-            chart.options.scales.change.title.text = `Daily Change (${unit})`;
-            chart.options.scales.cumulative.title.text = `Cumulative (${unit})`;
-
-            chart.update();
-        },
-        updateInsights(data) {
-            const asset = this.store.assetLabel();
-            const minerReserveLatest = data.minerReserve.at(-1) ?? 0;
-            const minerReservePrev =
-                data.minerReserve.at(-2) ?? minerReserveLatest;
-            const puellLatest = data.puellMultiple.at(-1) ?? 0;
-            const puellPrev = data.puellMultiple.at(-2) ?? puellLatest;
-            const reserveDirection =
-                minerReserveLatest >= minerReservePrev
-                    ? "meningkat"
-                    : "menurun";
-            const puellTone =
-                puellLatest > 1.5
-                    ? "Puell tinggi mengindikasikan margin penambang subur dan potensi distribusi."
-                    : puellLatest < 1
-                    ? "Puell rendah menandakan insentif jual penambang menurun."
-                    : "Puell berada di zona seimbang; tekanan distribusi terkontrol.";
-            this.insights.miner = `Cadangan penambang ${asset} ${reserveDirection} ke ${minerReserveLatest.toFixed(
-                2
-            )}M, sementara Puell ${asset} berada di ${puellLatest.toFixed(
-                2
-            )}. ${puellTone}`;
-            const cohortDeltas = Object.entries(data.whaleCohorts).map(
-                ([cohort, series]) => ({
-                    cohort,
-                    delta:
-                        (series.at(-1) ?? 0) -
-                        (series.at(-2) ?? series.at(-1) ?? 0),
-                    latest: series.at(-1) ?? 0,
-                })
-            );
-            const leader = cohortDeltas.reduce(
-                (top, item) =>
-                    Math.abs(item.delta) > Math.abs(top.delta) ? item : top,
-                cohortDeltas[0] ?? { cohort: "-", delta: 0, latest: 0 }
-            );
-            const whaleTone =
-                leader.delta >= 0
-                    ? `Cohort ${leader.cohort} menambah ${Math.abs(
-                          leader.delta
-                      ).toFixed(2)} ${
-                          this.store.selectedAsset === "STABLECOINS" ? "B" : "M"
-                      } ${asset}, mengonfirmasi akumulasi smart money.`
-                    : `Cohort ${leader.cohort} melepas ${Math.abs(
-                          leader.delta
-                      ).toFixed(2)} ${
-                          this.store.selectedAsset === "STABLECOINS" ? "B" : "M"
-                      } ${asset}, sinyal distribusi strategis.`;
-            this.insights.whale = `${whaleTone} Total kepemilikan cohort tetap di ${leader.latest.toFixed(
-                2
-            )} ${
-                this.store.selectedAsset === "STABLECOINS" ? "B" : "M"
-            } ${asset}.`;
-
-            const cohorts = Object.keys(data.whaleCohorts);
-            const firstCohort = cohorts[0];
-            const dailyChanges = data.whaleCohorts[firstCohort].map(
-                (val, idx, arr) => {
-                    if (idx === 0) return 0;
-                    return Number((val - arr[idx - 1]).toFixed(2));
-                }
-            );
-            const latestChange = dailyChanges.at(-1) ?? 0;
-            const cumulativeChange = dailyChanges.reduce(
-                (acc, val) => acc + val,
-                0
-            );
-
-            const changeTrend = latestChange >= 0 ? "akumulasi" : "distribusi";
-            const changeDirection =
-                cumulativeChange >= 0 ? "positif" : "negatif";
-            const whaleChangeTone = `Arah perubahan posisi whale membantu membaca fase ${changeTrend} jangka panjang. Perubahan harian terakhir ${
-                latestChange >= 0 ? "+" : ""
-            }${latestChange.toFixed(2)} ${
-                this.store.selectedAsset === "STABLECOINS" ? "B" : "M"
-            } ${asset} dengan kumulatif ${changeDirection} ${Math.abs(
-                cumulativeChange
-            ).toFixed(2)} ${
-                this.store.selectedAsset === "STABLECOINS" ? "B" : "M"
-            }.`;
-            this.insights.whaleChange = whaleChangeTone;
-
-            const unit = this.store.selectedAsset === "STABLECOINS" ? "B" : "M";
-            this.metrics.minerReserve = `${minerReserveLatest.toFixed(
-                2
-            )}${unit}`;
-            this.metrics.minerTrend =
-                minerReserveLatest >= minerReservePrev
-                    ? "Reserves rising"
-                    : "Reserves declining";
-            this.metrics.puell = puellLatest.toFixed(2);
-            this.metrics.puellTone =
-                puellLatest >= puellPrev
-                    ? "Revenue improving"
-                    : "Revenue cooling";
-            this.metrics.whaleLeader = `${leader.cohort}: ${
-                leader.delta >= 0 ? "+" : ""
-            }${leader.delta.toFixed(2)} ${unit}`;
+            const latest = this.series.at(-1).value;
+            const previous = this.series.length > 1 ? this.series.at(-2).value : null;
+            this.metrics.puellMultiple = latest.toFixed(3);
+            if (previous !== null) {
+                const change = latest - previous;
+                this.metrics.puellChange = `${change >= 0 ? "+" : ""}${change.toFixed(3)}`;
+            } else {
+                this.metrics.puellChange = "";
+            }
         },
     }));
+
+
     Alpine.data("sidebar", () => ({
         open: true,
         collapsed: false,
