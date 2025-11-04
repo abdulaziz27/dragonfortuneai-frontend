@@ -700,16 +700,13 @@ const registerAlpineModules = () => {
                 const zonePlugin = {
                     id: "mvrvZones",
                     beforeDraw: (chart) => {
-                        const { ctx: context, chartArea, scales } = chart;
-                        if (
-                            !context ||
-                            typeof context.save !== "function" ||
-                            !chartArea
-                        ) {
+                        const context = chart?.ctx ?? null;
+                        const chartArea = chart?.chartArea ?? null;
+                        const axis = chart?.scales?.mvrv ?? null;
+                        if (!context || typeof context.save !== "function" || !chartArea || !axis) {
                             return;
                         }
-                        const axis = scales.mvrv;
-                        if (!axis || typeof axis.getPixelForValue !== "function") {
+                        if (typeof axis.getPixelForValue !== "function") {
                             return;
                         }
                         const sections = [
