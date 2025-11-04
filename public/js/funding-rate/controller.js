@@ -936,24 +936,72 @@ export function createFundingRateController() {
          */
         formatNextFundingTime(timestamp) {
             if (!timestamp) return '--';
-            const date = new Date(timestamp);
+            
+            let date = new Date(timestamp);
             const now = new Date();
+            
+            // If timestamp is invalid, return '--'
+            if (isNaN(date.getTime())) {
+                return '--';
+            }
+            
+            // If timestamp is in the past, calculate next funding time (8-hour intervals)
+            // Funding times: 00:00, 08:00, 16:00 UTC
+            if (date <= now) {
+                // Calculate next funding time from now
+                const hours = now.getUTCHours();
+                let nextHour = 0;
+                
+                if (hours < 8) {
+                    nextHour = 8;
+                } else if (hours < 16) {
+                    nextHour = 16;
+                } else {
+                    // After 16:00, next is 00:00 next day
+                    nextHour = 0;
+                    date = new Date(now);
+                    date.setUTCDate(date.getUTCDate() + 1);
+                    date.setUTCHours(nextHour, 0, 0, 0);
+                }
+                
+                // Set to next funding hour
+                if (nextHour !== 0) {
+                    date = new Date(now);
+                    date.setUTCHours(nextHour, 0, 0, 0);
+                }
+            }
+            
             const diffMs = date - now;
             const diffMins = Math.floor(diffMs / 60000);
             const diffHours = Math.floor(diffMins / 60);
+            const diffDays = Math.floor(diffHours / 24);
             
             if (diffMins < 0) {
-                return 'Lalu';
+                // Should not happen, but fallback
+                return '--';
             } else if (diffMins < 60) {
                 return `${diffMins} menit lagi`;
             } else if (diffHours < 24) {
+                const remainingMins = diffMins % 60;
+                if (remainingMins > 0) {
+                    return `${diffHours}j ${remainingMins}m`;
+                }
                 return `${diffHours} jam lagi`;
+            } else if (diffDays === 1) {
+                return date.toLocaleDateString('id-ID', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    timeZone: 'UTC'
+                });
             } else {
                 return date.toLocaleDateString('id-ID', { 
                     month: 'short', 
                     day: 'numeric', 
                     hour: '2-digit', 
-                    minute: '2-digit' 
+                    minute: '2-digit',
+                    timeZone: 'UTC'
                 });
             }
         },
