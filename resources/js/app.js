@@ -51,6 +51,10 @@ Chart.register(
     clipFallbackPlugin
 );
 
+// Disable dataset clipping globally to avoid undefined metadata from custom controllers
+Chart.defaults.dataset = Chart.defaults.dataset || {};
+Chart.defaults.dataset.clip = false;
+
 // Make Chart.js available globally
 window.Chart = Chart;
 window.Alpine = Alpine;
