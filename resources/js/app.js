@@ -21,6 +21,18 @@ import {
 } from "chart.js";
 import { MatrixController, MatrixElement } from "chartjs-chart-matrix";
 
+// Patch missing clip metadata when third-party controllers skip DatasetController.update
+const clipFallbackPlugin = {
+    id: "clipFallback",
+    beforeDatasetDraw(chart, args) {
+        const meta = args?.meta;
+        if (!meta || meta._clip) {
+            return;
+        }
+        meta._clip = { top: 0, right: 0, bottom: 0, left: 0, disabled: true };
+    },
+};
+
 // Register Chart.js components
 Chart.register(
     ...registerables, 
@@ -35,7 +47,8 @@ Chart.register(
     Title,
     Tooltip,
     Legend,
-    Filler
+    Filler,
+    clipFallbackPlugin
 );
 
 // Make Chart.js available globally
