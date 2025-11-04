@@ -53,12 +53,13 @@
 
                     <!-- Exchange Selector -->
                     <select class="form-select" style="width: 160px;" x-model="selectedExchange" @change="updateExchange()">
-                        <option value="OKX">OKX</option>
                         <option value="Binance">Binance</option>
+                        <option value="CoinEx">CoinEx</option>
+                        <option value="Bybit">Bybit</option>
+                        <!-- <option value="OKX">OKX</option>
                         <option value="HTX">HTX</option>
                         <option value="Bitmex">Bitmex</option>
                         <option value="Bitfinex">Bitfinex</option>
-                        <option value="Bybit">Bybit</option>
                         <option value="Deribit">Deribit</option>
                         <option value="Gate">Gate</option>
                         <option value="Kraken">Kraken</option>
@@ -66,7 +67,6 @@
                         <option value="CME">CME</option>
                         <option value="Bitget">Bitget</option>
                         <option value="dYdX">dYdX</option>
-                        <option value="CoinEx">CoinEx</option>
                         <option value="BingX">BingX</option>
                         <option value="Coinbase">Coinbase</option>
                         <option value="Gemini">Gemini</option>
@@ -81,7 +81,7 @@
                         <option value="Drift">Drift</option>
                         <option value="Paradex">Paradex</option>
                         <option value="Extended">Extended</option>
-                        <option value="ApeX Omni">ApeX Omni</option>
+                        <option value="ApeX Omni">ApeX Omni</option> -->
                     </select>
 
                     <!-- Interval Selector -->
