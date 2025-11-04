@@ -445,14 +445,12 @@ export function createFundingRateController() {
                 
                 console.log('💰 Price data extracted:', this.priceData.length, 'points');
                 
-                // Update current funding rate from latest data (immediate, before chart render)
+                // CRITICAL: Calculate metrics IMMEDIATELY from rawData (like production)
+                // This ensures summary cards are populated INSTANTLY without waiting for analytics API
+                // Analytics API will update these values later if available (non-blocking)
                 if (this.rawData.length > 0) {
-                    this.currentFundingRate = this.rawData[this.rawData.length - 1].value;
-                    if (this.rawData.length > 1) {
-                        // Calculate change from previous value
-                        const prevValue = this.rawData[this.rawData.length - 2].value;
-                        this.fundingChange = this.currentFundingRate - prevValue;
-                    }
+                    this.calculateMetrics();
+                    console.log('✅ Metrics calculated from rawData (instant, no delay)');
                 }
                 
                 this.dataLoaded = true;
@@ -554,13 +552,10 @@ export function createFundingRateController() {
                                     .filter(d => d.price !== null && d.price !== undefined)
                                     .map(d => ({ date: d.date, price: d.price }));
                                 
-                                // Update current funding rate from latest data
+                                // Recalculate metrics with full dataset
                                 if (this.rawData.length > 0) {
-                                    this.currentFundingRate = this.rawData[this.rawData.length - 1].value;
-                                    if (this.rawData.length > 1) {
-                                        const prevValue = this.rawData[this.rawData.length - 2].value;
-                                        this.fundingChange = this.currentFundingRate - prevValue;
-                                    }
+                                    this.calculateMetrics();
+                                    console.log('✅ Metrics recalculated with full dataset');
                                 }
 
                                 // Update chart with full data (use renderChart directly like Open Interest)
@@ -633,20 +628,15 @@ export function createFundingRateController() {
             this.fundingChange = (this.currentFundingRate - previousFundingRate) * 10000; // Basis points
             
             // Statistical metrics
-            // Note: avgFundingRate, maxFundingRate, minFundingRate are now set from analytics API
-            // Only calculate if not already set by analytics (fallback)
-            if (this.avgFundingRate === null || this.avgFundingRate === undefined) {
-                this.avgFundingRate = fundingValues.reduce((a, b) => a + b, 0) / fundingValues.length;
-            }
+            // CRITICAL: Always calculate from rawData FIRST (instant, no delay)
+            // Analytics API will update these later if available (non-blocking enhancement)
+            // This ensures summary cards are NEVER empty (no "--" or null values)
+            this.avgFundingRate = fundingValues.reduce((a, b) => a + b, 0) / fundingValues.length;
+            this.maxFundingRate = Math.max(...fundingValues);
+            this.minFundingRate = Math.min(...fundingValues);
+            
             // Median still calculated from raw data (not in analytics API)
             this.medianFundingRate = FundingRateUtils.calculateMedian(fundingValues);
-            // Max and min from analytics if available, otherwise calculate from raw data
-            if (this.maxFundingRate === null || this.maxFundingRate === undefined) {
-                this.maxFundingRate = Math.max(...fundingValues);
-            }
-            if (this.minFundingRate === null || this.minFundingRate === undefined) {
-                this.minFundingRate = Math.min(...fundingValues);
-            }
             
             // Peak date
             const peakIndex = fundingValues.indexOf(this.maxFundingRate);
