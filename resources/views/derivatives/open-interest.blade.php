@@ -38,11 +38,15 @@
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <h1 class="mb-0">Open Interest</h1>
-                        <span class="pulse-dot pulse-success" x-show="rawData.length > 0"></span>
+                        <span class="pulse-dot pulse-success" x-show="rawData.length > 0 && refreshEnabled"></span>
                         <span class="spinner-border spinner-border-sm text-primary" style="width: 16px; height: 16px;" x-show="rawData.length === 0" x-cloak></span>
+                        <span class="badge text-bg-success" x-show="refreshEnabled" title="Auto-refresh setiap 15 detik">
+                            <i class="fas fa-sync-alt"></i> LIVE
+                        </span>
                     </div>
                     <p class="mb-0 text-secondary">
-                        Pantau perubahan open interest untuk melihat arus modal dan membaca kekuatan tren pasar.
+                        Pantau perubahan open interest untuk melihat arus modal dan membaca kekuatan tren pasar. 
+                        <span x-show="refreshEnabled" class="text-success">• Auto-refresh aktif</span>
                     </p>
                 </div>
 
