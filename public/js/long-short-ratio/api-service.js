@@ -12,8 +12,6 @@ export class LongShortRatioAPIService {
         this.analyticsAbortController = null;
         this.topAccountsAbortController = null;
         this.topPositionsAbortController = null;
-        this.globalAccountAbortController = null;
-        this.takerBuySellAbortController = null;
         
         // Cache for external API calls (5 minutes)
         this.dataCache = new Map();
@@ -333,119 +331,6 @@ export class LongShortRatioAPIService {
     }
 
     /**
-     * Fetch global account ratio (external API - Coinglass)
-     * Keep for backward compatibility until migration complete
-     */
-    async fetchGlobalAccountRatio(params) {
-        const { exchange, symbol, interval, startTime, endTime, limit } = params;
-        
-        if (this.globalAccountAbortController) {
-            this.globalAccountAbortController.abort();
-        }
-        this.globalAccountAbortController = new AbortController();
-
-        const cacheKey = `global-account-${exchange}-${symbol}-${interval}-${startTime}-${endTime}`;
-        
-        if (this.dataCache.has(cacheKey)) {
-            console.log('📦 Using cached Global Account Ratio data');
-            return this.dataCache.get(cacheKey);
-        }
-
-        const url = `/api/coinglass/global-account-ratio?` +
-            `exchange=${exchange}&` +
-            `symbol=${symbol}&` +
-            `interval=${interval}&` +
-            `start_time=${startTime}&` +
-            `end_time=${endTime}&` +
-            `limit=${limit || 1000}`;
-
-        try {
-            const response = await fetch(url, {
-                signal: this.globalAccountAbortController.signal,
-                headers: { 'Accept': 'application/json' }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-
-            if (!data.success || !Array.isArray(data.data)) {
-                throw new Error('Invalid Global Account Ratio data format');
-            }
-
-            // Cache the result for 5 minutes
-            this.dataCache.set(cacheKey, data.data);
-            setTimeout(() => this.dataCache.delete(cacheKey), 5 * 60 * 1000);
-
-            console.log('✅ Global Account Ratio data received:', data.data.length, 'records');
-            return data.data;
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                console.log('🛑 Global Account Ratio request aborted');
-                throw error;
-            }
-            console.error('❌ Error fetching Global Account Ratio:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Fetch taker buy/sell ratio (external API - Coinglass)
-     */
-    async fetchTakerBuySellRatio(params) {
-        const { symbol, range } = params;
-        
-        if (this.takerBuySellAbortController) {
-            this.takerBuySellAbortController.abort();
-        }
-        this.takerBuySellAbortController = new AbortController();
-
-        const cacheKey = `taker-buysell-${symbol}-${range}`;
-        
-        if (this.dataCache.has(cacheKey)) {
-            console.log('📦 Using cached Taker Buy/Sell data');
-            return this.dataCache.get(cacheKey);
-        }
-
-        const url = `/api/coinglass/taker-buy-sell?` +
-            `symbol=${symbol}&` +
-            `range=${range || '1h'}`;
-
-        try {
-            const response = await fetch(url, {
-                signal: this.takerBuySellAbortController.signal,
-                headers: { 'Accept': 'application/json' }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-
-            if (!data.success || !data.data) {
-                throw new Error('Invalid Taker Buy/Sell data format');
-            }
-
-            // Cache the result for 5 minutes
-            this.dataCache.set(cacheKey, data.data);
-            setTimeout(() => this.dataCache.delete(cacheKey), 5 * 60 * 1000);
-
-            console.log('✅ Taker Buy/Sell data received:', data.data);
-            return data.data;
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                console.log('🛑 Taker Buy/Sell request aborted');
-                throw error;
-            }
-            console.error('❌ Error fetching Taker Buy/Sell:', error);
-            throw error;
-        }
-    }
-
-    /**
      * Transform top accounts data from internal API to match Coinglass format
      */
     transformTopAccountsData(data) {
@@ -487,9 +372,7 @@ export class LongShortRatioAPIService {
             this.overviewAbortController,
             this.analyticsAbortController,
             this.topAccountsAbortController,
-            this.topPositionsAbortController,
-            this.globalAccountAbortController,
-            this.takerBuySellAbortController
+            this.topPositionsAbortController
         ];
 
         controllers.forEach(controller => {

@@ -54,7 +54,6 @@ const registerAlpineModules = () => {
         );
         return;
     }
-
     const themePalette = {
         bullish: "#22c55e",
         bearish: "#ef4444",

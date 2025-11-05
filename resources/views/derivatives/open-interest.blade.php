@@ -48,94 +48,107 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <!-- Symbol Selector -->
-                    <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="updateSymbol($event.target.value)">
-                        <option value="BTCUSDT">BTC/USDT</option>
+                    <!-- Symbol Selector (Coinglass Supported) -->
+                    <select class="form-select" style="width: 120px;" :value="selectedSymbol" @change="updateSymbol($event.target.value)">
+                        <option value="BTC">BTC</option>
+                        <option value="ETH">ETH</option>
+                        <option value="SOL">SOL</option>
+                        <option value="XRP">XRP</option>
+                        <option value="HYPE">HYPE</option>
+                        <option value="BNB">BNB</option>
+                        <option value="DOGE">DOGE</option>
                     </select>
 
-                    <!-- Exchange Selector -->
-                    <select class="form-select" style="width: 160px;" x-model="selectedExchange" @change="updateExchange($event.target.value)">
-                        <option value="Binance">Binance</option>
-                        <option value="Bybit">Bybit</option>
-                        <option value="CoinEx">CoinEx</option>
+                    <!-- Unit Selector -->
+                    <select class="form-select" style="width: 100px;" :value="selectedUnit" @change="updateUnit($event.target.value)">
+                        <option value="usd">USD</option>
+                        <option value="coin">Coin</option>
                     </select>
 
-                    <!-- Interval Selector -->
-                    <select class="form-select" style="width: 140px;" x-model="selectedInterval" @change="updateInterval($event.target.value)">
-                        <option value="1m">1 Minute</option>
-                        <option value="5m">5 Minutes</option>
-                        <option value="15m">15 Minutes</option>
-                        <option value="1h">1 Hour</option>
-                        <option value="4h">4 Hours</option>
-                        <option value="8h">8 Hours</option>
-                        <option value="1w">1 Week</option>
+                    <!-- Interval Selector (API Compliant) -->
+                    <select class="form-select" style="width: 120px;" :value="selectedInterval" @change="updateInterval($event.target.value)">
+                        <option value="1m">1M</option>
+                        <option value="3m">3M</option>
+                        <option value="5m">5M</option>
+                        <option value="15m">15M</option>
+                        <option value="30m">30M</option>
+                        <option value="1h">1H</option>
+                        <option value="4h">4H</option>
+                        <option value="6h">6H</option>
+                        <option value="8h">8H</option>
+                        <option value="12h">12H</option>
+                        <option value="1d">1D</option>
+                        <option value="1w">1W</option>
                     </select>
 
-                    <!-- Limit Selector -->
-                    <select class="form-select" style="width: 160px;" x-model="selectedLimit" @change="setLimit($event.target.value)">
-                        <template x-for="option in limitOptions" :key="option.value">
-                            <option :value="option.value" x-text="option.label"></option>
+                    <!-- Date Range Selector -->
+                    <select class="form-select" style="width: 120px;" :value="selectedTimeRange" @change="updateTimeRange($event.target.value)">
+                        <template x-for="range in timeRanges" :key="range.value">
+                            <option :value="range.value" x-text="range.label"></option>
                         </template>
                     </select>
                 </div>
             </div>
         </div>
 
-        <!-- Summary Cards Row (4 Cards Only: Current OI, Min OI, Max OI, Trend) -->
+        <!-- Summary Cards Row (OHLC-based Insights) -->
         <div class="row g-3">
-            <!-- Current Open Interest -->
-            <div class="col-md-3">
+            <!-- Current Open Interest (Close) -->
+            <div class="col-md-4">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Current OI</span>
-                        <span class="badge text-bg-primary" x-show="currentOI !== null && currentOI !== undefined">Latest</span>
-                        <span class="badge text-bg-secondary" x-show="currentOI === null || currentOI === undefined">Loading...</span>
+                        <span class="badge text-bg-primary" x-show="currentOI !== null">Latest</span>
+                        <span class="badge text-bg-secondary" x-show="currentOI === null">Loading...</span>
                     </div>
                     <div>
-                        <div class="h3 mb-1" x-show="currentOI !== null && currentOI !== undefined" x-text="formatOI(currentOI)"></div>
-                        <div class="h3 mb-1 text-secondary" x-show="currentOI === null || currentOI === undefined">...</div>
+                        <div class="h3 mb-1" x-show="currentOI !== null" x-text="formatOI(currentOI)"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="currentOI === null">...</div>
+                        <small class="text-muted" x-show="oiChange !== null">
+                            <span :class="oiChange >= 0 ? 'text-success' : 'text-danger'" x-text="formatChange(oiChange)"></span>
+                        </small>
                     </div>
                 </div>
             </div>
 
-            <!-- Min OI -->
-            <div class="col-md-3">
+            <!-- Period High/Low Range -->
+            <div class="col-md-4">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Min OI</span>
-                        <span class="badge" :class="minOI ? 'text-bg-success' : 'text-bg-secondary'" x-text="minOI ? 'Low' : 'Loading...'"></span>
+                        <span class="small text-secondary">Range (H/L)</span>
+                        <span class="badge text-bg-info" x-show="maxOI && minOI">Range</span>
+                        <span class="badge text-bg-secondary" x-show="!maxOI || !minOI">Loading...</span>
                     </div>
                     <div>
-                        <div class="h3 mb-1" x-show="minOI" x-text="formatOI(minOI)"></div>
-                        <div class="h3 mb-1 text-secondary" x-show="!minOI">...</div>
+                        <div x-show="maxOI && minOI">
+                            <div class="h5 mb-1 text-danger" x-text="formatOI(maxOI)"></div>
+                            <div class="h5 mb-1 text-success" x-text="formatOI(minOI)"></div>
+                        </div>
+                        <div class="h3 mb-1 text-secondary" x-show="!maxOI || !minOI">...</div>
+                        <small class="text-muted" x-show="oiVolatility !== null">
+                            Volatility: <span x-text="formatPercentage(oiVolatility)"></span>
+                        </small>
                     </div>
                 </div>
             </div>
 
-            <!-- Max OI -->
-            <div class="col-md-3">
+            <!-- Average OI & Momentum -->
+            <div class="col-md-4">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Max OI</span>
-                        <span class="badge" :class="maxOI ? 'text-bg-danger' : 'text-bg-secondary'" x-text="maxOI ? 'High' : 'Loading...'"></span>
+                        <span class="small text-secondary">Avg OI</span>
+                        <span class="badge" :class="momentum > 0 ? 'text-bg-success' : momentum < 0 ? 'text-bg-danger' : 'text-bg-secondary'">
+                            <span x-show="momentum > 0">📈 Bullish</span>
+                            <span x-show="momentum < 0">📉 Bearish</span>
+                            <span x-show="momentum === 0">➡️ Neutral</span>
+                        </span>
                     </div>
                     <div>
-                        <div class="h3 mb-1 text-danger" x-show="maxOI" x-text="formatOI(maxOI)"></div>
-                        <div class="h3 mb-1 text-secondary" x-show="!maxOI">...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Trend -->
-            <div class="col-md-3">
-                <div class="df-panel p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Trend</span>
-                        <span class="badge" :class="trend ? getTrendBadgeClass(trend) : 'text-bg-secondary'" x-text="trend || 'Loading...'"></span>
-                    </div>
-                    <div>
-                        <div class="h3 mb-1" x-show="trend" :class="trend !== 'stable' ? getTrendColorClass(trend) : ''" x-text="trend"></div>
-                        <div class="h3 mb-1 text-secondary" x-show="!trend">...</div>
+                        <div class="h3 mb-1" x-show="avgOI !== null" x-text="formatOI(avgOI)"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="avgOI === null">...</div>
+                        <small class="text-muted" x-show="momentum !== null">
+                            Momentum: <span :class="momentum >= 0 ? 'text-success' : 'text-danger'" x-text="formatPercentage(momentum)"></span>
+                        </small>
                     </div>
                 </div>
             </div>
@@ -189,7 +202,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="chart-body">
+                    <div class="chart-body" style="position: relative;">
                         <canvas id="openInterestMainChart"></canvas>
                     </div>
                     <div class="chart-footer">
@@ -312,31 +325,7 @@
     {{-- <script src="{{ asset('js/laevitas-heatmap.js') }}"></script> --}}
 
     <style>
-        /* Skeleton placeholders */
         [x-cloak] { display: none !important; }
-        .skeleton {
-            position: relative;
-            overflow: hidden;
-            background: rgba(148, 163, 184, 0.15);
-            border-radius: 6px;
-        }
-        .skeleton::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            transform: translateX(-100%);
-            background: linear-gradient(90deg,
-                rgba(255,255,255,0) 0%,
-                rgba(255,255,255,0.4) 50%,
-                rgba(255,255,255,0) 100%);
-            animation: skeleton-shimmer 1.2s infinite;
-        }
-        .skeleton-text { display: inline-block; }
-        .skeleton-badge { display: inline-block; border-radius: 999px; }
-        .skeleton-pill { display: inline-block; border-radius: 999px; }
-        @keyframes skeleton-shimmer {
-            100% { transform: translateX(100%); }
-        }
         /* Light Theme Chart Container */
         .tradingview-chart-container {
             background: #ffffff;
@@ -667,30 +656,7 @@
             animation: pulse 2s ease-in-out infinite, pulseGlow 2s ease-in-out infinite;
         }
 
-        /* Loading States */
-        .chart-loading {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .chart-loading::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(59, 130, 246, 0.1) 50%, 
-                transparent 100%);
-            animation: shimmer 1.5s infinite;
-        }
-
-        @keyframes shimmer {
-            0% { left: -100%; }
-            100% { left: 100%; }
-        }
+        
 
         /* Enhanced Hover Effects - Match Funding Rate (already defined above at line 931) */
 
@@ -824,10 +790,8 @@
             }
         }
 
-        /* ===== EXCHANGE DOMINANCE HEATMAP STYLES - COMMENTED OUT (section removed) ===== */
-        /* 
-        Heatmap Container - Professional CryptoQuant Level */
-        .heatmap-container {
+        /* ===== EXCHANGE DOMINANCE HEATMAP STYLES - REMOVED ===== */
+        /* .heatmap-container {
             background: linear-gradient(135deg, 
                 rgba(15, 23, 42, 0.98) 0%, 
                 rgba(30, 41, 59, 0.98) 50%,
@@ -843,7 +807,7 @@
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             margin-bottom: 2rem;
-        }
+        } */
 
         .heatmap-container::before {
             content: '';
@@ -1588,9 +1552,8 @@
             }
         }
 
-        /* ===== LAEVITAS-STYLE GRID ===== */
-        
-        .laevitas-grid {
+        /* ===== LAEVITAS-STYLE GRID (REMOVED) ===== */
+        /* .laevitas-grid {
             font-family: 'Courier New', monospace;
             font-size: 11px;
             background: #0f1419;
@@ -1598,7 +1561,7 @@
             overflow: hidden;
             border: 1px solid rgba(59, 130, 246, 0.2);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
+        } */
 
         .grid-header {
             display: grid;

@@ -83,6 +83,13 @@ Route::get('/api/coinglass/top-position-ratio', [App\Http\Controllers\CoinglassC
 Route::get('/api/coinglass/net-position', [App\Http\Controllers\CoinglassController::class, 'getNetPosition'])->name('api.coinglass.net-position');
 Route::get('/api/coinglass/taker-buy-sell', [App\Http\Controllers\CoinglassController::class, 'getTakerBuySell'])->name('api.coinglass.taker-buy-sell');
 Route::get('/api/coinglass/liquidation-coin-list', [App\Http\Controllers\CoinglassController::class, 'getLiquidationCoinList'])->name('api.coinglass.liquidation-coin-list');
+
+// Coinglass Open Interest (new proxy endpoints)
+Route::prefix('api/coinglass/open-interest')->group(function () {
+    Route::get('/exchanges', [App\Http\Controllers\Coinglass\OpenInterestController::class, 'exchanges']);
+    Route::get('/history', [App\Http\Controllers\Coinglass\OpenInterestController::class, 'aggregatedHistory']);
+    Route::get('/exchange-history', [App\Http\Controllers\Coinglass\OpenInterestController::class, 'exchangeHistory']);
+});
 Route::get('/api/coinglass/liquidation-aggregated-history', [App\Http\Controllers\CoinglassController::class, 'getLiquidationAggregatedHistory'])->name('api.coinglass.liquidation-aggregated-history');
 Route::get('/api/coinglass/liquidation-exchange-list', [App\Http\Controllers\CoinglassController::class, 'getLiquidationExchangeList'])->name('api.coinglass.liquidation-exchange-list');
 Route::get('/api/coinglass/liquidation-history', [App\Http\Controllers\CoinglassController::class, 'getLiquidationHistory'])->name('api.coinglass.liquidation-history');

@@ -422,98 +422,7 @@ export class ChartManager {
         }
     }
 
-    /**
-     * Render net position chart
-     */
-    renderNetPositionChart(netPositionData) {
-        this.destroy();
 
-        const canvas = document.getElementById(this.canvasId);
-        if (!canvas) {
-            console.warn('⚠️ Canvas element not found:', this.canvasId);
-            return;
-        }
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            console.warn('⚠️ Cannot get 2D context');
-            return;
-        }
-
-        if (!netPositionData || netPositionData.length === 0) {
-            console.warn('⚠️ No net position data available');
-            return;
-        }
-
-        // Small delay to ensure destroy is complete
-        setTimeout(() => {
-            try {
-                const sorted = [...netPositionData].sort((a, b) => (a.time || a.ts) - (b.time || b.ts));
-                // Keep full timestamp (milliseconds) for accurate time display in tooltip
-                const labels = sorted.map(d => d.time || d.ts);
-
-                // Extract net long/short changes (support multiple field names)
-                const netLongChanges = sorted.map(d => 
-                    parseFloat(d.net_long_change || d.longNetChange || d.long_net_change || d.netLong || 0)
-                );
-                
-                const netShortChanges = sorted.map(d => 
-                    parseFloat(d.net_short_change || d.shortNetChange || d.short_net_change || d.netShort || 0)
-                );
-
-                const datasets = [
-                    {
-                        label: 'Net Long Flow',
-                        data: netLongChanges,
-                        borderColor: 'rgba(34, 197, 94, 1)',
-                        backgroundColor: 'rgba(34, 197, 94, 0.2)',
-                        borderWidth: 2,
-                        fill: 'origin',
-                        tension: 0.4,
-                        pointRadius: 3,
-                        pointHoverRadius: 6
-                    },
-                    {
-                        label: 'Net Short Flow',
-                        data: netShortChanges,
-                        borderColor: 'rgba(239, 68, 68, 1)',
-                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                        borderWidth: 2,
-                        fill: 'origin',
-                        tension: 0.4,
-                        pointRadius: 3,
-                        pointHoverRadius: 6
-                    },
-                    {
-                        label: 'Zero Line',
-                        data: Array(netLongChanges.length).fill(0),
-                        borderColor: 'rgba(156, 163, 175, 0.5)',
-                        backgroundColor: 'transparent',
-                        borderWidth: 1,
-                        borderDash: [5, 5],
-                        fill: false,
-                        pointRadius: 0
-                    }
-                ];
-
-                const chartOptions = this.getNetPositionChartOptions();
-
-                this.chart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: datasets
-                    },
-                    options: chartOptions
-                });
-
-                console.log('✅ Net position chart rendered:', this.canvasId);
-            } catch (error) {
-                console.error('❌ Error rendering net position chart:', error);
-                this.chart = null;
-            }
-        }, 50);
-    }
 
     /**
      * Get chart options for main chart
@@ -645,6 +554,7 @@ export class ChartManager {
                 },
                 y: {
                     beginAtZero: false,
+                    grace: '15%', // Add 15% padding to top and bottom
                     title: {
                         display: true,
                         text: 'Long/Short Ratio',
@@ -816,6 +726,7 @@ export class ChartManager {
                 },
                 y: {
                     beginAtZero: false,
+                    grace: '15%', // Add 15% padding to top and bottom
                     title: {
                         display: true,
                         text: 'Long/Short Ratio',
@@ -836,112 +747,6 @@ export class ChartManager {
         };
     }
 
-    /**
-     * Get chart options for net position chart
-     */
-    getNetPositionChartOptions() {
-        return {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            interaction: {
-                mode: 'index',
-                intersect: false
-            },
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top',
-                    labels: {
-                        color: '#64748b',
-                        font: { size: 11, weight: '500' },
-                        boxWidth: 12,
-                        boxHeight: 12,
-                        padding: 15,
-                        usePointStyle: true,
-                        filter: function(item) {
-                            return !item.text.includes('Zero Line');
-                        }
-                    }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                    titleColor: '#1e293b',
-                    bodyColor: '#334155',
-                    borderColor: 'rgba(59, 130, 246, 0.3)',
-                    borderWidth: 1,
-                    padding: 12,
-                    displayColors: true,
-                    callbacks: {
-                        title: (items) => {
-                            const date = new Date(items[0].label);
-                            return date.toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                            });
-                        },
-                        label: (context) => {
-                            const datasetLabel = context.dataset.label;
-                            const value = context.parsed.y;
-                            if (datasetLabel.includes('Flow')) {
-                                const sign = value >= 0 ? '+' : '';
-                                return `  ${datasetLabel}: ${sign}${value.toFixed(2)}%`;
-                            }
-                            return `  ${datasetLabel}: ${value}`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    ticks: {
-                        color: '#64748b',
-                        font: { size: 11 },
-                        maxRotation: 0,
-                        minRotation: 0,
-                        callback: function (value, index) {
-                            const totalLabels = this.chart.data.labels.length;
-                            const showEvery = Math.max(1, Math.ceil(totalLabels / 12));
-                            if (index % showEvery === 0) {
-                                const date = new Date(this.chart.data.labels[index]);
-                                return date.toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric'
-                                });
-                            }
-                            return '';
-                        }
-                    },
-                    grid: {
-                        display: true,
-                        color: 'rgba(148, 163, 184, 0.15)',
-                        drawBorder: false
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Net Position Change (%)',
-                        color: '#475569',
-                        font: { size: 11, weight: '500' }
-                    },
-                    ticks: {
-                        color: '#64748b',
-                        font: { size: 11 },
-                        callback: (value) => {
-                            const sign = value >= 0 ? '+' : '';
-                            return `${sign}${value.toFixed(1)}%`;
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(148, 163, 184, 0.15)',
-                        drawBorder: false
-                    }
-                }
-            }
-        };
-    }
+
 }
 

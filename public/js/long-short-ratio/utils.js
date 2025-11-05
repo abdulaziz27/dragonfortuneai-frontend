@@ -239,55 +239,12 @@ export const LongShortRatioUtils = {
     /**
      * Get sell ratio class
      */
-    getSellRatioClass(value) {
-        if (value > 60) return 'text-danger fw-bold';
-        if (value > 55) return 'text-danger';
-        if (value < 40) return 'text-success';
-        if (value < 45) return 'text-warning';
-        return 'text-secondary';
-    },
-
-    /**
-     * Calculate dominance level for visual feedback
-     */
-    getDominanceLevel(longPct, shortPct) {
-        const dominance = Math.abs(longPct - shortPct);
-        if (dominance > 30) return 'extreme';
-        if (dominance > 15) return 'moderate';
-        if (dominance > 5) return 'slight';
-        return 'balanced';
-    },
-
-    /**
-     * Get dominance color intensity
-     */
-    getDominanceIntensity(percentage) {
-        // Return opacity value based on dominance (0.4 to 1.0)
-        return Math.max(0.4, Math.min(1.0, percentage / 80));
-    },
-
-    /**
-     * Get dominance description
-     */
-    getDominanceDescription(longPct, shortPct) {
-        const dominance = Math.abs(longPct - shortPct);
-        const isLongDominant = longPct > shortPct;
-        
-        if (dominance > 30) {
-            return isLongDominant ? 
-                '🟢 STRONG LONG DOMINANCE - Pasar sangat bullish' : 
-                '🔴 STRONG SHORT DOMINANCE - Pasar sangat bearish';
-        } else if (dominance > 15) {
-            return isLongDominant ? 
-                '🟡 Moderate Long Bias - Cenderung bullish' : 
-                '🟡 Moderate Short Bias - Cenderung bearish';
-        } else if (dominance > 5) {
-            return isLongDominant ? 
-                '🔵 Slight Long Bias - Sedikit bullish' : 
-                '🔵 Slight Short Bias - Sedikit bearish';
-        } else {
-            return '⚪ Balanced Market - Pasar seimbang';
+            getSellRatioClass(value) {
+            if (value > 60) return 'text-danger fw-bold';
+            if (value > 55) return 'text-danger';
+            if (value < 40) return 'text-success';
+            if (value < 45) return 'text-warning';
+            return 'text-secondary';
         }
-    }
 };
 

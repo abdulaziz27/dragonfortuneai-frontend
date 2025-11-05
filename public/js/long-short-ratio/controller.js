@@ -24,7 +24,6 @@ export function createLongShortRatioController() {
         selectedExchange: 'Binance',
         selectedSymbol: 'BTCUSDT',
         selectedInterval: '1h',
-        selectedTakerRange: '1h',
         scaleType: 'linear',
         chartType: 'line',
         
@@ -55,7 +54,6 @@ export function createLongShortRatioController() {
         overviewData: null,
         analyticsData: null,
         analyticsLoading: false,
-        takerBuySellData: null,
 
         // Current metrics
         currentTopAccountRatio: null,
@@ -878,22 +876,16 @@ export function createLongShortRatioController() {
             this.loadAllData();
         },
 
-        updateTakerRange() {
-            console.log('🔄 Updating taker range to:', this.selectedTakerRange);
-            this.loadAllData();
-        },
-
         toggleChartType(type) {
             if (this.chartType === type) return;
             console.log('🔄 Toggling chart type to:', type);
             this.chartType = type;
-            // Re-render main chart with new type
-            if (this.globalAccountData.length > 0) {
-                this.mainChartManager.renderMainChart(
-                    this.globalAccountData, 
-                    this.chartType, 
-                    [] // No price overlay
-                );
+            // Re-render charts with new type if data exists
+            if (this.topAccountData.length > 0 && this.mainChartManager) {
+                this.mainChartManager.renderMainChart(this.topAccountData, this.chartType);
+            }
+            if (this.topPositionData.length > 0 && this.positionsChartManager) {
+                this.positionsChartManager.renderPositionsChart(this.topPositionData, this.chartType);
             }
         },
 
@@ -965,29 +957,6 @@ export function createLongShortRatioController() {
 
         getSellRatioClass(value) {
             return LongShortRatioUtils.getSellRatioClass(value);
-        },
-
-        /**
-         * Helper functions for taker buy/sell data
-         */
-        getSortedExchanges() {
-            if (!this.takerBuySellData?.exchange_list) return [];
-            return [...this.takerBuySellData.exchange_list]
-                .sort((a, b) => (b.buy_ratio || 0) - (a.buy_ratio || 0));
-        },
-
-        getMostBullishExchanges() {
-            return this.getSortedExchanges()
-                .filter(ex => ex.buy_ratio > 50)
-                .slice(0, 5);
-        },
-
-        getMostBearishExchanges() {
-            if (!this.takerBuySellData?.exchange_list) return [];
-            return [...this.takerBuySellData.exchange_list]
-                .filter(ex => ex.sell_ratio > 50)
-                .sort((a, b) => (b.sell_ratio || 0) - (a.sell_ratio || 0))
-                .slice(0, 5);
         },
 
         /**

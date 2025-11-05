@@ -1,9 +1,9 @@
 /**
  * Open Interest Controller - Entry Point
- * Thin wrapper to expose the modular controller to Alpine.js
+ * Coinglass-only version with date-range queries
  */
 
-import { createOpenInterestController } from './open-interest/controller.js';
+import { createOpenInterestController } from './open-interest/controller-coinglass.js';
 
 // Expose to global scope for Alpine.js
 window.openInterestController = createOpenInterestController;

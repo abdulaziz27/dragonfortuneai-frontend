@@ -9,6 +9,7 @@ export class ChartManager {
     constructor(canvasId) {
         this.canvasId = canvasId;
         this.chart = null;
+        this.isRendering = false; // ⚡ FIXED: Prevent concurrent renders
     }
 
     /**
@@ -17,69 +18,90 @@ export class ChartManager {
      * Note: Always destroys and recreates chart to avoid Chart.js
      * internal stack overflow issues during updates.
      */
-    updateChart(data, priceData = [], chartType = 'line') {
-        // Always destroy and recreate for stability
-        // Chart.js incremental updates can cause stack overflow
-        // with complex configurations. Performance impact is minimal
-        // with 5 second refresh interval.
-        this.renderChart(data, priceData, chartType);
+    updateChart(data) {
+        this.renderChart(data);
     }
 
     /**
-     * Update existing chart data (no re-render)
+     * Update existing chart data (no re-render) - SAFE & ROBUST
      */
     updateChartData(data, priceData) {
-        const sorted = [...data].sort((a, b) => 
-            new Date(a.date) - new Date(b.date)
-        );
-
-        const labels = sorted.map(d => d.date);
-        const oiValues = sorted.map(d => parseFloat(d.value));
-
-        // Update Open Interest data
-        this.chart.data.labels = labels;
-        this.chart.data.datasets[0].data = oiValues;
-
-        // Update price overlay if available
-        if (priceData.length > 0 && this.chart.data.datasets[1]) {
-            const priceMap = new Map(priceData.map(p => [p.date, p.price]));
-            const alignedPrices = labels.map(date => priceMap.get(date) || null);
-            this.chart.data.datasets[1].data = alignedPrices;
+        if (!this.chart || this.isRendering) {
+            console.warn('⚠️ Chart not available or rendering in progress, skipping update');
+            return false;
         }
 
-        // Smooth update without animation
-        this.chart.update('none');
-        
-        console.log('📊 Chart updated smoothly');
+        try {
+            const sorted = [...data].sort((a, b) => 
+                new Date(a.date) - new Date(b.date)
+            );
+
+            const labels = sorted.map(d => d.date);
+            const oiValues = sorted.map(d => parseFloat(d.value));
+
+            // ⚡ SAFE: Check if chart still exists before updating
+            if (!this.chart || !this.chart.data || !this.chart.data.datasets[0]) {
+                console.warn('⚠️ Chart structure invalid, cannot update');
+                return false;
+            }
+
+            // ⚡ Batch update for better performance
+            this.chart.data.labels = labels;
+            this.chart.data.datasets[0].data = oiValues;
+
+            // Update price overlay if available
+            if (priceData.length > 0 && this.chart.data.datasets[1]) {
+                const priceMap = new Map(priceData.map(p => [p.date, p.price]));
+                const alignedPrices = labels.map(date => priceMap.get(date) || null);
+                this.chart.data.datasets[1].data = alignedPrices;
+            }
+
+            // ⚡ SAFE: Ultra-fast update with error handling
+            this.chart.update('none');
+            
+            console.log('⚡ Chart updated safely:', oiValues.length, 'points');
+            return true;
+        } catch (error) {
+            console.error('❌ Chart update error:', error);
+            return false;
+        }
     }
 
     /**
      * Full chart render with cleanup
      */
-    renderChart(data, priceData = [], chartType = 'line') {
-        // Cleanup old chart
-        this.destroy();
-
-        // Verify Chart.js loaded
-        if (typeof Chart === 'undefined') {
-            console.warn('⚠️ Chart.js not loaded, retrying...');
-            setTimeout(() => this.renderChart(data, priceData), 100);
+    renderChart(data) {
+        // ⚡ FIXED: Prevent concurrent renders
+        if (this.isRendering) {
+            console.warn('⚠️ Chart render already in progress, skipping');
             return;
         }
+        
+        this.isRendering = true;
+        
+        try {
+            // Cleanup old chart
+            this.destroy();
 
-        // Get canvas
-        const canvas = document.getElementById(this.canvasId);
-        if (!canvas || !canvas.isConnected) {
-            console.warn('⚠️ Canvas not available');
-            return;
-        }
+            // Verify Chart.js loaded
+            if (typeof Chart === 'undefined') {
+                console.warn('⚠️ Chart.js not loaded, aborting render');
+                return; // ⚡ FIXED: Don't retry to prevent infinite loop
+            }
 
-        // Clear canvas to prevent memory leaks
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            console.warn('⚠️ Cannot get 2D context');
-            return;
-        }
+            // Get canvas
+            const canvas = document.getElementById(this.canvasId);
+            if (!canvas || !canvas.isConnected) {
+                console.warn('⚠️ Canvas not available');
+                return;
+            }
+
+            // Clear canvas to prevent memory leaks
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.warn('⚠️ Cannot get 2D context');
+                return;
+            }
         
         // Clear canvas before rendering
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -92,23 +114,20 @@ export class ChartManager {
         const labels = sorted.map(d => d.date);
         const oiValues = sorted.map(d => parseFloat(d.value)); // Open Interest values
         
-        // Render based on chart type
-        if (chartType === 'line') {
-            this.renderLineChart(sorted, labels, oiValues, priceData);
-            return;
-        } else if (chartType === 'candlestick') {
-            this.renderCandlestickChart(sorted, labels, priceData);
-            return;
+            // Render line chart only
+            this.renderLineChart(sorted, labels, oiValues);
+        } catch (error) {
+            console.error('❌ Chart render error:', error);
+            this.chart = null;
+        } finally {
+            this.isRendering = false; // ⚡ FIXED: Always reset flag
         }
-        
-        // Default: render line chart
-        this.renderLineChart(sorted, labels, oiValues, priceData);
     }
 
     /**
      * Render simple line chart (easy to read)
      */
-    renderLineChart(sorted, labels, oiValues, priceData = []) {
+    renderLineChart(sorted, labels, oiValues) {
         const datasets = [
             {
                 label: 'Open Interest',
@@ -124,27 +143,11 @@ export class ChartManager {
             }
         ];
 
-        // Add price overlay if available
-        if (priceData.length > 0) {
-            const priceMap = new Map(priceData.map(p => [p.date, p.price]));
-            const alignedPrices = labels.map(date => priceMap.get(date) || null);
-            datasets.push({
-                label: 'Price',
-                data: alignedPrices,
-                borderColor: '#f59e0b',
-                backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                borderWidth: 1,
-                fill: false,
-                tension: 0.4,
-                pointRadius: 0,
-                yAxisID: 'y1',
-                hidden: true // Hidden by default
-            });
-        }
+        // Price overlay removed
 
         console.log('📊 Line chart data prepared:', oiValues.length, 'points');
 
-        const chartOptions = this.getChartOptions(priceData.length > 0);
+        const chartOptions = this.getChartOptions(false);
         
         // Update tooltip to match OHLC format (same time format)
         chartOptions.plugins.tooltip = {
@@ -181,7 +184,7 @@ export class ChartManager {
                 datasets: datasets
             },
             options: chartOptions,
-            plugins: [] // No candlestick plugin for line chart
+            plugins: []
         });
 
         console.log('✅ Line chart rendered successfully');
@@ -413,12 +416,22 @@ export class ChartManager {
         return {
             responsive: true,
             maintainAspectRatio: false,
-            animation: false, // Disable animation to prevent race conditions during auto-refresh
+            animation: false, // ⚡ Disable all animations for instant updates
             interaction: {
                 mode: 'index',
                 intersect: false
             },
             plugins: {
+                // Ensure option objects exist for globally-registered plugins
+                clipFallback: {},
+                zoom: {
+                    pan: { enabled: false },
+                    zoom: {
+                        wheel: { enabled: false },
+                        pinch: { enabled: false },
+                        drag: { enabled: false }
+                    }
+                },
                 legend: {
                     display: false  // Hide legend for candlestick chart
                 },

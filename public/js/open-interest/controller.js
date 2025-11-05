@@ -37,17 +37,16 @@ export function createOpenInterestController() {
         ],
         selectedInterval: '8h',
         
-        // Limit selector (limit-based approach, no dateRange) - optimized for speed
-        limitOptions: [
-            { label: '10 Records', value: '10' },
-            { label: '20 Records', value: '20' },
-            { label: '50 Records', value: '50' },
-            { label: '100 Records', value: '100' },
-            { label: '200 Records', value: '200' },
-            { label: '500 Records', value: '500' },
-            { label: 'ALL (No Limit)', value: 'all' }
+        // Date range selector (Coinglass uses start_time/end_time, no limit)
+        timeRanges: [
+            { label: '24H', value: '1d', days: 1 },
+            { label: '7D', value: '7d', days: 7 },
+            { label: '1M', value: '1m', days: 30 },
+            { label: '3M', value: '3m', days: 90 },
+            { label: '6M', value: '6m', days: 180 },
+            { label: '1Y', value: '1y', days: 365 }
         ],
-        selectedLimit: '10', // Default 10 records for faster initial loads
+        selectedTimeRange: '1m', // Default 1 month
         
         // Auto-refresh state
         refreshInterval: null,
