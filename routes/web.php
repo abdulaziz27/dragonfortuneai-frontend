@@ -20,6 +20,7 @@ Route::view('/derivatives/long-short-ratio', 'derivatives.long-short-ratio-new')
 
 Route::view('/derivatives/liquidations', 'derivatives.liquidations-new')->name('derivatives.liquidations');
 Route::view('/derivatives/liquidations-stream', 'derivatives.liquidations-stream')->name('derivatives.liquidations-stream');
+Route::view('/derivatives/liquidations-aggregated', 'derivatives.liquidations-aggregated')->name('derivatives.liquidations-aggregated');
 Route::view('/derivatives/basis-term-structure', 'derivatives.basis-term-structure-new')->name('derivatives.basis-term-structure');
 Route::view('/derivatives/exchange-inflow-cdd', 'derivatives.exchange-inflow-cdd')->name('derivatives.exchange-inflow-cdd');
 
@@ -112,6 +113,7 @@ Route::prefix('api/coinglass/basis')->group(function () {
 // Coinglass Liquidations (new proxy endpoints)
 Route::prefix('api/coinglass/liquidation')->group(function () {
     Route::get('/aggregated-heatmap/model3', [App\Http\Controllers\Coinglass\LiquidationsController::class, 'heatmapModel3']);
+    Route::get('/aggregated-history', [App\Http\Controllers\Coinglass\LiquidationsController::class, 'aggregatedHistory']);
 });
 
 Route::get('/api/coinglass/liquidation-aggregated-history', [App\Http\Controllers\CoinglassController::class, 'getLiquidationAggregatedHistory'])->name('api.coinglass.liquidation-aggregated-history');

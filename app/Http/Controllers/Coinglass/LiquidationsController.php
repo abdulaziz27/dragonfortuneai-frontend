@@ -108,6 +108,115 @@ class LiquidationsController extends Controller
     }
 
     /**
+     * GET /api/coinglass/liquidation/aggregated-history
+     * 
+     * Fetch aggregated liquidation history
+     * 
+     * Query params:
+     * - exchange_list: string (required) - Comma-separated exchanges (e.g., "Binance,OKX")
+     * - symbol: string (required) - Trading symbol (e.g., BTC)
+     * - interval: string (required) - Time interval (1m, 3m, 5m, 15m, 30m, 1h, 4h, 6h, 8h, 12h, 1d, 1w)
+     * - start_time: int64 (optional) - Start timestamp in milliseconds
+     * - end_time: int64 (optional) - End timestamp in milliseconds
+     */
+    public function aggregatedHistory(Request $request)
+    {
+        $exchangeList = $request->query('exchange_list', 'Binance');
+        $symbol = $this->toCoinglassSymbol($request->query('symbol', 'BTC'));
+        $interval = $request->query('interval', '1d');
+        $startTime = $request->query('start_time');
+        $endTime = $request->query('end_time');
+
+        // Validate interval
+        $validIntervals = ['1m', '3m', '5m', '15m', '30m', '1h', '4h', '6h', '8h', '12h', '1d', '1w'];
+        if (!in_array($interval, $validIntervals)) {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 400,
+                    'message' => 'Invalid interval. Supported: ' . implode(', ', $validIntervals)
+                ]
+            ], 400);
+        }
+
+        $cacheKey = sprintf(
+            'coinglass:liquidations:history:%s:%s:%s:%s:%s',
+            md5($exchangeList),
+            $symbol,
+            $interval,
+            $startTime ?? 'null',
+            $endTime ?? 'null'
+        );
+
+        $raw = Cache::remember($cacheKey, $this->cacheTtlSeconds, function () use ($exchangeList, $symbol, $interval, $startTime, $endTime) {
+            $query = array_filter([
+                'exchange_list' => $exchangeList,
+                'symbol' => $symbol,
+                'interval' => $interval,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+            ], fn($v) => $v !== null && $v !== '');
+
+            return $this->client->get('/futures/liquidation/aggregated-history', $query);
+        });
+
+        $normalized = $this->normalizeAggregatedHistory($raw);
+        return response()->json($normalized);
+    }
+
+    /**
+     * Normalize aggregated history data
+     */
+    private function normalizeAggregatedHistory($raw): array
+    {
+        // Check for API error
+        if (!is_array($raw) || (isset($raw['success']) && $raw['success'] === false)) {
+            return [
+                'success' => false,
+                'error' => $raw['error'] ?? ['code' => 500, 'message' => 'Unknown error']
+            ];
+        }
+
+        // Check for Coinglass error code
+        if (isset($raw['code']) && $raw['code'] !== '0' && $raw['code'] !== 0) {
+            return [
+                'success' => false,
+                'error' => [
+                    'code' => $raw['code'],
+                    'message' => $raw['msg'] ?? $raw['message'] ?? 'API error'
+                ]
+            ];
+        }
+
+        // Extract data
+        $rows = $raw['data'] ?? [];
+        
+        if (empty($rows)) {
+            return [
+                'success' => false,
+                'error' => ['code' => 404, 'message' => 'No data available']
+            ];
+        }
+
+        // Normalize each row
+        $data = [];
+        foreach ($rows as $row) {
+            $data[] = [
+                'time' => $row['time'] ?? null,
+                'long_liquidation_usd' => $row['aggregated_long_liquidation_usd'] ?? 0,
+                'short_liquidation_usd' => $row['aggregated_short_liquidation_usd'] ?? 0,
+                'total_liquidation_usd' => ($row['aggregated_long_liquidation_usd'] ?? 0) + ($row['aggregated_short_liquidation_usd'] ?? 0),
+            ];
+        }
+
+        return [
+            'success' => true,
+            'data' => $data,
+            'timestamp' => time()
+        ];
+    }
+
+    /**
      * Convert symbol to Coinglass format (remove quote currency)
      */
     private function toCoinglassSymbol(?string $symbol): ?string
