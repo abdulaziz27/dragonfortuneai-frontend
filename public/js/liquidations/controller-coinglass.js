@@ -53,10 +53,11 @@ export function createLiquidationsController() {
         },
 
         // Interactive features
-        liquidityThreshold: 0.9, // Default threshold (0-1)
+        liquidityThreshold: 0.2, // Default threshold (0-1) - lower shows more colors
         zoomLevel: 1,
         panX: 0,
         panY: 0,
+        thresholdDebounceTimer: null, // For smooth slider performance
 
         async init() {
             if (this.initialized) return;
@@ -66,6 +67,9 @@ export function createLiquidationsController() {
 
             this.apiService = new LiquidationsAPIService();
             this.chartManager = new ChartManager('liquidationsHeatmapChart');
+            
+            // Set initial threshold to match controller default (0.2)
+            this.chartManager.threshold = this.liquidityThreshold;
 
             await this.loadData();
 
@@ -209,12 +213,21 @@ export function createLiquidationsController() {
             return LiquidationsUtils.formatPercentage(value);
         },
 
-        // Interactive controls
+        // Interactive controls with debouncing for smooth performance
         updateThreshold(value) {
-            this.liquidityThreshold = parseFloat(value);
-            if (this.chartManager && this.rawData) {
-                this.chartManager.updateThreshold(this.liquidityThreshold);
+            const newThreshold = parseFloat(value);
+            this.liquidityThreshold = newThreshold; // Update immediately for UI
+            
+            // Debounce chart re-render for smooth slider movement
+            if (this.thresholdDebounceTimer) {
+                clearTimeout(this.thresholdDebounceTimer);
             }
+            
+            this.thresholdDebounceTimer = setTimeout(() => {
+                if (this.chartManager && this.rawData) {
+                    this.chartManager.updateThreshold(newThreshold);
+                }
+            }, 150); // 150ms debounce - smooth but responsive
         },
 
         zoomIn() {

@@ -19,6 +19,7 @@ Route::view('/derivatives/open-interest-old', 'derivatives.open-interest-old')->
 Route::view('/derivatives/long-short-ratio', 'derivatives.long-short-ratio-new')->name('derivatives.long-short-ratio');
 
 Route::view('/derivatives/liquidations', 'derivatives.liquidations-new')->name('derivatives.liquidations');
+Route::view('/derivatives/liquidations-stream', 'derivatives.liquidations-stream')->name('derivatives.liquidations-stream');
 Route::view('/derivatives/basis-term-structure', 'derivatives.basis-term-structure-new')->name('derivatives.basis-term-structure');
 Route::view('/derivatives/exchange-inflow-cdd', 'derivatives.exchange-inflow-cdd')->name('derivatives.exchange-inflow-cdd');
 

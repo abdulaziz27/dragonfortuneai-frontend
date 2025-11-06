@@ -13,8 +13,8 @@ export class ChartManager {
         this.chart = null;
         this.isRendering = false; // Prevent concurrent renders
         
-        // Interactive state
-        this.threshold = 0.9;
+        // Interactive state (default 0.2 for colorful display)
+        this.threshold = 0.2;
         this.zoomLevel = 1;
         this.panX = 0;
         this.panY = 0;
@@ -188,14 +188,17 @@ export class ChartManager {
     }
 
     /**
-     * Update threshold and re-render
+     * Update threshold and re-render (optimized with RAF)
      */
     updateThreshold(threshold) {
         this.threshold = threshold;
         const canvas = document.getElementById(this.canvasId);
         if (canvas) {
-            const ctx = canvas.getContext('2d');
-            this.drawHeatmap(ctx);
+            // Use requestAnimationFrame for smooth 60fps rendering
+            requestAnimationFrame(() => {
+                const ctx = canvas.getContext('2d');
+                this.drawHeatmap(ctx);
+            });
         }
     }
 

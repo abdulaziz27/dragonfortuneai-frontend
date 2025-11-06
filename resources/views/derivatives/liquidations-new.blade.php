@@ -35,22 +35,22 @@
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <h1 class="mb-0">Liquidations Heatmap</h1>
-                        <span class="pulse-dot pulse-success" x-show="rawData && refreshEnabled"></span>
+                        <span class="pulse-dot pulse-success" x-show="rawData && refreshEnabled" x-cloak></span>
                         <span class="spinner-border spinner-border-sm text-primary" style="width: 16px; height: 16px;" x-show="!rawData" x-cloak></span>
-                        <span class="badge text-bg-success" x-show="refreshEnabled" title="Auto-refresh setiap 15 detik">
+                        <span class="badge text-bg-success" x-show="refreshEnabled" title="Auto-refresh setiap 15 detik" x-cloak>
                             <i class="fas fa-sync-alt"></i> LIVE
                         </span>
                     </div>
                     <p class="mb-0 text-secondary">
                         Visualisasi area liquidation untuk identifikasi level support/resistance kunci. 
-                        <span x-show="refreshEnabled" class="text-success">• Live update</span>
+                        <span x-show="refreshEnabled" class="text-success" x-cloak>• Live update</span>
                     </p>
                 </div>
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                     <!-- Symbol Selector -->
-                    <select class="form-select" style="width: 120px;" :value="selectedSymbol" @change="updateSymbol($event.target.value)">
+                    <select class="form-select" style="width: 120px;" :value="selectedSymbol || 'BTC'" @change="updateSymbol && updateSymbol($event.target.value)">
                         <option value="BTC">BTC</option>
                         <option value="ETH">ETH</option>
                         <option value="SOL">SOL</option>
@@ -64,8 +64,8 @@
                     </select>
 
                     <!-- Time Range Selector -->
-                    <select class="form-select" style="width: 120px;" :value="selectedRange" @change="updateRange($event.target.value)">
-                        <template x-for="range in timeRanges" :key="range.value">
+                    <select class="form-select" style="width: 120px;" :value="selectedRange || '3d'" @change="updateRange && updateRange($event.target.value)">
+                        <template x-for="range in (timeRanges || [])" :key="range.value">
                             <option :value="range.value" x-text="range.label"></option>
                         </template>
                     </select>
@@ -80,13 +80,13 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Total Liquidations</span>
-                        <span class="badge text-bg-primary" x-show="stats.totalLiquidations > 0">Total</span>
-                        <span class="badge text-bg-secondary" x-show="stats.totalLiquidations === 0">Loading...</span>
+                        <span class="badge text-bg-primary" x-show="stats && stats.totalLiquidations > 0" x-cloak>Total</span>
+                        <span class="badge text-bg-secondary" x-show="!stats || stats.totalLiquidations === 0" x-cloak>Loading...</span>
                     </div>
                     <div>
-                        <div class="h3 mb-1" x-show="stats && stats.totalLiquidations > 0" x-text="stats && formatValue ? formatValue(stats.totalLiquidations) : '...'"></div>
-                        <div class="h3 mb-1 text-secondary" x-show="!stats || stats.totalLiquidations === 0">...</div>
-                        <small class="text-muted" x-show="stats && stats.count > 0">
+                        <div class="h3 mb-1" x-show="stats && stats.totalLiquidations > 0" x-text="stats && formatValue ? formatValue(stats.totalLiquidations) : '...'" x-cloak></div>
+                        <div class="h3 mb-1 text-secondary" x-show="!stats || stats.totalLiquidations === 0" x-cloak>...</div>
+                        <small class="text-muted" x-show="stats && stats.count > 0" x-cloak>
                             <span x-text="stats ? stats.count : 0"></span> data points
                         </small>
                     </div>
@@ -98,12 +98,12 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Max Liquidation</span>
-                        <span class="badge text-bg-danger" x-show="stats.maxLiquidation > 0">Peak</span>
-                        <span class="badge text-bg-secondary" x-show="stats.maxLiquidation === 0">Loading...</span>
+                        <span class="badge text-bg-danger" x-show="stats && stats.maxLiquidation > 0" x-cloak>Peak</span>
+                        <span class="badge text-bg-secondary" x-show="!stats || stats.maxLiquidation === 0" x-cloak>Loading...</span>
                     </div>
                     <div>
-                        <div class="h3 mb-1" x-show="stats && stats.maxLiquidation > 0" x-text="stats && formatValue ? formatValue(stats.maxLiquidation) : '...'"></div>
-                        <div class="h3 mb-1 text-secondary" x-show="!stats || stats.maxLiquidation === 0">...</div>
+                        <div class="h3 mb-1" x-show="stats && stats.maxLiquidation > 0" x-text="stats && formatValue ? formatValue(stats.maxLiquidation) : '...'" x-cloak></div>
+                        <div class="h3 mb-1 text-secondary" x-show="!stats || stats.maxLiquidation === 0" x-cloak>...</div>
                     </div>
                 </div>
             </div>
@@ -113,12 +113,12 @@
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Avg Liquidation</span>
-                        <span class="badge text-bg-info" x-show="stats.avgLiquidation > 0">Average</span>
-                        <span class="badge text-bg-secondary" x-show="stats.avgLiquidation === 0">Loading...</span>
+                        <span class="badge text-bg-info" x-show="stats && stats.avgLiquidation > 0" x-cloak>Average</span>
+                        <span class="badge text-bg-secondary" x-show="!stats || stats.avgLiquidation === 0" x-cloak>Loading...</span>
                     </div>
                     <div>
-                        <div class="h3 mb-1" x-show="stats && stats.avgLiquidation > 0" x-text="stats && formatValue ? formatValue(stats.avgLiquidation) : '...'"></div>
-                        <div class="h3 mb-1 text-secondary" x-show="!stats || stats.avgLiquidation === 0">...</div>
+                        <div class="h3 mb-1" x-show="stats && stats.avgLiquidation > 0" x-text="stats && formatValue ? formatValue(stats.avgLiquidation) : '...'" x-cloak></div>
+                        <div class="h3 mb-1 text-secondary" x-show="!stats || stats.avgLiquidation === 0" x-cloak>...</div>
                     </div>
                 </div>
             </div>
@@ -131,7 +131,7 @@
                     <div class="chart-header">
                         <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-3">
                             <div class="d-flex align-items-center gap-3">
-                                <h5 class="mb-0">Liquidations Heatmap (Model 3)</h5>
+                                <h5 class="mb-0">Liquidations Heatmap</h5>
                             </div>
                             
                             <!-- Interactive Controls -->
@@ -143,26 +143,27 @@
                                         <div style="width: 12px; height: 12px; background: linear-gradient(90deg, #f59e0b, #ef4444); border-radius: 2px;"></div>
                                     </div>
                                     <span class="small text-white-50">Liquidity Threshold = </span>
-                                    <span class="small text-white fw-bold" x-text="liquidityThreshold ? liquidityThreshold.toFixed(1) : '0.9'">0.9</span>
+                                    <span class="small text-white fw-bold" x-text="liquidityThreshold ? liquidityThreshold.toFixed(1) : '0.2'">0.2</span>
                                     <input type="range" 
                                            class="form-range" 
                                            min="0" 
                                            max="1" 
-                                           step="0.1" 
-                                           :value="liquidityThreshold || 0.9"
+                                           step="0.05" 
+                                           :value="liquidityThreshold || 0.2"
                                            @input="updateThreshold && updateThreshold($event.target.value)"
-                                           style="width: 120px;">
+                                           style="width: 120px;"
+                                           title="Drag to filter liquidation intensity (lower = more colors visible)">
                                 </div>
 
                                 <!-- Zoom Controls -->
                                 <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-outline-light" @click="zoomOut()" title="Zoom Out">
+                                    <button type="button" class="btn btn-sm btn-outline-light" @click="zoomOut && zoomOut()" title="Zoom Out">
                                         <i class="fas fa-search-minus"></i>
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-outline-light" @click="resetZoom()" title="Reset Zoom">
+                                    <button type="button" class="btn btn-sm btn-outline-light" @click="resetZoom && resetZoom()" title="Reset Zoom">
                                         <i class="fas fa-compress"></i>
                                     </button>
-                                    <button type="button" class="btn btn-sm btn-outline-light" @click="zoomIn()" title="Zoom In">
+                                    <button type="button" class="btn btn-sm btn-outline-light" @click="zoomIn && zoomIn()" title="Zoom In">
                                         <i class="fas fa-search-plus"></i>
                                     </button>
                                 </div>
