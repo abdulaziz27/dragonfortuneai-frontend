@@ -169,7 +169,7 @@
                                 <a href="/derivatives/long-short-ratio" class="df-submenu-item {{ request()->routeIs('derivatives.long-short-ratio') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Long/Short Ratio</a>
                                 <a href="/derivatives/liquidations" class="df-submenu-item {{ request()->routeIs('derivatives.liquidations') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Liquidations</a>
                                 <a href="/derivatives/basis-term-structure" class="df-submenu-item {{ request()->routeIs('derivatives.basis-term-structure') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Basis & Term Structure</a>
-                                <a href="/derivatives/perp-quarterly-spread" class="df-submenu-item {{ request()->routeIs('derivatives.perp-quarterly-spread') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Perp–Quarterly Spread</a>
+                                <!-- <a href="/derivatives/perp-quarterly-spread" class="df-submenu-item {{ request()->routeIs('derivatives.perp-quarterly-spread') ? 'active' : '' }}" style="color: var(--foreground);" @click="closeSidebar()">Perp–Quarterly Spread</a> -->
                             </div>
                         </li>
                         <li class="df-sidebar-menu-item">

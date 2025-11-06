@@ -20,7 +20,6 @@ Route::view('/derivatives/long-short-ratio', 'derivatives.long-short-ratio-new')
 
 Route::view('/derivatives/liquidations', 'derivatives.liquidations')->name('derivatives.liquidations');
 Route::view('/derivatives/basis-term-structure', 'derivatives.basis-term-structure-new')->name('derivatives.basis-term-structure');
-Route::view('/derivatives/perp-quarterly-spread', 'derivatives.perp-quarterly-spread')->name('derivatives.perp-quarterly-spread');
 Route::view('/derivatives/exchange-inflow-cdd', 'derivatives.exchange-inflow-cdd')->name('derivatives.exchange-inflow-cdd');
 
 // Spot Microstructure - Single Unified Page
