@@ -1,143 +1,297 @@
 /**
- * Liquidations Controller (Modular, Coinglass)
+ * Liquidations Heatmap Controller (Coinglass)
+ * Blueprint: Open Interest Controller (proven stable)
+ * 
+ * Displays liquidation heatmap (Model 3)
  */
 
 import { LiquidationsAPIService } from './api-service.js';
+import { ChartManager } from './chart-manager.js';
+import { LiquidationsUtils } from './utils.js';
 
 export function createLiquidationsController() {
-    const api = new LiquidationsAPIService();
-
     return {
-        // Global state
-        globalLoading: true,
-        selectedExchange: 'binance',
-        selectedSymbol: 'btc_usdt',
+        initialized: false,
+        apiService: null,
+        chartManager: null,
 
-        // Summary metrics
-        currentPrice: 0,
-        priceChange: 0,
-        totalLiquidations: 0,
-        longLiquidations: 0,
-        shortLiquidations: 0,
-        longLiquidationRatio: 0,
-        shortLiquidationRatio: 0,
-        longShortLiqRatio: 0,
-        liquidationSentiment: 'Loading...',
-        liquidationSentimentStrength: 'Normal',
-        liquidationSentimentDescription: 'Analyzing market data...',
+        // State
+        selectedSymbol: 'BTC',
+        selectedRange: '3d', // Default 3 days
+
+        // Supported symbols (same as Open Interest)
+        supportedSymbols: ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'DOGE', 'AVAX', 'TON', 'SUI'],
+
+        // Time ranges for heatmap
+        timeRanges: [
+            { label: '12H', value: '12h' },
+            { label: '24H', value: '24h' },
+            { label: '3D', value: '3d' },
+            { label: '7D', value: '7d' },
+            { label: '30D', value: '30d' },
+            { label: '90D', value: '90d' },
+            { label: '180D', value: '180d' },
+            { label: '1Y', value: '1y' }
+        ],
+
+        // Loading state
+        isLoading: false,
+
+        // Auto-refresh
+        refreshInterval: null,
+        refreshEnabled: true,
+        errorCount: 0,
+        maxErrors: 3,
+
+        // Data
+        rawData: null,
+        stats: {
+            totalLiquidations: 0,
+            maxLiquidation: 0,
+            avgLiquidation: 0,
+            count: 0
+        },
+
+        // Interactive features
+        liquidityThreshold: 0.9, // Default threshold (0-1)
+        zoomLevel: 1,
+        panX: 0,
+        panY: 0,
 
         async init() {
-            await this.refreshAll();
-            setInterval(() => this.refreshAll(), 30000);
+            if (this.initialized) return;
+            this.initialized = true;
+
+            console.log('🚀 Liquidations Heatmap (Coinglass) initialized');
+
+            this.apiService = new LiquidationsAPIService();
+            this.chartManager = new ChartManager('liquidationsHeatmapChart');
+
+            await this.loadData();
+
+            // Start auto-refresh for real-time updates
+            this.startAutoRefresh();
         },
 
-        async refreshAll() {
+        async loadData(isAutoRefresh = false) {
+            if (this.isLoading && !isAutoRefresh) {
+                console.warn('⚠️ Load already in progress, skipping');
+                return;
+            }
+
+            const startTime = performance.now();
+
+            // Always set loading to prevent concurrent calls
+            this.isLoading = true;
+
             try {
-                this.globalLoading = true;
-                await Promise.all([
-                    this.loadBitcoinPrice(),
-                    this.loadLiquidationSummary(),
-                ]);
-            } catch (e) {
-                console.error('Liquidations refresh error:', e);
+                console.log('[LIQUIDATIONS:LOAD]', {
+                    symbol: this.selectedSymbol,
+                    range: this.selectedRange
+                });
+
+                const fetchStart = performance.now();
+
+                const data = await this.apiService.fetchHeatmap({
+                    symbol: this.selectedSymbol,
+                    range: this.selectedRange,
+                    preferFresh: !isAutoRefresh
+                });
+
+                const fetchEnd = performance.now();
+                const fetchTime = Math.round(fetchEnd - fetchStart);
+
+                if (data && data.success) {
+                    this.rawData = data;
+                    this.calculateStats();
+                    this.renderChart();
+
+                    // Reset error count on successful load
+                    this.errorCount = 0;
+
+                    const totalTime = Math.round(performance.now() - startTime);
+                    console.log(`[LIQUIDATIONS:OK] (fetch: ${fetchTime}ms, total: ${totalTime}ms)`);
+                } else {
+                    console.warn('[LIQUIDATIONS:EMPTY]');
+                }
+
+            } catch (error) {
+                console.error('[LIQUIDATIONS:ERROR]', error);
+
+                // Circuit breaker: Prevent infinite error loops
+                this.errorCount++;
+                if (this.errorCount >= this.maxErrors) {
+                    console.error('🚨 Circuit breaker tripped! Too many errors, stopping auto-refresh');
+                    this.stopAutoRefresh();
+
+                    // Reset after 5 minutes
+                    setTimeout(() => {
+                        console.log('🔄 Circuit breaker reset, resuming auto-refresh');
+                        this.errorCount = 0;
+                        this.startAutoRefresh();
+                    }, 300000); // 5 minutes
+                }
             } finally {
-                this.globalLoading = false;
+                this.isLoading = false;
             }
         },
 
-        async loadBitcoinPrice() {
-            try {
-                const data = await api.fetchBitcoinPrice24hWindow();
-                if (data.success && Array.isArray(data.data) && data.data.length) {
-                    const latest = data.data[data.data.length - 1];
-                    this.currentPrice = latest.close || latest.value || 0;
-                    if (data.data.length >= 2) {
-                        const prev = data.data[data.data.length - 2];
-                        const prevPrice = prev.close || prev.value || 0;
-                        if (prevPrice > 0) this.priceChange = ((this.currentPrice - prevPrice) / prevPrice) * 100;
-                    }
-                } else {
-                    this.useFallbackPrice();
-                }
-            } catch (e) {
-                this.useFallbackPrice();
+        calculateStats() {
+            if (!this.rawData) return;
+
+            const parsed = LiquidationsUtils.parseHeatmapData(this.rawData);
+            if (!parsed) return;
+
+            this.stats = LiquidationsUtils.calculateStats(parsed.heatmapData);
+        },
+
+        renderChart() {
+            // Simplified render
+            if (!this.chartManager || !this.rawData) return;
+            this.chartManager.renderChart(this.rawData);
+        },
+
+        // Direct load for user interactions
+        instantLoadData() {
+            console.log('⚡ Instant load triggered');
+
+            // Force load even if currently loading (user interaction priority)
+            if (this.isLoading) {
+                console.log('⚡ Force loading for user interaction (overriding current load)');
+                this.isLoading = false; // Reset flag to allow new load
+            }
+
+            this.loadData(); // Load immediately
+        },
+
+        setTimeRange(value) {
+            console.log('🎯 setTimeRange called with:', value, 'current:', this.selectedRange);
+            if (this.selectedRange === value) {
+                console.log('⚠️ Same time range, skipping');
+                return;
+            }
+            console.log('🎯 Time range changed to:', value);
+            this.selectedRange = value;
+
+            // Always trigger load for filter changes
+            console.log('🚀 Filter changed, triggering instant load');
+            this.instantLoadData();
+        },
+
+        // Alpine expects these names from the blade template
+        updateRange(value) {
+            console.log('🎯 updateRange called with:', value);
+            this.setTimeRange(value);
+        },
+
+        updateSymbol(value) {
+            console.log('🎯 updateSymbol called with:', value);
+            if (value && value !== this.selectedSymbol) {
+                console.log('🎯 Symbol changed to:', value);
+                this.selectedSymbol = value;
+
+                // Always trigger load for filter changes
+                console.log('🚀 Filter changed, triggering instant load');
+                this.instantLoadData();
             }
         },
 
-        async loadLiquidationSummary() {
-            try {
-                const data = await api.fetchLiquidationSummary('BTC');
-                if (data.success && data.data) {
-                    this.totalLiquidations = data.data.total || 0;
-                    this.longLiquidations = data.data.long || 0;
-                    this.shortLiquidations = data.data.short || 0;
-                    if (this.totalLiquidations > 0) {
-                        this.longLiquidationRatio = (this.longLiquidations / this.totalLiquidations) * 100;
-                        this.shortLiquidationRatio = (this.shortLiquidations / this.totalLiquidations) * 100;
-                    }
-                    if (this.shortLiquidations > 0) this.longShortLiqRatio = this.longLiquidations / this.shortLiquidations;
-                    this.calculateLiquidationSentiment();
-                } else {
-                    this.useFallbackLiquidations();
-                }
-            } catch (e) {
-                this.useFallbackLiquidations();
-            }
+        // Format methods (must be at controller level for Alpine.js)
+        formatValue(value) {
+            return LiquidationsUtils.formatValue(value);
         },
 
-        // Helpers and fallbacks
-        useFallbackPrice() {
-            this.currentPrice = 95000;
-            this.priceChange = 2.5;
-        },
-
-        useFallbackLiquidations() {
-            this.totalLiquidations = 45000000;
-            this.longLiquidations = 25000000;
-            this.shortLiquidations = 20000000;
-            this.longLiquidationRatio = 55.6;
-            this.shortLiquidationRatio = 44.4;
-            this.longShortLiqRatio = 1.25;
-            this.calculateLiquidationSentiment();
-        },
-
-        calculateLiquidationSentiment() {
-            const r = this.longShortLiqRatio;
-            if (r > 3) { this.liquidationSentiment = 'Extreme Long Liquidations'; this.liquidationSentimentStrength = 'Strong'; this.liquidationSentimentDescription = 'Massive long positions being liquidated - strong bearish pressure'; return; }
-            if (r > 2) { this.liquidationSentiment = 'High Long Liquidations'; this.liquidationSentimentStrength = 'Moderate'; this.liquidationSentimentDescription = 'More longs being liquidated - bearish momentum'; return; }
-            if (r < 0.33) { this.liquidationSentiment = 'Extreme Short Liquidations'; this.liquidationSentimentStrength = 'Strong'; this.liquidationSentimentDescription = 'Massive short positions being liquidated - strong bullish pressure'; return; }
-            if (r < 0.5) { this.liquidationSentiment = 'High Short Liquidations'; this.liquidationSentimentStrength = 'Moderate'; this.liquidationSentimentDescription = 'More shorts being liquidated - bullish momentum'; return; }
-            this.liquidationSentiment = 'Balanced';
-            this.liquidationSentimentStrength = 'Normal';
-            this.liquidationSentimentDescription = 'Liquidations are relatively balanced between longs and shorts';
-        },
-
-        updateExchange() {},
-        updateSymbol() {},
-
-        formatPriceUSD(value) {
-            if (!value || isNaN(value)) return '$0';
-            const num = parseFloat(value);
-            return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-        },
-        formatLiquidation(value) {
-            if (!value || isNaN(value)) return '$0';
-            const num = parseFloat(value);
-            if (num >= 1_000_000) return '$' + (num / 1_000_000).toFixed(2) + 'M';
-            if (num >= 1_000) return '$' + (num / 1_000).toFixed(1) + 'K';
-            return '$' + num.toFixed(0);
-        },
         formatChange(value) {
-            if (!value || isNaN(value)) return '0.00%';
-            const num = parseFloat(value);
-            const sign = num >= 0 ? '+' : '';
-            return sign + num.toFixed(2) + '%';
+            return LiquidationsUtils.formatChange(value);
         },
-        getPriceTrendClass(value) {
-            if (!value || isNaN(value)) return 'text-secondary';
-            return parseFloat(value) >= 0 ? 'text-success' : 'text-danger';
+
+        formatPercentage(value) {
+            return LiquidationsUtils.formatPercentage(value);
         },
+
+        // Interactive controls
+        updateThreshold(value) {
+            this.liquidityThreshold = parseFloat(value);
+            if (this.chartManager && this.rawData) {
+                this.chartManager.updateThreshold(this.liquidityThreshold);
+            }
+        },
+
+        zoomIn() {
+            this.zoomLevel = Math.min(this.zoomLevel * 1.2, 5);
+            this.updateZoom();
+        },
+
+        zoomOut() {
+            this.zoomLevel = Math.max(this.zoomLevel / 1.2, 0.5);
+            this.updateZoom();
+        },
+
+        resetZoom() {
+            this.zoomLevel = 1;
+            this.panX = 0;
+            this.panY = 0;
+            this.updateZoom();
+        },
+
+        updateZoom() {
+            if (this.chartManager && this.rawData) {
+                this.chartManager.updateZoom(this.zoomLevel, this.panX, this.panY);
+            }
+        },
+
+        // Auto-refresh functionality
+        startAutoRefresh() {
+            this.stopAutoRefresh(); // Clear any existing interval
+
+            if (!this.refreshEnabled) return;
+
+            // 15 second interval for faster real-time updates
+            this.refreshInterval = setInterval(() => {
+                // Skip if page is hidden (tab not active)
+                if (document.hidden) return;
+
+                // Skip if currently loading to prevent race conditions
+                if (this.isLoading) return;
+
+                // Skip if too many errors
+                if (this.errorCount >= this.maxErrors) {
+                    console.warn('🚨 Auto-refresh disabled due to errors');
+                    this.stopAutoRefresh();
+                    return;
+                }
+
+                console.log('🔄 Auto-refresh: Silent update (15s)');
+                this.loadData(true); // Silent background update
+
+            }, 15000); // 15 seconds - Faster real-time updates
+
+            // Handle page visibility changes
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && this.refreshEnabled) {
+                    // Page became visible - trigger immediate update
+                    console.log('👁️ Page visible: Triggering refresh');
+                    if (!this.isLoading) {
+                        this.loadData(true);
+                    }
+                }
+            });
+
+            console.log('✅ Auto-refresh started (15s interval)');
+        },
+
+        stopAutoRefresh() {
+            if (this.refreshInterval) {
+                clearInterval(this.refreshInterval);
+                this.refreshInterval = null;
+                console.log('⏹️ Auto-refresh stopped');
+            }
+        },
+
+        cleanup() {
+            this.stopAutoRefresh();
+            if (this.chartManager) this.chartManager.destroy();
+            if (this.apiService) this.apiService.cancelRequest();
+        }
     };
 }
-
-
