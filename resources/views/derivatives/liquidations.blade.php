@@ -2,6 +2,10 @@
 
 @section('title', 'Liquidations | DragonFortune')
 
+@push('head')
+    <link rel="preload" href="{{ asset('js/liquidations-controller.js') }}" as="script" crossorigin="anonymous">
+@endpush
+
 @section('content')
     {{--
         Bitcoin: Liquidations Dashboard (HYBRID)
@@ -18,13 +22,13 @@
         - Liquidation clusters = Key price levels untuk entry/exit
     --}}
 
-    <div class="d-flex flex-column h-100 gap-3" x-data="liquidationsHybridController()">
+    <div class="d-flex flex-column h-100 gap-3" x-data="liquidationsController()">
         <!-- Page Header -->
         <div class="derivatives-header">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <h1 class="mb-0">💥 Bitcoin: Liquidations</h1>
+                        <h1 class="mb-0">Liquidations</h1>
                         <span class="pulse-dot pulse-success"></span>
                     </div>
                     <p class="mb-0 text-secondary">
@@ -940,8 +944,8 @@
         });
     </script>
 
-    <!-- Liquidations Page Controller (Main Controller for Summary Cards) -->
-    <script src="{{ asset('js/liquidations-page-controller.js') }}"></script>
+    <!-- Liquidations Modular Controller (Main Controller) -->
+    <script type="module" src="{{ asset('js/liquidations-controller.js') }}"></script>
     
     <!-- Liquidation History Chart Controller -->
     <script src="{{ asset('js/liquidation-history-chart-controller.js') }}"></script>

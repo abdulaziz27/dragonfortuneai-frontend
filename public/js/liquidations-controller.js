@@ -1,4 +1,13 @@
 /**
+ * Liquidations Controller - Entry Point
+ */
+
+import { createLiquidationsController } from './liquidations/controller-coinglass.js';
+
+// Expose to global scope for Alpine.js
+window.liquidationsController = createLiquidationsController;
+
+/**
  * Liquidations Dashboard Controller
  *
  * Comprehensive liquidation analytics dengan 6 API endpoints
