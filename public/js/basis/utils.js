@@ -1,96 +1,77 @@
 /**
  * Basis & Term Structure Utilities
  * Helper functions for formatting and calculations
+ * 
+ * Blueprint: Open Interest Utils (proven stable)
  */
 
 export const BasisUtils = {
+
     /**
-     * Format basis absolute value
+     * Format Basis value for display (percentage)
+     * Example: 0.0374 -> "3.74%"
      */
     formatBasis(value) {
-        if (value === null || value === undefined || isNaN(value)) return '--';
-        return parseFloat(value).toFixed(2);
+        if (value === null || value === undefined || isNaN(value)) return 'N/A';
+        const num = parseFloat(value);
+        return (num * 100).toFixed(2) + '%';
     },
 
     /**
-     * Format basis annualized (percentage)
+     * Format Change value (percentage)
+     * Example: 41.5 -> "41.50%"
      */
-    formatBasisAnnualized(value) {
-        if (value === null || value === undefined || isNaN(value)) return '--';
-        const percentage = parseFloat(value);
-        return percentage.toFixed(2) + '%';
+    formatChange(value) {
+        if (value === null || value === undefined || isNaN(value)) return 'N/A';
+        const num = parseFloat(value);
+        const sign = num >= 0 ? '+' : '';
+        return `${sign}${num.toFixed(2)}%`;
     },
 
     /**
-     * Format price in USD
+     * Get market structure from basis
+     * Positive basis = Contango (normal)
+     * Negative basis = Backwardation (bullish signal)
      */
-    formatPrice(value) {
-        if (value === null || value === undefined || isNaN(value)) return '--';
-        return '$' + parseFloat(value).toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-    },
-
-    /**
-     * Calculate standard deviation
-     */
-    calculateStdDev(values) {
-        if (!values || values.length === 0) return 0;
-        const mean = values.reduce((a, b) => a + b, 0) / values.length;
-        const squaredDiffs = values.map(v => Math.pow(v - mean, 2));
-        const avgSquaredDiff = squaredDiffs.reduce((a, b) => a + b, 0) / values.length;
-        return Math.sqrt(avgSquaredDiff);
-    },
-
-    /**
-     * Calculate limit from date range and interval
-     * Same pattern as funding-rate and perp-quarterly
-     */
-    calculateLimit(days, interval) {
-        if (!days || days === null) {
-            // For 'ALL' period, use maximum limit
-            return 5000;
-        }
-
-        const intervalHours = {
-            '5m': 5 / 60,
-            '15m': 15 / 60,
-            '1h': 1,
-            '4h': 4
-        };
-
-        const hours = intervalHours[interval] || 1;
-        const exactRecordsNeeded = Math.ceil((days * 24) / hours);
+    getMarketStructure(basis) {
+        if (basis === null || basis === undefined || isNaN(basis)) return 'Unknown';
+        const num = parseFloat(basis);
         
-        // Dynamic buffer multiplier based on interval
-        let bufferMultiplier = 1.5;
-        if (interval === '5m') bufferMultiplier = 2.0;
-        else if (interval === '15m') bufferMultiplier = 1.8;
+        if (num > 0.001) return 'Contango';
+        if (num < -0.001) return 'Backwardation';
+        return 'Flat';
+    },
+
+    /**
+     * Get market structure color class
+     */
+    getStructureColor(basis) {
+        if (basis === null || basis === undefined || isNaN(basis)) return 'text-secondary';
+        const num = parseFloat(basis);
         
-        let calculatedLimit = Math.ceil(exactRecordsNeeded * bufferMultiplier);
-        const maxLimit = 5000;
-        return Math.min(calculatedLimit, maxLimit);
+        if (num > 0.001) return 'text-primary'; // Contango (normal)
+        if (num < -0.001) return 'text-success'; // Backwardation (bullish)
+        return 'text-warning'; // Flat
     },
 
     /**
-     * Format market structure (contango, backwardation, etc.)
+     * Get market structure badge class
      */
-    formatMarketStructure(value) {
-        if (!value) return '--';
-        // Format: "strong_contango" → "Strong Contango"
-        return value
-            .split('_')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ');
+    getStructureBadge(basis) {
+        if (basis === null || basis === undefined || isNaN(basis)) return 'text-bg-secondary';
+        const num = parseFloat(basis);
+        
+        if (num > 0.001) return 'text-bg-primary'; // Contango
+        if (num < -0.001) return 'text-bg-success'; // Backwardation
+        return 'text-bg-warning'; // Flat
     },
 
     /**
-     * Format trend (increasing, decreasing, stable)
+     * Capitalize exchange name (binance -> Binance)
      */
-    formatTrend(value) {
-        if (!value) return '--';
-        return value.charAt(0).toUpperCase() + value.slice(1);
+    capitalizeExchange(exchange) {
+        if (!exchange) return exchange;
+        return exchange.charAt(0).toUpperCase() + exchange.slice(1);
     }
-};
 
+};

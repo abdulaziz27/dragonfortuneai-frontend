@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Funding Rate | DragonFortune')
+@section('title', 'Long-Short Ratio | DragonFortune')
 
 @push('head')
     <!-- Resource Hints for Faster API Loading -->
@@ -10,56 +10,61 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     
     <!-- Preload critical resources for faster initial load -->
-    <link rel="preload" href="{{ asset('js/funding-rate-controller.js') }}" as="script" crossorigin="anonymous">
+    <link rel="preload" href="{{ asset('js/long-short-ratio-controller.js') }}" as="script" crossorigin="anonymous">
 @endpush
 
 @section('content')
     {{--
-        Bitcoin: Funding Rate Dashboard (Coinglass)
+        Bitcoin: Long-Short Ratio Dashboard (Coinglass)
         Think like a trader • Build like an engineer • Visualize like a designer
 
         Interpretasi Trading:
-        - Funding Rate mengukur premium/discount perpetual futures
-        - Positive funding = longs pay shorts (bullish sentiment)
-        - Negative funding = shorts pay longs (bearish sentiment)
-        - Extreme funding = potential squeeze setup
+        - Long-Short Ratio mengukur sentimen pasar
+        - Ratio > 1 = More longs (bullish sentiment)
+        - Ratio < 1 = More shorts (bearish sentiment)
+        - Global Account = All traders sentiment
+        - Top Account = Smart money sentiment
     --}}
 
-    <div class="d-flex flex-column h-100 gap-3" x-data="fundingRateController()">
+    <div class="d-flex flex-column h-100 gap-3" x-data="longShortRatioController()">
         <!-- Page Header -->
         <div class="derivatives-header">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <h1 class="mb-0">Funding Rate</h1>
-                        <span class="pulse-dot pulse-success" x-show="rawData.length > 0 && refreshEnabled"></span>
-                        <span class="spinner-border spinner-border-sm text-primary" style="width: 16px; height: 16px;" x-show="rawData.length === 0" x-cloak></span>
+                        <h1 class="mb-0">Long-Short Ratio</h1>
+                        <span class="pulse-dot pulse-success" x-show="globalRawData.length > 0 && refreshEnabled"></span>
+                        <span class="spinner-border spinner-border-sm text-primary" style="width: 16px; height: 16px;" x-show="globalRawData.length === 0" x-cloak></span>
                         <span class="badge text-bg-success" x-show="refreshEnabled" title="Auto-refresh setiap 15 detik">
                             <i class="fas fa-sync-alt"></i> LIVE
                         </span>
                     </div>
                     <p class="mb-0 text-secondary">
-                        Pantau funding rate untuk melihat sentimen pasar dan tekanan long/short positions. 
+                        Pantau sentimen pasar melalui Long-Short Ratio. Global Account menunjukkan sentimen retail, Top Account menunjukkan smart money. 
                         <span x-show="refreshEnabled" class="text-success">• Auto-refresh aktif</span>
                     </p>
                 </div>
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <!-- Symbol Selector (Coinglass Supported) -->
+                    <!-- Symbol Selector (Verified Data Available) -->
                     <select class="form-select" style="width: 120px;" :value="selectedSymbol" @change="updateSymbol($event.target.value)">
                         <option value="BTC">BTC</option>
                         <option value="ETH">ETH</option>
                         <option value="SOL">SOL</option>
-                        <option value="XRP">XRP</option>
-                        <option value="HYPE">HYPE</option>
                         <option value="BNB">BNB</option>
+                        <option value="XRP">XRP</option>
+                        <option value="ADA">ADA</option>
                         <option value="DOGE">DOGE</option>
+                        <option value="AVAX">AVAX</option>
+                        <option value="TON">TON</option>
+                        <option value="SUI">SUI</option>
                     </select>
 
-                    <!-- Unit Selector -->
-                    <select class="form-select" style="width: 120px;" :value="selectedUnit" @change="updateUnit($event.target.value)">
-                        <option value="percentage">Percentage</option>
+                    <!-- Exchange Selector (Only exchanges with data) -->
+                    <select class="form-select" style="width: 120px;" :value="selectedExchange" @change="updateExchange($event.target.value)">
+                        <option value="Binance">Binance</option>
+                        <option value="Bybit">Bybit</option>
                     </select>
 
                     <!-- Interval Selector (API Compliant) - SAME AS OPEN INTEREST -->
@@ -88,79 +93,130 @@
             </div>
         </div>
 
-        <!-- Summary Cards Row -->
+        <!-- Summary Cards Row - Global Account -->
         <div class="row g-3">
-            <!-- Current Funding Rate -->
+            <div class="col-12">
+                <h5 class="mb-3">📊 Global Account (All Traders)</h5>
+            </div>
+            
+            <!-- Current Ratio - Global -->
             <div class="col-md-4">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Current Funding Rate</span>
-                        <span class="badge text-bg-primary" x-show="currentFundingRate !== null">Latest</span>
-                        <span class="badge text-bg-secondary" x-show="currentFundingRate === null">Loading...</span>
+                        <span class="small text-secondary">Current Ratio</span>
+                        <span class="badge" :class="getSentimentBadge(globalCurrentRatio)" x-show="globalCurrentRatio !== null" x-text="getSentiment(globalCurrentRatio)"></span>
+                        <span class="badge text-bg-secondary" x-show="globalCurrentRatio === null">Loading...</span>
                     </div>
                     <div>
-                        <div class="h3 mb-1" x-show="currentFundingRate !== null" x-text="formatFundingRate(currentFundingRate)"></div>
-                        <div class="h3 mb-1 text-secondary" x-show="currentFundingRate === null">...</div>
-                        <small class="text-muted" x-show="fundingChange !== null">
-                            <span :class="fundingChange >= 0 ? 'text-success' : 'text-danger'" x-text="formatChange(fundingChange)"></span>
+                        <div class="h3 mb-1" x-show="globalCurrentRatio !== null" x-text="formatRatio(globalCurrentRatio)"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="globalCurrentRatio === null">...</div>
+                        <small class="text-muted" x-show="globalChange !== null">
+                            <span :class="globalChange >= 0 ? 'text-success' : 'text-danger'" x-text="formatChange(globalChange)"></span>
                         </small>
                     </div>
                 </div>
             </div>
 
-            <!-- Period High/Low Range -->
+            <!-- Range (H/L) - Global -->
             <div class="col-md-4">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <span class="small text-secondary">Range (H/L)</span>
-                        <span class="badge text-bg-info" x-show="maxFundingRate && minFundingRate">Range</span>
-                        <span class="badge text-bg-secondary" x-show="!maxFundingRate || !minFundingRate">Loading...</span>
+                        <span class="badge text-bg-info" x-show="globalMaxRatio && globalMinRatio">Range</span>
+                        <span class="badge text-bg-secondary" x-show="!globalMaxRatio || !globalMinRatio">Loading...</span>
                     </div>
                     <div>
-                        <div x-show="maxFundingRate && minFundingRate">
-                            <div class="h5 mb-1 text-danger" x-text="formatFundingRate(maxFundingRate)"></div>
-                            <div class="h5 mb-1 text-success" x-text="formatFundingRate(minFundingRate)"></div>
+                        <div x-show="globalMaxRatio && globalMinRatio">
+                            <div class="h5 mb-1 text-danger" x-text="formatRatio(globalMaxRatio)"></div>
+                            <div class="h5 mb-1 text-success" x-text="formatRatio(globalMinRatio)"></div>
                         </div>
-                        <div class="h3 mb-1 text-secondary" x-show="!maxFundingRate || !minFundingRate">...</div>
-                        <small class="text-muted" x-show="fundingVolatility !== null">
-                            Volatility: <span x-text="formatPercentage(fundingVolatility)"></span>
-                        </small>
+                        <div class="h3 mb-1 text-secondary" x-show="!globalMaxRatio || !globalMinRatio">...</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Average Funding Rate & Momentum -->
+            <!-- Average Ratio - Global -->
             <div class="col-md-4">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Avg Funding Rate</span>
-                        <span class="badge" :class="momentum > 0 ? 'text-bg-success' : momentum < 0 ? 'text-bg-danger' : 'text-bg-secondary'">
-                            <span x-show="momentum > 0">📈 Bullish</span>
-                            <span x-show="momentum < 0">📉 Bearish</span>
-                            <span x-show="momentum === 0">➡️ Neutral</span>
-                        </span>
+                        <span class="small text-secondary">Avg Ratio</span>
+                        <span class="badge" :class="getSentimentBadge(globalAvgRatio)" x-show="globalAvgRatio !== null" x-text="getSentiment(globalAvgRatio)"></span>
                     </div>
                     <div>
-                        <div class="h3 mb-1" x-show="avgFundingRate !== null" x-text="formatFundingRate(avgFundingRate)"></div>
-                        <div class="h3 mb-1 text-secondary" x-show="avgFundingRate === null">...</div>
-                        <small class="text-muted" x-show="momentum !== null">
-                            Momentum: <span :class="momentum >= 0 ? 'text-success' : 'text-danger'" x-text="formatPercentage(momentum)"></span>
-                        </small>
+                        <div class="h3 mb-1" x-show="globalAvgRatio !== null" x-text="formatRatio(globalAvgRatio)"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="globalAvgRatio === null">...</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Main Chart -->
+        <!-- Summary Cards Row - Top Account -->
+        <div class="row g-3">
+            <div class="col-12">
+                <h5 class="mb-3">🎯 Top Account (Smart Money)</h5>
+            </div>
+            
+            <!-- Current Ratio - Top -->
+            <div class="col-md-4">
+                <div class="df-panel p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary">Current Ratio</span>
+                        <span class="badge" :class="getSentimentBadge(topCurrentRatio)" x-show="topCurrentRatio !== null" x-text="getSentiment(topCurrentRatio)"></span>
+                        <span class="badge text-bg-secondary" x-show="topCurrentRatio === null">Loading...</span>
+                    </div>
+                    <div>
+                        <div class="h3 mb-1" x-show="topCurrentRatio !== null" x-text="formatRatio(topCurrentRatio)"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="topCurrentRatio === null">...</div>
+                        <small class="text-muted" x-show="topChange !== null">
+                            <span :class="topChange >= 0 ? 'text-success' : 'text-danger'" x-text="formatChange(topChange)"></span>
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Range (H/L) - Top -->
+            <div class="col-md-4">
+                <div class="df-panel p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary">Range (H/L)</span>
+                        <span class="badge text-bg-info" x-show="topMaxRatio && topMinRatio">Range</span>
+                        <span class="badge text-bg-secondary" x-show="!topMaxRatio || !topMinRatio">Loading...</span>
+                    </div>
+                    <div>
+                        <div x-show="topMaxRatio && topMinRatio">
+                            <div class="h5 mb-1 text-danger" x-text="formatRatio(topMaxRatio)"></div>
+                            <div class="h5 mb-1 text-success" x-text="formatRatio(topMinRatio)"></div>
+                        </div>
+                        <div class="h3 mb-1 text-secondary" x-show="!topMaxRatio || !topMinRatio">...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Average Ratio - Top -->
+            <div class="col-md-4">
+                <div class="df-panel p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="small text-secondary">Avg Ratio</span>
+                        <span class="badge" :class="getSentimentBadge(topAvgRatio)" x-show="topAvgRatio !== null" x-text="getSentiment(topAvgRatio)"></span>
+                    </div>
+                    <div>
+                        <div class="h3 mb-1" x-show="topAvgRatio !== null" x-text="formatRatio(topAvgRatio)"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="topAvgRatio === null">...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Account Chart -->
         <div class="row g-3">
             <div class="col-12">
                 <div class="tradingview-chart-container">
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0">Funding Rate</h5>
+                            <h5 class="mb-0">📊 Global Account Long-Short Ratio</h5>
                             <div class="chart-info">
                                 <div class="d-flex align-items-center gap-3">
-                                    <span class="current-value" x-text="currentFundingRate !== null && currentFundingRate !== undefined ? formatFundingRate(currentFundingRate) : '--'"></span>
+                                    <span class="current-value" x-text="globalCurrentRatio !== null ? formatRatio(globalCurrentRatio) : '--'"></span>
                                 </div>
                             </div>
                         </div>
@@ -183,12 +239,12 @@
                                     <button class="btn btn-outline-secondary btn-sm dropdown-toggle interval-dropdown-btn" 
                                             type="button" 
                                             data-bs-toggle="dropdown" 
-                                            :title="'Chart Interval: ' + (chartIntervals.find(i => i.value === selectedInterval)?.label || '8H')">
+                                            :title="'Chart Interval: ' + (chartIntervals.find(i => i.value === selectedInterval)?.label || '1H')">
                                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1">
                                             <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
                                             <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
                                         </svg>
-                                        <span x-text="chartIntervals.find(i => i.value === selectedInterval)?.label || '8H'"></span>
+                                        <span x-text="chartIntervals.find(i => i.value === selectedInterval)?.label || '1H'"></span>
                                     </button>
                                     <ul class="dropdown-menu">
                                         <template x-for="interval in chartIntervals" :key="interval.value">
@@ -207,12 +263,43 @@
                         </div>
                     </div>
                     <div class="chart-body" style="position: relative;">
-                        <canvas id="fundingRateMainChart"></canvas>
+                        <canvas id="globalAccountChart"></canvas>
                     </div>
                     <div class="chart-footer">
                         <div class="d-flex justify-content-between align-items-center">
                             <small class="chart-footer-text text-secondary">
-                                📈 Funding rate positif menunjukkan longs membayar shorts (sentimen bullish)
+                                📊 Ratio > 1 menunjukkan lebih banyak long positions (bullish sentiment)
+                            </small>
+                            <small class="text-muted">
+                                <span class="badge text-bg-success">Coinglass API</span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Account Chart -->
+        <div class="row g-3">
+            <div class="col-12">
+                <div class="tradingview-chart-container">
+                    <div class="chart-header">
+                        <div class="d-flex align-items-center gap-3">
+                            <h5 class="mb-0">🎯 Top Account Long-Short Ratio (Smart Money)</h5>
+                            <div class="chart-info">
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="current-value" x-text="topCurrentRatio !== null ? formatRatio(topCurrentRatio) : '--'"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-body" style="position: relative;">
+                        <canvas id="topAccountChart"></canvas>
+                    </div>
+                    <div class="chart-footer">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="chart-footer-text text-secondary">
+                                🎯 Top traders sentiment - often contrarian to retail
                             </small>
                             <small class="text-muted">
                                 <span class="badge text-bg-success">Coinglass API</span>
@@ -227,18 +314,18 @@
         <div class="row g-3">
             <div class="col-12">
                 <div class="df-panel p-4">
-                    <h5 class="mb-3">📚 Memahami Funding Rate</h5>
+                    <h5 class="mb-3">📚 Memahami Long-Short Ratio</h5>
 
                     <div class="row g-3">
                         <div class="col-md-4">
                             <div class="p-3 rounded" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e;">
-                                <div class="fw-bold mb-2 text-success">🟢 Funding Rate Positif</div>
+                                <div class="fw-bold mb-2 text-success">🟢 Ratio > 1 (Bullish)</div>
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
-                                        <li>Long positions membayar short positions</li>
-                                        <li>Sentimen bullish dominan di pasar</li>
-                                        <li>Leverage bias ke arah long</li>
-                                        <li>Strategi: Hati-hati dengan long crowding</li>
+                                        <li>Lebih banyak long positions</li>
+                                        <li>Sentimen bullish dominan</li>
+                                        <li>Pasar optimis terhadap kenaikan harga</li>
+                                        <li>Strategi: Hati-hati dengan overcrowding</li>
                                     </ul>
                                 </div>
                             </div>
@@ -246,12 +333,12 @@
 
                         <div class="col-md-4">
                             <div class="p-3 rounded" style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444;">
-                                <div class="fw-bold mb-2 text-danger">🔴 Funding Rate Negatif</div>
+                                <div class="fw-bold mb-2 text-danger">🔴 Ratio < 1 (Bearish)</div>
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
-                                        <li>Short positions membayar long positions</li>
-                                        <li>Sentimen bearish dominan di pasar</li>
-                                        <li>Leverage bias ke arah short</li>
+                                        <li>Lebih banyak short positions</li>
+                                        <li>Sentimen bearish dominan</li>
+                                        <li>Pasar pesimis terhadap harga</li>
                                         <li>Strategi: Cari peluang untuk long</li>
                                     </ul>
                                 </div>
@@ -260,13 +347,13 @@
 
                         <div class="col-md-4">
                             <div class="p-3 rounded" style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6;">
-                                <div class="fw-bold mb-2 text-primary">⚡ Funding Rate Ekstrem</div>
+                                <div class="fw-bold mb-2 text-primary">⚡ Global vs Top Account</div>
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
-                                        <li>Positioning sangat crowded</li>
-                                        <li>Potensi squeeze setup</li>
-                                        <li>Mean reversion opportunity</li>
-                                        <li>Strategi: Contrarian positioning</li>
+                                        <li>Global = Retail sentiment</li>
+                                        <li>Top = Smart money sentiment</li>
+                                        <li>Divergence = Opportunity</li>
+                                        <li>Strategi: Follow smart money</li>
                                     </ul>
                                 </div>
                             </div>
@@ -274,7 +361,7 @@
                     </div>
 
                     <div class="alert alert-info mt-3 mb-0">
-                        <strong>💡 Tips Pro:</strong> Funding rate ekstrem (>0.1% atau <-0.1%) sering menandakan positioning yang crowded dan potensi squeeze. Kombinasikan dengan analisis teknikal untuk timing yang optimal.
+                        <strong>💡 Tips Pro:</strong> Perhatikan divergence antara Global dan Top Account. Ketika retail bullish tapi smart money bearish, sering menandakan reversal. Kombinasikan dengan analisis teknikal untuk timing yang optimal.
                     </div>
                 </div>
             </div>
@@ -314,8 +401,8 @@
         });
     </script>
 
-    <!-- Funding Rate Modular Controller -->
-    <script type="module" src="{{ asset('js/funding-rate-controller.js') }}" defer></script>
+    <!-- Long-Short Ratio Modular Controller -->
+    <script type="module" src="{{ asset('js/long-short-ratio-controller.js') }}" defer></script>
 
     <style>
         /* Skeleton placeholders */
@@ -376,7 +463,7 @@
 
         .chart-body {
             padding: 20px;
-            height: 500px;
+            height: 400px;
             position: relative;
             background: #ffffff;
         }

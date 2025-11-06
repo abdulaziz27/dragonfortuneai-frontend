@@ -13,13 +13,13 @@ Route::post('/logout', function () {
 })->name('logout');
 
 // Derivatives Core Routes
-Route::view('/derivatives/funding-rate', 'derivatives.funding-rate-exact')->name('derivatives.funding-rate');
+Route::view('/derivatives/funding-rate', 'derivatives.funding-rate')->name('derivatives.funding-rate');
 Route::view('/derivatives/open-interest', 'derivatives.open-interest')->name('derivatives.open-interest');
 Route::view('/derivatives/open-interest-old', 'derivatives.open-interest-old')->name('derivatives.open-interest-old');
-Route::view('/derivatives/long-short-ratio', 'derivatives.long-short-ratio')->name('derivatives.long-short-ratio');
+Route::view('/derivatives/long-short-ratio', 'derivatives.long-short-ratio-new')->name('derivatives.long-short-ratio');
 
 Route::view('/derivatives/liquidations', 'derivatives.liquidations')->name('derivatives.liquidations');
-Route::view('/derivatives/basis-term-structure', 'derivatives.basis-term-structure')->name('derivatives.basis-term-structure');
+Route::view('/derivatives/basis-term-structure', 'derivatives.basis-term-structure-new')->name('derivatives.basis-term-structure');
 Route::view('/derivatives/perp-quarterly-spread', 'derivatives.perp-quarterly-spread')->name('derivatives.perp-quarterly-spread');
 Route::view('/derivatives/exchange-inflow-cdd', 'derivatives.exchange-inflow-cdd')->name('derivatives.exchange-inflow-cdd');
 
@@ -90,6 +90,25 @@ Route::prefix('api/coinglass/open-interest')->group(function () {
     Route::get('/history', [App\Http\Controllers\Coinglass\OpenInterestController::class, 'aggregatedHistory']);
     Route::get('/exchange-history', [App\Http\Controllers\Coinglass\OpenInterestController::class, 'exchangeHistory']);
 });
+
+// Coinglass Funding Rate (new proxy endpoints)
+Route::prefix('api/coinglass/funding-rate')->group(function () {
+    Route::get('/exchanges', [App\Http\Controllers\Coinglass\FundingRateController::class, 'exchanges']);
+    Route::get('/history', [App\Http\Controllers\Coinglass\FundingRateController::class, 'history']);
+    Route::get('/current', [App\Http\Controllers\Coinglass\FundingRateController::class, 'current']);
+});
+
+// Coinglass Long-Short Ratio (new proxy endpoints)
+Route::prefix('api/coinglass/long-short-ratio')->group(function () {
+    Route::get('/global-account/history', [App\Http\Controllers\Coinglass\LongShortRatioController::class, 'globalAccountHistory']);
+    Route::get('/top-account/history', [App\Http\Controllers\Coinglass\LongShortRatioController::class, 'topAccountHistory']);
+});
+
+// Coinglass Basis & Term Structure (new proxy endpoints)
+Route::prefix('api/coinglass/basis')->group(function () {
+    Route::get('/history', [App\Http\Controllers\Coinglass\BasisController::class, 'basisHistory']);
+});
+
 Route::get('/api/coinglass/liquidation-aggregated-history', [App\Http\Controllers\CoinglassController::class, 'getLiquidationAggregatedHistory'])->name('api.coinglass.liquidation-aggregated-history');
 Route::get('/api/coinglass/liquidation-exchange-list', [App\Http\Controllers\CoinglassController::class, 'getLiquidationExchangeList'])->name('api.coinglass.liquidation-exchange-list');
 Route::get('/api/coinglass/liquidation-history', [App\Http\Controllers\CoinglassController::class, 'getLiquidationHistory'])->name('api.coinglass.liquidation-history');

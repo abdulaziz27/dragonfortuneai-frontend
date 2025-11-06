@@ -52,21 +52,33 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <!-- Symbol Selector (Coinglass Supported) -->
+                    <!-- Symbol Selector (19 Verified Symbols) -->
                     <select class="form-select" style="width: 120px;" :value="selectedSymbol" @change="updateSymbol($event.target.value)">
                         <option value="BTC">BTC</option>
                         <option value="ETH">ETH</option>
                         <option value="SOL">SOL</option>
-                        <option value="XRP">XRP</option>
-                        <option value="HYPE">HYPE</option>
                         <option value="BNB">BNB</option>
+                        <option value="XRP">XRP</option>
+                        <option value="ADA">ADA</option>
                         <option value="DOGE">DOGE</option>
+                        <option value="AVAX">AVAX</option>
+                        <option value="TON">TON</option>
+                        <option value="SUI">SUI</option>
+                        <option value="APEX">APEX</option>
+                        <option value="SPX">SPX</option>
+                        <option value="FORM">FORM</option>
+                        <option value="CAKE">CAKE</option>
+                        <option value="MNT">MNT</option>
+                        <option value="ZEC">ZEC</option>
+                        <option value="MET">MET</option>
+                        <option value="4">4</option>
+                        <option value="HYPE">HYPE</option>
                     </select>
 
                     <!-- Unit Selector -->
                     <select class="form-select" style="width: 100px;" :value="selectedUnit" @change="updateUnit($event.target.value)">
                         <option value="usd">USD</option>
-                        <option value="coin">Coin</option>
+                        <!-- <option value="coin">Coin</option> -->
                     </select>
 
                     <!-- Interval Selector (API Compliant) -->

@@ -46,9 +46,28 @@
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <!-- Symbol Selector -->
+                    <!-- Symbol Selector (20 Verified Symbols) -->
                     <select class="form-select" style="width: 140px;" x-model="selectedSymbol" @change="updateSymbol()">
                         <option value="BTCUSDT">BTC/USDT</option>
+                        <option value="ETHUSDT">ETH/USDT</option>
+                        <option value="SOLUSDT">SOL/USDT</option>
+                        <option value="XRPUSDT">XRP/USDT</option>
+                        <option value="HYPEUSDT">HYPE/USDT</option>
+                        <option value="DOGEUSDT">DOGE/USDT</option>
+                        <option value="BNBUSDT">BNB/USDT</option>
+                        <option value="ZECUSDT">ZEC/USDT</option>
+                        <option value="SUIUSDT">SUI/USDT</option>
+                        <option value="ADAUSDT">ADA/USDT</option>
+                        <option value="LINKUSDT">LINK/USDT</option>
+                        <option value="ASTERUSDT">ASTER/USDT</option>
+                        <option value="AVAXUSDT">AVAX/USDT</option>
+                        <option value="ENAUSDT">ENA/USDT</option>
+                        <option value="LTCUSDT">LTC/USDT</option>
+                        <option value="PUMPUSDT">PUMP/USDT</option>
+                        <option value="XPLUSDT">XPL/USDT</option>
+                        <option value="BCHUSDT">BCH/USDT</option>
+                        <option value="AAVEUSDT">AAVE/USDT</option>
+                        <option value="TRUMPUSDT">TRUMP/USDT</option>
                     </select>
 
                     <!-- Exchange Selector -->

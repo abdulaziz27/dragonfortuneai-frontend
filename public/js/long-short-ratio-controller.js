@@ -1,28 +1,11 @@
 /**
- * Long Short Ratio Controller - Entry Point
+ * Long-Short Ratio Controller Entry Point
+ * Initializes Alpine.js component for Long-Short Ratio page
  * 
- * Modular implementation with:
- * - Hybrid API approach (internal + external)
- * - Smart auto-refresh (5 seconds)
- * - Production-ready error handling
- * - Clean separation of concerns
- * 
- * Architecture:
- * - api-service.js: Data fetching (internal + external APIs)
- * - chart-manager.js: Chart operations
- * - utils.js: Helper functions
- * - controller.js: Main logic
+ * Blueprint: Open Interest Controller Entry Point (proven stable)
  */
 
-import { createLongShortRatioController } from './long-short-ratio/controller.js';
+import { createLongShortRatioController } from './long-short-ratio/controller-coinglass.js';
 
-// Create controller function for Alpine.js
-function longShortRatioController() {
-    return createLongShortRatioController();
-}
-
-// Export for Alpine.js
-window.longShortRatioController = longShortRatioController;
-
-console.log('✅ Long Short Ratio Controller loaded (Modular ES6)');
-
+// Expose to global scope for Alpine.js (SAME AS OPEN INTEREST)
+window.longShortRatioController = createLongShortRatioController;

@@ -1,387 +1,217 @@
 /**
- * Long Short Ratio API Service
- * Handles all data fetching from internal and external APIs
+ * Long-Short Ratio API Service
+ * Handles API calls to Coinglass Long-Short Ratio endpoints
+ * 
+ * Blueprint: Open Interest API Service (proven stable)
+ * 
+ * Endpoints:
+ * 1. Global Account Ratio - All traders sentiment
+ * 2. Top Account Ratio - Smart money sentiment
  */
 
 export class LongShortRatioAPIService {
-    constructor() {
-        this.baseUrl = window.APP_CONFIG?.apiBaseUrl || 'https://test.dragonfortune.ai';
-        
-        // Separate AbortController for each request type to prevent race conditions
-        this.overviewAbortController = null;
-        this.analyticsAbortController = null;
-        this.topAccountsAbortController = null;
-        this.topPositionsAbortController = null;
-        
-        // Cache for external API calls (5 minutes)
-        this.dataCache = new Map();
-        
-        console.log('📡 Long Short Ratio API Service initialized with base URL:', this.baseUrl);
+    constructor(baseUrl = '') {
+        const meta = document.querySelector('meta[name="api-base-url"]');
+        const resolved = (meta?.content || baseUrl || '').replace(/\/+$/, '');
+        this.baseUrl = resolved || window.location.origin;
+
+        // Stale-while-revalidate cache (same as Open Interest)
+        this.cache = new Map();
+        this.CACHE_TTL = 30000; // 30 seconds for fresh data
     }
 
-    /**
-     * Fetch overview data (internal API)
-     */
-    async fetchOverview(params) {
-        const { symbol, interval, limit } = params;
-        
-        if (this.overviewAbortController) {
-            this.overviewAbortController.abort();
-        }
-        this.overviewAbortController = new AbortController();
-
-        const url = `${this.baseUrl}/api/long-short-ratio/overview?` +
-            `symbol=${symbol}&` +
-            `interval=${interval}&` +
-            `limit=${limit || 1000}`;
-
-        console.log('📡 Fetching overview:', url);
-        
-        const startTime = Date.now();
-        let timeoutId = null;
-
-        try {
-            // Add timeout (30 seconds) to prevent hanging requests
-            const timeoutDuration = 30000; // 30 seconds
-            timeoutId = setTimeout(() => {
-                if (this.overviewAbortController) {
-                    console.warn('⏱️ Overview request timeout after', timeoutDuration / 1000, 'seconds');
-                    this.overviewAbortController.abort();
-                }
-            }, timeoutDuration);
-
-            const response = await fetch(url, {
-                signal: this.overviewAbortController.signal,
-                headers: { 'Accept': 'application/json' }
-            });
-
-            // Clear timeout if request succeeds
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-            }
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            const fetchTime = Date.now() - startTime;
-            console.log('✅ Overview data received:', data, `(${fetchTime}ms)`);
-            return data;
-        } catch (error) {
-            // Clear timeout in case of error
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-            }
-            
-            if (error.name === 'AbortError') {
-                console.log('🛑 Overview request aborted');
-                return null;
-            }
-            console.error('❌ Error fetching overview:', error);
-            throw error;
-        }
+    getCacheKey(url) {
+        return url.toString();
     }
 
-    /**
-     * Fetch analytics data (internal API)
-     */
-    async fetchAnalytics(params) {
-        const { symbol, exchange, interval, ratio_type, limit } = params;
-        
-        if (this.analyticsAbortController) {
-            this.analyticsAbortController.abort();
-        }
-        this.analyticsAbortController = new AbortController();
+    getCachedData(key) {
+        const cached = this.cache.get(key);
+        if (!cached) return null;
 
-        const url = `${this.baseUrl}/api/long-short-ratio/analytics?` +
-            `symbol=${symbol}&` +
-            `exchange=${exchange}&` +
-            `interval=${interval}&` +
-            `ratio_type=${ratio_type || 'accounts'}&` +
-            `limit=${limit || 1000}`;
+        const now = Date.now();
+        const age = now - cached.timestamp;
 
-        console.log('📡 Fetching analytics:', url);
-        
-        const startTime = Date.now();
-        let timeoutId = null;
-
-        try {
-            // Add timeout (15 seconds) to prevent hanging requests
-            const timeoutDuration = 15000; // 15 seconds
-            timeoutId = setTimeout(() => {
-                if (this.analyticsAbortController) {
-                    console.warn('⏱️ Analytics request timeout after', timeoutDuration / 1000, 'seconds');
-                    this.analyticsAbortController.abort();
-                }
-            }, timeoutDuration);
-
-            const response = await fetch(url, {
-                signal: this.analyticsAbortController.signal,
-                headers: { 'Accept': 'application/json' }
-            });
-
-            // Clear timeout if request succeeds
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-            }
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            const fetchTime = Date.now() - startTime;
-            console.log('✅ Analytics data received:', data, `(${fetchTime}ms)`);
-            // API returns array, get first item
-            return data && data.length > 0 ? data[0] : null;
-        } catch (error) {
-            // Clear timeout in case of error
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-            }
-            
-            if (error.name === 'AbortError') {
-                console.log('🛑 Analytics request aborted');
-                return null;
-            }
-            console.error('❌ Error fetching analytics:', error);
-            throw error;
-        }
+        return {
+            data: cached.data,
+            isStale: age > this.CACHE_TTL
+        };
     }
 
-    /**
-     * Fetch top accounts data (internal API)
-     */
-    async fetchTopAccounts(params) {
-        const { symbol, exchange, interval, limit, dateRange } = params;
-        
-        if (this.topAccountsAbortController) {
-            this.topAccountsAbortController.abort();
-        }
-        this.topAccountsAbortController = new AbortController();
-
-        const url = `${this.baseUrl}/api/long-short-ratio/top-accounts?` +
-            `symbol=${symbol}&` +
-            `exchange=${exchange}&` +
-            `interval=${interval}&` +
-            `limit=${limit || 5000}`;
-
-        console.log('📡 Fetching top accounts:', url);
-        
-        const startTime = Date.now();
-        let timeoutId = null;
-
-        try {
-            // Add timeout (30 seconds) to prevent hanging requests
-            const timeoutDuration = 30000; // 30 seconds
-            timeoutId = setTimeout(() => {
-                if (this.topAccountsAbortController) {
-                    console.warn('⏱️ Top accounts request timeout after', timeoutDuration / 1000, 'seconds');
-                    this.topAccountsAbortController.abort();
-                }
-            }, timeoutDuration);
-
-            const response = await fetch(url, {
-                signal: this.topAccountsAbortController.signal,
-                headers: { 'Accept': 'application/json' }
-            });
-
-            // Clear timeout if request succeeds
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-            }
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            let data = await response.json();
-            const fetchTime = Date.now() - startTime;
-            console.log('✅ Top accounts data received:', data.length, 'records', `(${fetchTime}ms)`);
-            
-            // Filter by date range if provided (client-side filtering)
-            if (dateRange && dateRange.startDate && dateRange.endDate) {
-                const beforeFilter = data.length;
-                data = this.filterByDateRange(data, dateRange.startDate, dateRange.endDate);
-                console.log(`📅 Date Range Filter: ${beforeFilter} → ${data.length} records`);
-            }
-            
-            // Transform data: convert ts to time (milliseconds)
-            return this.transformTopAccountsData(data);
-        } catch (error) {
-            // Clear timeout in case of error
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-            }
-            
-            if (error.name === 'AbortError') {
-                console.log('🛑 Top accounts request aborted');
-                return null;
-            }
-            console.error('❌ Error fetching top accounts:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Fetch top positions data (internal API)
-     */
-    async fetchTopPositions(params) {
-        const { symbol, exchange, interval, limit, dateRange } = params;
-        
-        if (this.topPositionsAbortController) {
-            this.topPositionsAbortController.abort();
-        }
-        this.topPositionsAbortController = new AbortController();
-
-        const url = `${this.baseUrl}/api/long-short-ratio/top-positions?` +
-            `symbol=${symbol}&` +
-            `exchange=${exchange}&` +
-            `interval=${interval}&` +
-            `limit=${limit || 5000}`;
-
-        console.log('📡 Fetching top positions:', url);
-        
-        const startTime = Date.now();
-        let timeoutId = null;
-
-        try {
-            // Add timeout (30 seconds) to prevent hanging requests
-            const timeoutDuration = 30000; // 30 seconds
-            timeoutId = setTimeout(() => {
-                if (this.topPositionsAbortController) {
-                    console.warn('⏱️ Top positions request timeout after', timeoutDuration / 1000, 'seconds');
-                    this.topPositionsAbortController.abort();
-                }
-            }, timeoutDuration);
-
-            const response = await fetch(url, {
-                signal: this.topPositionsAbortController.signal,
-                headers: { 'Accept': 'application/json' }
-            });
-
-            // Clear timeout if request succeeds
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-            }
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            let data = await response.json();
-            const fetchTime = Date.now() - startTime;
-            console.log('✅ Top positions data received:', data.length, 'records', `(${fetchTime}ms)`);
-            
-            // Filter by date range if provided (client-side filtering)
-            if (dateRange && dateRange.startDate && dateRange.endDate) {
-                const beforeFilter = data.length;
-                data = this.filterByDateRange(data, dateRange.startDate, dateRange.endDate);
-                console.log(`📅 Date Range Filter: ${beforeFilter} → ${data.length} records`);
-            }
-            
-            // Transform data: convert ts to time (milliseconds)
-            return this.transformTopPositionsData(data);
-        } catch (error) {
-            // Clear timeout in case of error
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-            }
-            
-            if (error.name === 'AbortError') {
-                console.log('🛑 Top positions request aborted');
-                return null;
-            }
-            console.error('❌ Error fetching top positions:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Filter data by date range (client-side filtering)
-     * @param {Array} data - Data with ts field (milliseconds)
-     * @param {Date} startDate - Start date (inclusive)
-     * @param {Date} endDate - End date (inclusive)
-     * @returns {Array} - Filtered data within date range
-     */
-    filterByDateRange(data, startDate, endDate) {
-        if (!Array.isArray(data) || !startDate || !endDate) {
-            return data;
-        }
-        
-        const startTs = startDate.getTime();
-        const endTs = endDate.getTime();
-        
-        // Include records where timestamp is within range [startTs, endTs]
-        const filtered = data.filter(item => {
-            const itemTs = item.ts;
-            return itemTs >= startTs && itemTs <= endTs;
+    setCachedData(key, data) {
+        console.log('💾 Caching LSR data for key:', key);
+        this.cache.set(key, {
+            data,
+            timestamp: Date.now()
         });
-        
-        return filtered;
+        console.log('💾 Cache size now:', this.cache.size);
     }
 
     /**
-     * Transform top accounts data from internal API to match Coinglass format
+     * Build URL for Global Account History
      */
-    transformTopAccountsData(data) {
-        return data.map(item => ({
-            time: item.ts, // Already in milliseconds
-            top_account_long_percent: parseFloat(item.long_accounts) || 0,
-            top_account_short_percent: parseFloat(item.short_accounts) || 0,
-            top_account_long_short_ratio: parseFloat(item.ls_ratio_accounts) || 0,
-            // Keep original fields for compatibility
-            long_accounts: parseFloat(item.long_accounts) || 0,
-            short_accounts: parseFloat(item.short_accounts) || 0,
-            ls_ratio_accounts: parseFloat(item.ls_ratio_accounts) || 0,
-            ts: item.ts
+    buildGlobalAccountUrl({ symbol, exchange, interval, start_time, end_time }) {
+        const url = new URL(`/api/coinglass/long-short-ratio/global-account/history`, window.location.origin);
+        const qs = new URLSearchParams({
+            ...(symbol ? { symbol } : {}),
+            ...(exchange ? { exchange } : {}),
+            ...(interval ? { interval } : {}),
+            ...(start_time ? { start_time: String(start_time) } : {}),
+            ...(end_time ? { end_time: String(end_time) } : {}),
+        });
+        url.search = qs.toString();
+        return url;
+    }
+
+    /**
+     * Build URL for Top Account History
+     */
+    buildTopAccountUrl({ symbol, exchange, interval, start_time, end_time }) {
+        const url = new URL(`/api/coinglass/long-short-ratio/top-account/history`, window.location.origin);
+        const qs = new URLSearchParams({
+            ...(symbol ? { symbol } : {}),
+            ...(exchange ? { exchange } : {}),
+            ...(interval ? { interval } : {}),
+            ...(start_time ? { start_time: String(start_time) } : {}),
+            ...(end_time ? { end_time: String(end_time) } : {}),
+        });
+        url.search = qs.toString();
+        return url;
+    }
+
+    /**
+     * Fetch fresh data with timeout
+     */
+    async fetchFreshData(url, controller, cacheKey) {
+        const timeoutMs = 8000; // 8 seconds timeout
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+            const res = await fetch(url.toString(), {
+                signal: controller.signal,
+                headers: { 'Accept': 'application/json' }
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const data = await res.json();
+            this.setCachedData(cacheKey, data);
+            return data;
+
+        } catch (e) {
+            clearTimeout(timeoutId);
+            return {
+                success: false,
+                error: { message: e.message }
+            };
+        }
+    }
+
+    /**
+     * Fetch Global Account History
+     */
+    async fetchGlobalAccountHistory(params, { preferFresh = false } = {}) {
+        const { symbol, exchange, interval, start_time, end_time } = params;
+        const controller = new AbortController();
+
+        const url = this.buildGlobalAccountUrl({ symbol, exchange, interval, start_time, end_time });
+        const cacheKey = this.getCacheKey(url);
+        const cached = this.getCachedData(cacheKey);
+
+        // Stale-while-revalidate strategy
+        if (cached && cached.isStale) {
+            if (preferFresh) {
+                // User-initiated: fetch fresh now
+                return await this.fetchFreshData(url, controller, cacheKey);
+            }
+            // Auto-refresh: return stale, refresh in background
+            this.fetchFreshData(url, controller, cacheKey).catch(() => {});
+            return cached.data;
+        } else if (cached && !cached.isStale) {
+            // Return fresh cached data
+            return cached.data;
+        }
+
+        // No cache - fetch synchronously
+        return await this.fetchFreshData(url, controller, cacheKey);
+    }
+
+    /**
+     * Fetch Top Account History
+     */
+    async fetchTopAccountHistory(params, { preferFresh = false } = {}) {
+        const { symbol, exchange, interval, start_time, end_time } = params;
+        const controller = new AbortController();
+
+        const url = this.buildTopAccountUrl({ symbol, exchange, interval, start_time, end_time });
+        const cacheKey = this.getCacheKey(url);
+        const cached = this.getCachedData(cacheKey);
+
+        // Stale-while-revalidate strategy
+        if (cached && cached.isStale) {
+            if (preferFresh) {
+                // User-initiated: fetch fresh now
+                return await this.fetchFreshData(url, controller, cacheKey);
+            }
+            // Auto-refresh: return stale, refresh in background
+            this.fetchFreshData(url, controller, cacheKey).catch(() => {});
+            return cached.data;
+        } else if (cached && !cached.isStale) {
+            // Return fresh cached data
+            return cached.data;
+        }
+
+        // No cache - fetch synchronously
+        return await this.fetchFreshData(url, controller, cacheKey);
+    }
+
+    /**
+     * Backward-compatible method for controller
+     * Fetches both Global and Top Account data
+     */
+    async fetchHistory(params) {
+        const { symbol, exchange, interval, start_time, end_time, preferFresh, type = 'global' } = params || {};
+
+        if (type === 'top') {
+            const res = await this.fetchTopAccountHistory(
+                { symbol, exchange, interval, start_time, end_time },
+                { preferFresh: !!preferFresh }
+            );
+
+            if (!res || res.success === false) return [];
+
+            const points = res.data || [];
+            return points.map(p => ({
+                date: new Date(p.ts).toISOString(),
+                ratio: p.ratio,
+                long_percent: p.long_percent,
+                short_percent: p.short_percent,
+                symbol,
+                exchange
+            }));
+        }
+
+        // Default: Global Account
+        const res = await this.fetchGlobalAccountHistory(
+            { symbol, exchange, interval, start_time, end_time },
+            { preferFresh: !!preferFresh }
+        );
+
+        if (!res || res.success === false) return [];
+
+        const points = res.data || [];
+        return points.map(p => ({
+            date: new Date(p.ts).toISOString(),
+            ratio: p.ratio,
+            long_percent: p.long_percent,
+            short_percent: p.short_percent,
+            symbol,
+            exchange
         }));
     }
 
-    /**
-     * Transform top positions data from internal API to match Coinglass format
-     */
-    transformTopPositionsData(data) {
-        return data.map(item => ({
-            time: item.ts, // Already in milliseconds
-            top_position_long_percent: parseFloat(item.long_positions_percent) || 0,
-            top_position_short_percent: parseFloat(item.short_positions_percent) || 0,
-            top_position_long_short_ratio: parseFloat(item.ls_ratio_positions) || 0,
-            // Keep original fields for compatibility
-            long_positions_percent: parseFloat(item.long_positions_percent) || 0,
-            short_positions_percent: parseFloat(item.short_positions_percent) || 0,
-            ls_ratio_positions: parseFloat(item.ls_ratio_positions) || 0,
-            ts: item.ts
-        }));
-    }
-
-    /**
-     * Cancel all pending requests
-     */
-    cancelAllRequests() {
-        const controllers = [
-            this.overviewAbortController,
-            this.analyticsAbortController,
-            this.topAccountsAbortController,
-            this.topPositionsAbortController
-        ];
-
-        controllers.forEach(controller => {
-            if (controller) {
-                controller.abort();
-            }
-        });
-
-        console.log('🛑 All API requests cancelled');
+    cancelRequest() {
+        // No-op: per-request controllers
     }
 }
-
