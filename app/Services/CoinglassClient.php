@@ -37,6 +37,9 @@ class CoinglassClient
                 $attempt++;
                 $response = Http::timeout($this->timeoutSeconds)
                     ->withHeaders($this->getAuthHeaders())
+                    ->withOptions([
+                        'verify' => config('app.env') === 'production'
+                    ])
                     ->acceptJson()
                     ->get($url);
 

@@ -117,6 +117,35 @@ Route::prefix('api/coinglass/liquidation')->group(function () {
     Route::get('/aggregated-history', [App\Http\Controllers\Coinglass\LiquidationsController::class, 'aggregatedHistory']);
 });
 
+// On-Chain Metrics (Coinglass API)
+Route::prefix('api/onchain')->group(function () {
+    Route::get('/exchange/assets', [App\Http\Controllers\OnChainMetricsController::class, 'getExchangeAssets']);
+    Route::get('/exchange/balance/list', [App\Http\Controllers\OnChainMetricsController::class, 'getExchangeBalanceList']);
+    Route::get('/exchange/balance/chart', [App\Http\Controllers\OnChainMetricsController::class, 'getExchangeBalanceChart']);
+    Route::get('/chain/transactions', [App\Http\Controllers\OnChainMetricsController::class, 'getChainTransactionList']);
+    Route::get('/whale-transfers', [App\Http\Controllers\OnChainMetricsController::class, 'getWhaleTransfers']);
+});
+
+// Spot Microstructure (Coinglass API - All Endpoints)
+Route::prefix('api/spot-microstructure')->group(function () {
+    // Basic endpoints
+    Route::get('/supported-coins', [App\Http\Controllers\SpotMicrostructureController::class, 'getSupportedCoins']);
+    Route::get('/supported-exchange-pairs', [App\Http\Controllers\SpotMicrostructureController::class, 'getSupportedExchangePairs']);
+    Route::get('/coins-markets', [App\Http\Controllers\SpotMicrostructureController::class, 'getCoinsMarkets']);
+    Route::get('/pairs-markets', [App\Http\Controllers\SpotMicrostructureController::class, 'getPairsMarkets']);
+    Route::get('/price-history', [App\Http\Controllers\SpotMicrostructureController::class, 'getPriceHistory']);
+    
+    // Orderbook endpoints
+    Route::get('/orderbook/ask-bids-history', [App\Http\Controllers\SpotMicrostructureController::class, 'getOrderbookAskBidsHistory']);
+    Route::get('/orderbook/aggregated-history', [App\Http\Controllers\SpotMicrostructureController::class, 'getAggregatedOrderbookHistory']);
+    Route::get('/orderbook/history', [App\Http\Controllers\SpotMicrostructureController::class, 'getOrderbookHistory']);
+    Route::get('/orderbook/large-limit-order', [App\Http\Controllers\SpotMicrostructureController::class, 'getLargeLimitOrder']);
+    Route::get('/orderbook/large-limit-order-history', [App\Http\Controllers\SpotMicrostructureController::class, 'getLargeLimitOrderHistory']);
+    
+    // Taker volume endpoints
+    Route::get('/taker-volume/history', [App\Http\Controllers\SpotMicrostructureController::class, 'getTakerBuySellVolumeHistory']);
+    Route::get('/taker-volume/aggregated-history', [App\Http\Controllers\SpotMicrostructureController::class, 'getAggregatedTakerVolumeHistory']);
+    Route::get('/volume-footprint/history', [App\Http\Controllers\SpotMicrostructureController::class, 'getVolumeFootprintHistory']);
 // Coinglass ETF Flows (new proxy endpoints)
 Route::prefix('api/coinglass/etf-flows')->group(function () {
     // Daily Flows (Aggregated)
