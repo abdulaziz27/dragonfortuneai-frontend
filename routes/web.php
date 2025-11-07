@@ -52,8 +52,8 @@ Route::view('/etf-flows', 'etf-flows.dashboard')->name('etf-flows.dashboard');
 Route::view('/volatility-regime/dashboard', 'volatility-regime.dashboard')->name('volatility-regime.dashboard');
 
 // Macro Overlay Routes
-Route::view('/macro-overlay', 'macro-overlay.raw-dashboard')->name('macro-overlay.index');
-Route::view('/macro-overlay/dashboard', 'macro-overlay.raw-dashboard')->name('macro-overlay.dashboard');
+Route::view('/macro-overlay', 'macro-overlay.dashboard')->name('macro-overlay.index');
+Route::view('/macro-overlay/dashboard', 'macro-overlay.dashboard')->name('macro-overlay.dashboard');
 Route::view('/macro-overlay/raw-dashboard', 'macro-overlay.dashboard-legacy')->name('macro-overlay.raw-dashboard');
 Route::view('/macro-overlay/dashboard-legacy', 'macro-overlay.dashboard-legacy')->name('macro-overlay.dashboard-legacy');
 
@@ -185,6 +185,21 @@ Route::prefix('api/coinglass/sentiment')->group(function () {
     
     // Whale Transfers (On-Chain)
     Route::get('/whale-transfers', [App\Http\Controllers\Coinglass\SentimentFlowController::class, 'whaleTransfers']);
+});
+
+// Coinglass Macro Overlay (FRED + Bitcoin vs M2)
+Route::prefix('api/coinglass/macro-overlay')->group(function () {
+    // FRED Multiple Series
+    Route::get('/fred', [App\Http\Controllers\Coinglass\MacroOverlayController::class, 'fredMultiSeries']);
+    
+    // FRED Latest Values (must be before {seriesId} route to avoid conflict)
+    Route::get('/fred-latest', [App\Http\Controllers\Coinglass\MacroOverlayController::class, 'fredLatest']);
+    
+    // FRED Single Series
+    Route::get('/fred/{seriesId}', [App\Http\Controllers\Coinglass\MacroOverlayController::class, 'fredSingleSeries']);
+    
+    // Bitcoin vs Global M2
+    Route::get('/bitcoin-m2', [App\Http\Controllers\Coinglass\MacroOverlayController::class, 'bitcoinVsM2']);
 });
 
 Route::get('/api/coinglass/liquidation-aggregated-history', [App\Http\Controllers\CoinglassController::class, 'getLiquidationAggregatedHistory'])->name('api.coinglass.liquidation-aggregated-history');
