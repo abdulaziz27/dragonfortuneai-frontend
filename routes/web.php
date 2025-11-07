@@ -54,7 +54,7 @@ Route::view('/volatility-regime/dashboard', 'volatility-regime.dashboard')->name
 // Macro Overlay Routes
 Route::view('/macro-overlay', 'macro-overlay.raw-dashboard')->name('macro-overlay.index');
 Route::view('/macro-overlay/dashboard', 'macro-overlay.raw-dashboard')->name('macro-overlay.dashboard');
-Route::view('/macro-overlay/raw-dashboard', 'macro-overlay.raw-dashboard')->name('macro-overlay.raw-dashboard');
+Route::view('/macro-overlay/raw-dashboard', 'macro-overlay.dashboard-legacy')->name('macro-overlay.raw-dashboard');
 Route::view('/macro-overlay/dashboard-legacy', 'macro-overlay.dashboard-legacy')->name('macro-overlay.dashboard-legacy');
 
 // Sentiment & Flow Routes
@@ -146,6 +146,8 @@ Route::prefix('api/spot-microstructure')->group(function () {
     Route::get('/taker-volume/history', [App\Http\Controllers\SpotMicrostructureController::class, 'getTakerBuySellVolumeHistory']);
     Route::get('/taker-volume/aggregated-history', [App\Http\Controllers\SpotMicrostructureController::class, 'getAggregatedTakerVolumeHistory']);
     Route::get('/volume-footprint/history', [App\Http\Controllers\SpotMicrostructureController::class, 'getVolumeFootprintHistory']);
+});
+
 // Coinglass ETF Flows (new proxy endpoints)
 Route::prefix('api/coinglass/etf-flows')->group(function () {
     // Daily Flows (Aggregated)
@@ -168,6 +170,21 @@ Route::prefix('api/coinglass/volatility')->group(function () {
     
     // End-of-Day data (for ATR/HV/RV calculations)
     Route::get('/eod', [App\Http\Controllers\Coinglass\VolatilityRegimeController::class, 'eod']);
+});
+
+// Coinglass Sentiment & Flow Analysis
+Route::prefix('api/coinglass/sentiment')->group(function () {
+    // Fear & Greed Index History
+    Route::get('/fear-greed', [App\Http\Controllers\Coinglass\SentimentFlowController::class, 'fearGreedIndex']);
+    
+    // Funding Rate Dominance (Exchange List)
+    Route::get('/funding-dominance', [App\Http\Controllers\Coinglass\SentimentFlowController::class, 'fundingDominance']);
+    
+    // Whale Alerts (Hyperliquid)
+    Route::get('/whale-alerts', [App\Http\Controllers\Coinglass\SentimentFlowController::class, 'whaleAlerts']);
+    
+    // Whale Transfers (On-Chain)
+    Route::get('/whale-transfers', [App\Http\Controllers\Coinglass\SentimentFlowController::class, 'whaleTransfers']);
 });
 
 Route::get('/api/coinglass/liquidation-aggregated-history', [App\Http\Controllers\CoinglassController::class, 'getLiquidationAggregatedHistory'])->name('api.coinglass.liquidation-aggregated-history');

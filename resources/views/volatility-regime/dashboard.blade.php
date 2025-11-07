@@ -139,7 +139,7 @@
             <div class="col-12">
                 <div class="df-panel p-4">
                     <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="mb-0">Volatility Metrics End of Day</h5>
+                        <h5 class="mb-0">Volatility Metrics Analysis - End of Day</h5>
                         <span class="badge text-bg-info" x-show="eodLoading">
                             <i class="fas fa-sync fa-spin"></i> Calculating...
                         </span>

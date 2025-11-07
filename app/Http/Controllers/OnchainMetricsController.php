@@ -198,7 +198,13 @@ class OnChainMetricsController extends Controller
         $startTime = $request->query('start_time');
         $endTime = $request->query('end_time');
 
-        $cacheKey = "onchain:whale-transfers:{$symbol}";
+        // Default to latest ~6 months window when timestamps are not explicitly provided
+        if (!$startTime || !$endTime) {
+            $endTime = $endTime ?: (int) (microtime(true) * 1000);
+            $startTime = $startTime ?: ($endTime - (180 * 24 * 60 * 60 * 1000));
+        }
+
+        $cacheKey = "onchain:whale-transfers:{$symbol}:{$startTime}:{$endTime}";
 
         $data = Cache::remember($cacheKey, 30, function () use ($symbol, $startTime, $endTime) {
             Log::info('Fetching Whale Transfers', ['symbol' => $symbol]);
@@ -217,10 +223,18 @@ class OnChainMetricsController extends Controller
                     throw new \Exception('API error: ' . ($result['msg'] ?? 'Unknown error'));
                 }
 
+                $items = $result['data'] ?? [];
+                // Sort by time desc (latest first)
+                usort($items, function ($a, $b) {
+                    $ta = (int) ($a['block_timestamp'] ?? 0);
+                    $tb = (int) ($b['block_timestamp'] ?? 0);
+                    return $tb <=> $ta;
+                });
+
                 return [
                     'success' => true,
-                    'data' => $result['data'] ?? [],
-                    'count' => count($result['data'] ?? []),
+                    'data' => $items,
+                    'count' => count($items),
                 ];
 
             } catch (\Exception $e) {

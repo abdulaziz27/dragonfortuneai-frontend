@@ -1,18 +1,27 @@
 @extends('layouts.app')
 
-@section('title', 'Sentiment Flow | DragonFortune')
+@section('title', 'Sentiment & Flow Analysis | DragonFortune')
+
+@push('head')
+    <!-- Resource Hints for Faster API Loading -->
+    <link rel="dns-prefetch" href="{{ config('app.api_urls.internal') }}">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="{{ config('app.api_urls.internal') }}" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="{{ asset('js/sentiment-flow/controller.js') }}" as="script" crossorigin="anonymous">
+@endpush
 
 @section('content')
     {{--
-        Sentiment & Flow Dashboard
-        Think like a trader • Build like an engineer • Visualize like a designer
-
-        Interpretasi Trading:
-        - Fear & Greed Index < 20 → Extreme Fear → Contrarian buy opportunity
-        - Fear & Greed Index > 80 → Extreme Greed → Take profit zone
-        - Social Mentions spike → FOMO building → Potential top near
-        - Funding Dominance → Track leverage positioning across exchanges
-        - Whale Alerts → Large wallet movements = Smart money positioning
+        Sentiment & Flow Analysis Dashboard
+        Track market sentiment, funding dominance, and whale movements
+        
+        Data Source: Coinglass API
+        - Fear & Greed Index (market sentiment indicator)
+        - Funding Rate Exchange List (leverage positioning)
+        - Hyperliquid Whale Alert (smart money movements)
     --}}
 
     <div class="d-flex flex-column h-100 gap-3" x-data="sentimentFlowController()">
@@ -21,162 +30,99 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <h1 class="mb-0">Sentiment & Flow Analysis BTC</h1>
-                        <span class="pulse-dot pulse-info"></span>
+                        <h1 class="mb-0">Sentiment & Flow Analysis</h1>
+                        <span class="pulse-dot pulse-success" x-show="!isLoading && refreshEnabled"></span>
+                        <span class="spinner-border spinner-border-sm text-primary" style="width: 16px; height: 16px;" x-show="isLoading" x-cloak></span>
+                        <span class="badge text-bg-success" x-show="refreshEnabled" title="Auto-refresh setiap 5 detik">
+                            <i class="fas fa-sync-alt"></i> LIVE
+                        </span>
                     </div>
                     <p class="mb-0 text-secondary">
-                        Pantau sentimen pasar, tren sosial media, dominasi funding rate & pergerakan whale
+                        Monitor market sentiment, funding dominance, and whale movements in real-time. 
+                        <span x-show="refreshEnabled" class="text-success">• Auto-refresh aktif</span>
                     </p>
                 </div>
 
-                <!-- Global Controls -->
-                <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <!-- <select class="form-select" style="width: 120px;" x-model="selectedAsset" @change="refreshAll()">
-                        <option value="BTC">Bitcoin</option>
-                        <option value="ETH">Ethereum</option>
-                        <option value="CRYPTO">All Crypto</option>
-                    </select>
-
-                    <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
-                        <span x-show="!loading">Refresh All</span>
-                        <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-                    </button> -->
+                <!-- Auto-refresh indicator -->
+                <div class="d-flex gap-2 align-items-center">
+                    <span class="text-success small">
+                        <i class="fas fa-check-circle"></i> Auto-refresh aktif
+                    </span>
                 </div>
             </div>
         </div>
 
-        <!-- Fear & Greed Index + Sentiment Overview -->
+        <!-- SECTION 1: FEAR & GREED INDEX -->
         <div class="row g-3">
-            <!-- Fear & Greed Gauge -->
-            <div class="col-lg-4">
-                <div class="df-panel p-4 h-100 d-flex flex-column">
-                    <div class="mb-3">
-                        <h5 class="mb-1">Fear & Greed Index</h5>
-                        <small class="text-secondary">Indeks Ketakutan & Keserakahan Pasar</small>
+            <div class="col-12">
+                <div class="df-panel p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="mb-0">Fear & Greed Index</h5>
+                        <span class="badge text-bg-info">Market Sentiment</span>
                     </div>
 
-                    <!-- Gauge Display -->
-                    <div class="text-center mb-3 flex-shrink-0">
-                        <div class="position-relative d-inline-block" style="width: 200px; height: 200px;">
-                            <!-- Circular Gauge Background -->
-                            <svg viewBox="0 0 200 200" class="w-100 h-100">
-                                <!-- Background Arc -->
-                                <path d="M 20 100 A 80 80 0 0 1 180 100"
-                                      fill="none"
-                                      stroke="#e5e7eb"
-                                      stroke-width="20"
-                                      stroke-linecap="round"/>
-
-                                <!-- Colored Segments -->
-                                <path d="M 20 100 A 80 80 0 0 1 52 42"
-                                      fill="none"
-                                      stroke="#ef4444"
-                                      stroke-width="20"
-                                      stroke-linecap="round"/>
-                                <path d="M 52 42 A 80 80 0 0 1 100 20"
-                                      fill="none"
-                                      stroke="#f59e0b"
-                                      stroke-width="20"
-                                      stroke-linecap="round"/>
-                                <path d="M 100 20 A 80 80 0 0 1 148 42"
-                                      fill="none"
-                                      stroke="#22c55e"
-                                      stroke-width="20"
-                                      stroke-linecap="round"/>
-                                <path d="M 148 42 A 80 80 0 0 1 180 100"
-                                      fill="none"
-                                      stroke="#ef4444"
-                                      stroke-width="20"
-                                      stroke-linecap="round"/>
-
-                                <!-- Indicator Needle -->
-                                <!-- Arc is top semicircle: left (180°) → top (270°/-90°) → right (360°/0°) -->
-                                <!-- Map value 0-100 to 180°-360° for correct positioning on top arc -->
-                                <line :x1="100" :y1="100"
-                                      :x2="100 + 70 * Math.cos((180 + fearGreedScore * 1.8) * Math.PI / 180)"
-                                      :y2="100 + 70 * Math.sin((180 + fearGreedScore * 1.8) * Math.PI / 180)"
-                                      stroke="#1f2937"
-                                      stroke-width="3"
-                                      stroke-linecap="round"/>
-                                <circle cx="100" cy="100" r="8" fill="#1f2937"/>
-                            </svg>
+                    <!-- Fear & Greed Summary -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded text-center">
+                                <div class="small text-secondary mb-2">Current Index</div>
+                                <div class="h1 mb-2" 
+                                     x-text="fearGreedValue !== null ? fearGreedValue : '...'"
+                                     :style="fearGreedValue !== null ? `color: ${getFearGreedColor(fearGreedValue)}` : ''">
                         </div>
-
-                        <div class="mt-3">
-                            <div class="h1 mb-1 fw-bold" x-text="fearGreedScore">--</div>
-                            <div class="badge fs-6" :class="getFearGreedBadge()" x-text="getFearGreedLabel()">--</div>
+                                <div class="badge" 
+                                     :class="fearGreedValue >= 80 ? 'text-bg-danger' : fearGreedValue >= 60 ? 'text-bg-warning' : fearGreedValue >= 40 ? 'text-bg-info' : fearGreedValue >= 20 ? 'text-bg-success' : 'text-bg-success'"
+                                     x-text="fearGreedSentiment || 'Loading...'">
                         </div>
                     </div>
-
-                    <div class="mt-auto">
-                        <div class="p-2 rounded mb-3" :class="getFearGreedAlert()">
-                            <div class="small fw-semibold mb-1" x-text="getFearGreedTitle()">Analysis</div>
-                            <div class="small" x-text="getFearGreedMessage()">Loading...</div>
                         </div>
-
-                        <div class="d-flex justify-content-between small text-secondary">
-                            <span>Fear</span>
-                            <span>Greed</span>
+                        <div class="col-md-8">
+                            <div class="p-3 border rounded">
+                                <div class="small text-secondary mb-2">Interpretation Guide</div>
+                                <div class="d-flex flex-column gap-1 small">
+                                    <div><span class="badge text-bg-danger">80-100</span> Extreme Greed - Potential correction</div>
+                                    <div><span class="badge text-bg-warning">60-79</span> Greed - Market heating up</div>
+                                    <div><span class="badge text-bg-info">40-59</span> Neutral - Balanced sentiment</div>
+                                    <div><span class="badge text-bg-success">20-39</span> Fear - Potential opportunity</div>
+                                    <div><span class="badge text-bg-success">0-19</span> Extreme Fear - Strong buy signal</div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Social Sentiment Breakdown -->
-            <div class="col-lg-8">
-                <div class="df-panel p-3 h-100 d-flex flex-column">
-                    <div class="mb-3 flex-shrink-0">
-                        <h5 class="mb-1">Social Media Sentiment - Daily Mentions</h5>
-                        <small class="text-secondary">Analisis sentimen dari penyebutan harian di media sosial</small>
+                    <!-- Fear & Greed Chart -->
+                    <div class="tradingview-chart-container">
+                        <div class="chart-header">
+                            <div class="d-flex align-items-center gap-3">
+                                <h6 class="mb-0">Fear & Greed Index History</h6>
+                                <small class="text-muted" x-text="`${fearGreedHistory.length} data points`"></small>
                     </div>
-                    <div class="flex-grow-1" style="min-height: 280px;">
-                        <canvas id="socialChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Social Platform Breakdown -->
-        <div class="row g-3">
-            <div class="col-lg-12">
-                <div class="df-panel p-3">
-                    <div class="mb-3">
-                        <h5 class="mb-1">Social Platform Breakdown - Last 24h</h5>
-                        <small class="text-secondary">Rincian aktivitas per platform dalam 24 jam terakhir</small>
-                    </div>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="p-3 rounded" style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444;">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div>
-                                        <div class="fw-bold">Reddit</div>
-                                        <div class="h4 mb-0 mt-1" x-text="socialBreakdown.reddit.mentions + ' posts'">--</div>
-                                    </div>
-                                    <div class="text-end">
-                                        <div class="badge" :class="socialBreakdown.reddit.sentiment >= 0 ? 'text-bg-success' : 'text-bg-danger'" x-text="socialBreakdown.reddit.sentiment + '%'">--</div>
-                                        <div class="small text-secondary">Sentiment</div>
-                                    </div>
-                                </div>
-                                <div class="small text-secondary">
-                                    Top subreddits: <span class="fw-semibold" x-text="socialBreakdown.reddit.keywords">--</span>
+                            <div class="chart-controls">
+                                <!-- Time Range Buttons -->
+                                <div class="time-range-selector">
+                                    <template x-for="range in fearGreedTimeRanges" :key="range.value">
+                                        <button type="button" 
+                                                class="btn btn-sm time-range-btn"
+                                                :class="selectedFearGreedRange === range.value ? 'btn-primary' : 'btn-outline-secondary'"
+                                                @click="updateFearGreedRange(range.value)"
+                                                x-text="range.label">
+                                        </button>
+                                    </template>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="p-3 rounded" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e;">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <div>
-                                        <div class="fw-bold">Google Trends</div>
-                                        <div class="h4 mb-0 mt-1" x-text="socialBreakdown.google.score + ' / 100'">--</div>
+                        <div class="chart-body" style="position: relative; height: 300px;">
+                            <canvas id="fearGreedChart"></canvas>
                                     </div>
-                                    <div class="text-end">
-                                        <div class="badge" :class="socialBreakdown.google.change >= 0 ? 'text-bg-success' : 'text-bg-danger'" x-text="formatChange(socialBreakdown.google.change) + '%'">--</div>
-                                        <div class="small text-secondary">24h Change</div>
-                                    </div>
-                                </div>
-                                <div class="small text-secondary">
-                                    Search interest: <span class="fw-semibold" x-text="socialBreakdown.google.region">--</span>
-                                </div>
+                        <div class="chart-footer">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="chart-footer-text">
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="margin-right: 4px;">
+                                        <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1"/>
+                                        <path d="M6 3v3l2 2" stroke="currentColor" stroke-width="1" fill="none"/>
+                                    </svg>
+                                    Hover over chart to see detailed date and sentiment classification
+                                </small>
                             </div>
                         </div>
                     </div>
@@ -184,654 +130,340 @@
             </div>
         </div>
 
-        <!-- Funding Dominance & Whale Flow -->
-        <div class="row g-3">
-            <!-- Funding Rate Heatmap -->
-            <div class="col-lg-6">
-                <div class="df-panel p-3 h-100 d-flex flex-column">
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
+        <!-- SECTION 2: FUNDING DOMINANCE -->
+        <div class="row g-3 mt-2">
+            <div class="col-12">
+                <div class="df-panel p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h5 class="mb-0">Funding Rate Dominance</h5>
-                                <small class="text-secondary">Tracking posisi leverage dominan antar exchange</small>
+                        <span class="badge text-bg-info">Leverage Positioning</span>
+                    </div>
+
+                    <!-- Info Alert -->
+                    <div class="alert alert-info mb-3">
+                        <small>
+                            <i class="fas fa-info-circle"></i> 
+                            <strong>Sentiment Calculation:</strong> Berdasarkan analisa rata-rata funding rate dari semua exchange. 
+                            <span class="badge text-bg-success">Bullish</span> jika &gt;0.001 (longs mendominasi, positioning crowded), 
+                            <span class="badge text-bg-danger">Bearish</span> jika &lt;-0.001 (shorts mendominasi, positioning crowded), 
+                            <span class="badge text-bg-secondary">Neutral</span> jika -0.001 s/d 0.001.
+                            <br>
+                            <strong>💡 Insight:</strong> Funding rate ekstrem (&gt;0.001 atau &lt;-0.001) sering menandakan positioning yang crowded dan potensi squeeze.
+                            <br>
+                            <strong>📊 Annualized Rate:</strong> Dihitung dari funding rate per interval × (365 hari × 24 jam / interval_hours). 
+                            Contoh: funding rate 0.01 per 8 jam = 0.01 × (365×24/8) = 0.01 × 1095 = 10.95 (1095% annualized).
+                        </small>
+                    </div>
+
+                    <!-- Aggregate Summary -->
+                    <div class="row g-3 mb-4" x-show="fundingAggregate">
+                        <div class="col-md-3">
+                            <div class="p-3 border rounded text-center">
+                                <div class="small text-secondary mb-2">Average Rate</div>
+                                <div class="h4 mb-1" x-text="fundingAggregate ? formatFundingRate(fundingAggregate.avg_funding_rate) : '...'"></div>
+                                <small class="text-muted" x-text="fundingAggregate ? fundingAggregate.sentiment : ''"></small>
+                                    </div>
+                                </div>
+                        <div class="col-md-3">
+                            <div class="p-3 border rounded text-center">
+                                <div class="small text-secondary mb-2">Highest Rate</div>
+                                <div class="h4 mb-1 text-success" x-text="fundingAggregate ? formatFundingRate(fundingAggregate.max_funding_rate) : '...'"></div>
+                                <small class="text-muted">Most bullish</small>
                             </div>
-                            <span class="badge text-bg-info">8h intervals</span>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 border rounded text-center">
+                                <div class="small text-secondary mb-2">Lowest Rate</div>
+                                <div class="h4 mb-1 text-danger" x-text="fundingAggregate ? formatFundingRate(fundingAggregate.min_funding_rate) : '...'"></div>
+                                <small class="text-muted">Most bearish</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 border rounded text-center">
+                                <div class="small text-secondary mb-2">Total Exchanges</div>
+                                <div class="h4 mb-1" x-text="fundingExchanges.length || '...'"></div>
+                                <small class="text-muted">Tracked</small>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="table-responsive flex-shrink-0">
-                        <table class="table table-sm mb-0">
+                    <!-- Funding Rate Table -->
+                    <div class="table-responsive">
+                        <table class="table table-hover">
                             <thead>
                                 <tr>
                                     <th>Exchange</th>
                                     <th>Funding Rate</th>
-                                    <th>Trend</th>
-                                    <th>Signal</th>
+                                    <th>Annualized</th>
+                                    <th>Interval</th>
+                                    <th>Sentiment</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="item in fundingDominance" :key="item.exchange">
+                                <template x-for="(exchange, index) in fundingExchanges" :key="index">
                                     <tr>
-                                        <td class="fw-semibold" x-text="item.exchange">--</td>
                                         <td>
-                                            <span :class="item.rate >= 0 ? 'text-success' : 'text-danger'" x-text="formatFundingRate(item.rate)">--</span>
+                                            <strong x-text="exchange.exchange"></strong>
                                         </td>
                                         <td>
-                                            <span x-show="item.trend === 'up'">Trending Up</span>
-                                            <span x-show="item.trend === 'down'">Trending Down</span>
-                                            <span x-show="item.trend === 'stable'">Stable</span>
+                                            <span :style="`color: ${getFundingColor(exchange.funding_rate)}`" 
+                                                  x-text="formatFundingRate(exchange.funding_rate)">
+                                            </span>
                                         </td>
+                                        <td x-text="formatAnnualizedRate(exchange.annualized_rate)"></td>
+                                        <td x-text="exchange.funding_rate_interval + 'h'"></td>
                                         <td>
-                                            <span class="badge" :class="getFundingActionBadge(item.rate)" x-text="getFundingAction(item.rate)">--</span>
+                                            <span class="badge" 
+                                                  :class="exchange.funding_rate > 0.001 ? 'text-bg-success' : exchange.funding_rate < -0.001 ? 'text-bg-danger' : 'text-bg-secondary'"
+                                                  x-text="getFundingTrend(exchange.funding_rate)">
+                                            </span>
                                         </td>
                                     </tr>
                                 </template>
                             </tbody>
                         </table>
                     </div>
-
-                    <!-- Funding Rate Heatmap Visual -->
-                    <div class="mt-3 flex-shrink-0">
-                        <div class="small text-secondary mb-2 fw-semibold">Visual Heatmap</div>
-                        <div style="height: 140px;">
-                            <canvas id="fundingHeatmap"></canvas>
-                        </div>
-                    </div>
-
-                    <div class="mt-auto pt-3">
-                        <div class="p-2 rounded" style="background: rgba(59, 130, 246, 0.1);">
-                            <div class="small text-secondary">
-                                <strong>Tip:</strong> Funding rate positif tinggi → Longs crowded → Potensi long squeeze.
-                                Bandingkan antar exchange untuk cari arbitrage opportunity.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Whale Flow Balance -->
-            <div class="col-lg-6">
-                <div class="df-panel p-3 h-100 d-flex flex-column">
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h5 class="mb-0">Whale Flow Balance</h5>
-                                <small class="text-secondary">Memantau posisi smart money melalui whale movements</small>
-                            </div>
-                            <span class="badge text-bg-warning">Real-time</span>
-                        </div>
-                    </div>
-
-                    <!-- Flow Balance Chart -->
-                    <div class="flex-grow-1" style="min-height: 240px;">
-                        <canvas id="whaleFlowChart"></canvas>
-                    </div>
-
-                    <div class="mt-3 flex-shrink-0">
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <div class="p-2 rounded" style="background: rgba(239, 68, 68, 0.1);">
-                                    <div class="small text-secondary">Inflow to Exchanges</div>
-                                    <div class="h5 mb-0 fw-bold text-danger" x-text="'$' + whaleFlow.inflow + 'M'">--</div>
-                                    <div class="small text-secondary">Last 24h</div>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="p-2 rounded" style="background: rgba(34, 197, 94, 0.1);">
-                                    <div class="small text-secondary">Outflow from Exchanges</div>
-                                    <div class="h5 mb-0 fw-bold text-success" x-text="'$' + whaleFlow.outflow + 'M'">--</div>
-                                    <div class="small text-secondary">Last 24h</div>
-                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mt-3 flex-shrink-0">
-                        <div class="d-flex justify-content-between align-items-center p-2 rounded" :class="whaleFlow.netFlow >= 0 ? 'bg-success bg-opacity-10' : 'bg-danger bg-opacity-10'">
-                            <div class="small fw-semibold">Net Flow:</div>
-                            <div class="h5 mb-0 fw-bold" :class="whaleFlow.netFlow >= 0 ? 'text-success' : 'text-danger'" x-text="(whaleFlow.netFlow >= 0 ? '+$' : '-$') + Math.abs(whaleFlow.netFlow) + 'M'">--</div>
-                        </div>
-                        <div class="mt-2 small text-secondary">
-                            <span x-show="whaleFlow.netFlow >= 0"><strong>Bullish:</strong> More whale money leaving exchanges (accumulation)</span>
-                            <span x-show="whaleFlow.netFlow < 0"><strong>Bearish:</strong> More whale money entering exchanges (distribution)</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recent Whale Alerts -->
-        <div class="row g-3">
+        <!-- SECTION 3: WHALE ALERTS -->
+        <div class="row g-3 mt-2">
             <div class="col-12">
-                <div class="df-panel p-3">
-                    <div class="mb-3">
+                <div class="df-panel p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">🐋 Whale Alerts (Hyperliquid)</h5>
+                        <div class="d-flex gap-2 align-items-center">
+                            <span class="badge text-bg-info">Smart Money Moves</span>
+                </div>
+            </div>
+
+                    <!-- Info Alert & Filter -->
+                    <div class="alert alert-warning mb-3">
                         <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h5 class="mb-0">Recent Whale Alerts</h5>
-                                <small class="text-secondary">Pelacakan transaksi whale besar secara real-time</small>
+                            <div class="small">
+                                <i class="fas fa-info-circle"></i> 
+                                <strong>Live Data:</strong> Menampilkan whale positions terbaru dari Hyperliquid (real-time). Data akan ter-refresh setiap detik untuk update terbaru.
                             </div>
-                            <span class="badge text-bg-warning">Live Feed</span>
+                            <div class="d-flex gap-2 align-items-center">
+                                <label class="small text-secondary mb-0">Filter Symbol:</label>
+                                <select class="form-select form-select-sm" 
+                                        style="width: 120px;"
+                                        x-model="selectedWhaleSymbol"
+                                        @change="updateWhaleSymbol($event.target.value)">
+                                    <template x-for="symbol in availableWhaleSymbols" :key="symbol">
+                                        <option :value="symbol" x-text="symbol"></option>
+                                    </template>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- Whale Aggregate Stats -->
+                    <div class="row g-3 mb-4" x-show="whaleAggregate">
+                        <div class="col-md-3">
+                            <div class="p-3 border rounded text-center">
+                                <div class="small text-secondary mb-2">Total Alerts</div>
+                                <div class="h4 mb-1" x-text="whaleAggregate ? whaleAggregate.total_alerts : '...'"></div>
+                                <small class="text-muted">All symbols</small>
+                            </div>
+                                </div>
+                        <div class="col-md-3">
+                            <div class="p-3 border rounded text-center">
+                                <div class="small text-secondary mb-2">BTC Alerts</div>
+                                <div class="h4 mb-1" x-text="whaleAggregate ? whaleAggregate.btc_alerts : '...'"></div>
+                                <small class="text-muted">Bitcoin only</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 border rounded text-center">
+                                <div class="small text-secondary mb-2">Long/Short Ratio</div>
+                                <div class="h4 mb-1" x-text="whaleAggregate ? formatNumber(whaleAggregate.long_short_ratio) : '...'"></div>
+                                <small class="text-muted">
+                                    <span class="text-success" x-text="whaleAggregate ? whaleAggregate.long_count : 0"></span> / 
+                                    <span class="text-danger" x-text="whaleAggregate ? whaleAggregate.short_count : 0"></span>
+                                </small>
+                    </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="p-3 border rounded text-center">
+                                <div class="small text-secondary mb-2">Total Value</div>
+                                <div class="h4 mb-1" x-text="whaleAggregate ? formatUSD(whaleAggregate.total_value_usd) : '...'"></div>
+                                <small class="text-muted">USD value</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Whale Alerts Table -->
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover">
+                        <table class="table table-hover">
                             <thead>
                                 <tr>
                                     <th>Time</th>
-                                    <th>Direction</th>
-                                    <th>Amount</th>
-                                    <th>Asset</th>
-                                    <th>USD Value</th>
-                                    <th>Exchange</th>
-                                    <th>Signal</th>
+                                    <th>User</th>
+                                    <th>Symbol</th>
+                                    <th>Size</th>
+                                    <th>Type</th>
+                                    <th>Entry Price</th>
+                                    <th>Liq Price</th>
+                                    <th>Value (USD)</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="whale in whaleAlerts" :key="whale.id">
-                                    <tr :class="getWhaleAlertRowClass(whale.type)">
-                                        <td class="small text-secondary" x-text="whale.time">--</td>
-                                        <td>
-                                            <span class="badge" :class="whale.type === 'in' ? 'text-bg-danger' : 'text-bg-success'" x-text="whale.type === 'in' ? 'IN' : 'OUT'">--</span>
+                                <template x-for="(alert, index) in whaleAlertsFiltered" :key="index">
+                                    <tr>
+                                        <td class="small" x-text="formatDate(alert.create_time)"></td>
+                                        <td class="small">
+                                            <code x-text="truncateAddress(alert.user)"></code>
                                         </td>
-                                        <td class="fw-semibold" x-text="whale.amount">--</td>
-                                        <td x-text="whale.asset">--</td>
-                                        <td class="fw-semibold" x-text="'$' + whale.usd_value">--</td>
-                                        <td x-text="whale.exchange">--</td>
+                                        <td><strong x-text="alert.symbol"></strong></td>
+                                        <td x-text="formatNumber(Math.abs(alert.position_size))"></td>
                                         <td>
-                                            <span class="badge" :class="whale.type === 'in' ? 'text-bg-danger' : 'text-bg-success'" x-text="whale.type === 'in' ? 'Bearish' : 'Bullish'">--</span>
+                                            <span class="badge" 
+                                                  :class="getPositionBadgeClass(alert.position_type)"
+                                                  x-text="alert.position_type">
+                                            </span>
+                                        </td>
+                                        <td x-text="formatPrice(alert.entry_price)"></td>
+                                        <td x-text="formatPrice(alert.liq_price)"></td>
+                                        <td x-text="formatUSD(alert.position_value_usd)"></td>
+                                        <td>
+                                            <span class="badge" 
+                                                  :class="getActionBadgeClass(alert.position_action)"
+                                                  x-text="alert.position_action">
+                                            </span>
                                         </td>
                                     </tr>
                                 </template>
+                                <tr x-show="whaleAlertsFiltered.length === 0">
+                                    <td colspan="9" class="text-center text-muted py-4">
+                                        <i class="fas fa-inbox"></i> No whale alerts found for selected symbol
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
-
-                    <div class="mt-2 p-2 rounded" style="background: rgba(245, 158, 11, 0.1);">
-                        <div class="small text-secondary">
-                            <strong>Whale Behavior:</strong> Transfer IN exchange → Potensi sell pressure (Bearish). Transfer OUT → Holding/accumulation (Bullish). Monitor untuk confirm trend.
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Social Mentions Trend -->
-        <div class="row g-3">
-            <div class="col-12">
-                <div class="df-panel p-3">
-                    <div class="mb-3">
-                        <h5 class="mb-1">Social Mentions Trend (Reddit, Google)</h5>
-                        <small class="text-secondary">Tracking volume penyebutan untuk detect FOMO atau kapitulasi</small>
-                    </div>
-                    <div style="height: 300px;">
-                        <canvas id="mentionsChart"></canvas>
-                    </div>
-                    <div class="mt-3 p-2 rounded" style="background: rgba(139, 92, 246, 0.1);">
-                        <div class="small text-secondary">
-                            <strong>Social Volume Insight:</strong> Spike mendadak di social mentions = FOMO building. Sering terjadi near local top. Volume turun drastis = Kapitulasi atau kehilangan interest.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- SECTION 4: WHALE TRANSFERS (ON-CHAIN) - moved to On-Chain Metrics dashboard -->
 
-        <!-- Sentiment Insights -->
-        <div class="row g-3">
-            <div class="col-12">
-                <div class="df-panel p-4">
-                    <div class="mb-3">
-                        <h5 class="mb-1">Trading Insights dari Sentiment</h5>
-                        <small class="text-secondary">Panduan interpretasi signal untuk entry & exit timing</small>
-                    </div>
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <div class="p-3 rounded" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e;">
-                                <div class="fw-bold mb-2 text-success">Contrarian Buy Signals</div>
-                                <div class="small text-secondary">
-                                    <ul class="mb-0 ps-3">
-                                        <li>Fear & Greed < 20 (Extreme Fear)</li>
-                                        <li>Social mentions bottom out</li>
-                                        <li>Negative funding across exchanges</li>
-                                        <li>Whale net outflow positive</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="p-3 rounded" style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444;">
-                                <div class="fw-bold mb-2 text-danger">Warning Sell Signals</div>
-                                <div class="small text-secondary">
-                                    <ul class="mb-0 ps-3">
-                                        <li>Fear & Greed > 80 (Extreme Greed)</li>
-                                        <li>Social mentions spike dramatically</li>
-                                        <li>High positive funding (longs crowded)</li>
-                                        <li>Whale net inflow negative</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="p-3 rounded" style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6;">
-                                <div class="fw-bold mb-2 text-primary">Momentum Confirmation</div>
-                                <div class="small text-secondary">
-                                    <ul class="mb-0 ps-3">
-                                        <li>Fear & Greed 40-60 (Neutral → Greed)</li>
-                                        <li>Gradual increase social volume</li>
-                                        <li>Balanced funding across exchanges</li>
-                                        <li>Whale activity aligned with trend</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 @endsection
 
 @section('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- Chart.js with Date Adapter - Load async -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
 
+    <!-- Initialize Chart.js ready promise -->
     <script>
-        function sentimentFlowController() {
-            return {
-                selectedAsset: 'BTC',
-                loading: false,
-                fearGreedScore: 42,
-                socialChart: null,
-                mentionsChart: null,
-                fundingHeatmap: null,
-                whaleFlowChart: null,
-                socialBreakdown: {
-                    reddit: { mentions: 3521, sentiment: 38, keywords: 'r/Bitcoin, r/CryptoCurrency' },
-                    google: { score: 67, change: 5.2, region: 'Worldwide' }
-                },
-                fundingDominance: [
-                    { exchange: 'Binance', rate: 0.0125, trend: 'up' },
-                    { exchange: 'Bybit', rate: 0.0098, trend: 'stable' },
-                    { exchange: 'OKX', rate: 0.0156, trend: 'up' },
-                    { exchange: 'Bitget', rate: -0.0023, trend: 'down' },
-                    { exchange: 'Gate.io', rate: 0.0087, trend: 'stable' },
-                    { exchange: 'Deribit', rate: 0.0112, trend: 'up' }
-                ],
-                whaleFlow: {
-                    inflow: 342.5,
-                    outflow: 487.2,
-                    netFlow: 144.7
-                },
-                whaleAlerts: [
-                    { id: 1, type: 'out', amount: '1,284', asset: 'BTC', usd_value: '55.2M', exchange: 'Binance', time: '2 mins ago' },
-                    { id: 2, type: 'in', amount: '3,450', asset: 'ETH', usd_value: '7.8M', exchange: 'Coinbase', time: '15 mins ago' },
-                    { id: 3, type: 'out', amount: '842', asset: 'BTC', usd_value: '36.1M', exchange: 'Kraken', time: '28 mins ago' },
-                    { id: 4, type: 'in', amount: '5,200', asset: 'ETH', usd_value: '11.7M', exchange: 'Binance', time: '45 mins ago' },
-                    { id: 5, type: 'out', amount: '2,150', asset: 'BTC', usd_value: '92.3M', exchange: 'Gemini', time: '1 hour ago' }
-                ],
-
-                init() {
-                    // Wait for Chart.js to be ready
+        window.chartJsReady = new Promise((resolve) => {
                     if (typeof Chart !== 'undefined') {
-                        this.initCharts();
-                        this.startWhaleSimulation();
-                    } else {
-                        setTimeout(() => {
-                            this.initCharts();
-                            this.startWhaleSimulation();
-                        }, 100);
-                    }
-                },
-
-                initCharts() {
-                    // Social Sentiment Chart
-                    const socialCtx = document.getElementById('socialChart');
-                    if (socialCtx) {
-                        this.socialChart = new Chart(socialCtx, {
-                            type: 'bar',
-                            data: {
-                                labels: this.generateDateLabels(30),
-                                datasets: [
-                                    {
-                                        label: 'Reddit',
-                                        data: this.generateSocialData(30, 3000, 1500),
-                                        backgroundColor: 'rgba(239, 68, 68, 0.7)'
-                                    },
-                                    {
-                                        label: 'Google Trends',
-                                        data: this.generateSocialData(30, 2000, 1000),
-                                        backgroundColor: 'rgba(34, 197, 94, 0.7)'
-                                    }
-                                ]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: { display: true, position: 'top' }
-                                },
-                                scales: {
-                                    x: { stacked: true },
-                                    y: {
-                                        stacked: true,
-                                        position: 'right',
-                                        title: { display: true, text: 'Mentions' }
-                                    }
-                                }
-                            }
-                        });
+                console.log('✅ Chart.js already loaded');
+                resolve();
+                return;
                     }
 
-                    // Funding Heatmap
-                    const fundingCtx = document.getElementById('fundingHeatmap');
-                    if (fundingCtx) {
-                        this.fundingHeatmap = new Chart(fundingCtx, {
-                            type: 'bar',
-                            data: {
-                                labels: this.fundingDominance.map(f => f.exchange),
-                                datasets: [{
-                                    label: 'Funding Rate (%)',
-                                    data: this.fundingDominance.map(f => (f.rate * 100).toFixed(4)),
-                                    backgroundColor: this.fundingDominance.map(f =>
-                                        f.rate > 0.015 ? 'rgba(239, 68, 68, 0.8)' :
-                                        f.rate > 0.01 ? 'rgba(245, 158, 11, 0.8)' :
-                                        f.rate < 0 ? 'rgba(34, 197, 94, 0.8)' :
-                                        'rgba(156, 163, 175, 0.6)'
-                                    ),
-                                    borderColor: this.fundingDominance.map(f =>
-                                        f.rate > 0.015 ? 'rgb(239, 68, 68)' :
-                                        f.rate > 0.01 ? 'rgb(245, 158, 11)' :
-                                        f.rate < 0 ? 'rgb(34, 197, 94)' :
-                                        'rgb(156, 163, 175)'
-                                    ),
-                                    borderWidth: 2
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: { display: false }
-                                },
-                                scales: {
-                                    y: {
-                                        position: 'right',
-                                        title: { display: true, text: 'Rate (%)' }
-                                    }
-                                }
-                            }
-                        });
-                    }
-
-                    // Whale Flow Chart
-                    const whaleFlowCtx = document.getElementById('whaleFlowChart');
-                    if (whaleFlowCtx) {
-                        this.whaleFlowChart = new Chart(whaleFlowCtx, {
-                            type: 'line',
-                            data: {
-                                labels: this.generateDateLabels(7),
-                                datasets: [
-                                    {
-                                        label: 'Inflow',
-                                        data: this.generateWhaleFlowData(7, 300, 500),
-                                        borderColor: 'rgb(239, 68, 68)',
-                                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                        tension: 0.4,
-                                        fill: true
-                                    },
-                                    {
-                                        label: 'Outflow',
-                                        data: this.generateWhaleFlowData(7, 400, 600),
-                                        borderColor: 'rgb(34, 197, 94)',
-                                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                                        tension: 0.4,
-                                        fill: true
-                                    }
-                                ]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: { display: true, position: 'top' }
-                                },
-                                scales: {
-                                    y: {
-                                        position: 'right',
-                                        title: { display: true, text: 'USD ($M)' }
-                                    }
-                                }
-                            }
-                        });
-                    }
-
-                    // Mentions Trend Chart
-                    const mentionsCtx = document.getElementById('mentionsChart');
-                    if (mentionsCtx) {
-                        this.mentionsChart = new Chart(mentionsCtx, {
-                            type: 'line',
-                            data: {
-                                labels: this.generateDateLabels(90),
-                                datasets: [
-                                    {
-                                        label: 'Total Social Volume',
-                                        data: this.generateMentionsTrend(90),
-                                        borderColor: 'rgb(139, 92, 246)',
-                                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                                        tension: 0.4,
-                                        fill: true
-                                    },
-                                    {
-                                        label: 'Fear & Greed Index',
-                                        data: this.generateFearGreedTrend(90),
-                                        borderColor: 'rgb(245, 158, 11)',
-                                        tension: 0.4,
-                                        yAxisID: 'y1'
-                                    }
-                                ]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                interaction: { mode: 'index', intersect: false },
-                                plugins: {
-                                    legend: { display: true, position: 'top' }
-                                },
-                                scales: {
-                                    y: {
-                                        type: 'linear',
-                                        display: true,
-                                        position: 'left',
-                                        title: { display: true, text: 'Social Volume' }
-                                    },
-                                    y1: {
-                                        type: 'linear',
-                                        display: true,
-                                        position: 'right',
-                                        title: { display: true, text: 'F&G Index' },
-                                        min: 0,
-                                        max: 100,
-                                        grid: { drawOnChartArea: false }
-                                    }
-                                }
-                            }
-                        });
-                    }
-                },
-
-                generateDateLabels(days) {
-                    const labels = [];
-                    const today = new Date();
-                    for (let i = days - 1; i >= 0; i--) {
-                        const date = new Date(today);
-                        date.setDate(date.getDate() - i);
-                        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-                    }
-                    return labels;
-                },
-
-                generateSocialData(days, base, volatility) {
-                    const data = [];
-                    for (let i = 0; i < days; i++) {
-                        data.push(Math.floor(base + (Math.random() - 0.5) * volatility));
-                    }
-                    return data;
-                },
-
-                generateWhaleFlowData(days, min, max) {
-                    const data = [];
-                    for (let i = 0; i < days; i++) {
-                        data.push(Math.floor(Math.random() * (max - min) + min));
-                    }
-                    return data;
-                },
-
-                generateMentionsTrend(days) {
-                    const data = [];
-                    let value = 8000;
-                    for (let i = 0; i < days; i++) {
-                        value += (Math.random() - 0.48) * 1000;
-                        data.push(Math.floor(Math.max(3000, value)));
-                    }
-                    return data;
-                },
-
-                generateFearGreedTrend(days) {
-                    const data = [];
-                    let value = 50;
-                    for (let i = 0; i < days - 1; i++) {
-                        value += (Math.random() - 0.5) * 15;
-                        data.push(Math.floor(Math.max(10, Math.min(90, value))));
-                    }
-                    // Last data point should match the current Fear & Greed meter
-                    data.push(this.fearGreedScore);
-                    return data;
-                },
-
-                startWhaleSimulation() {
-                    setInterval(() => {
-                        const types = ['in', 'out'];
-                        const assets = ['BTC', 'ETH'];
-                        const exchanges = ['Binance', 'Coinbase', 'Kraken', 'Gemini', 'Bybit'];
-
-                        const newWhale = {
-                            id: Date.now(),
-                            type: types[Math.floor(Math.random() * types.length)],
-                            amount: (Math.random() * 3000 + 500).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ','),
-                            asset: assets[Math.floor(Math.random() * assets.length)],
-                            usd_value: (Math.random() * 100 + 10).toFixed(1) + 'M',
-                            exchange: exchanges[Math.floor(Math.random() * exchanges.length)],
-                            time: 'Just now'
-                        };
-
-                        this.whaleAlerts.unshift(newWhale);
-                        if (this.whaleAlerts.length > 10) {
-                            this.whaleAlerts.pop();
-                        }
-
-                        // Update whale flow
-                        if (newWhale.type === 'in') {
-                            this.whaleFlow.inflow += 5;
-                        } else {
-                            this.whaleFlow.outflow += 5;
-                        }
-                        this.whaleFlow.netFlow = this.whaleFlow.outflow - this.whaleFlow.inflow;
-                    }, 15000); // New whale every 15 seconds
-                },
-
-                getFearGreedBadge() {
-                    if (this.fearGreedScore <= 25) return 'text-bg-danger';
-                    if (this.fearGreedScore <= 45) return 'text-bg-warning';
-                    if (this.fearGreedScore <= 55) return 'text-bg-secondary';
-                    if (this.fearGreedScore <= 75) return 'text-bg-info';
-                    return 'text-bg-success';
-                },
-
-                getFearGreedLabel() {
-                    if (this.fearGreedScore <= 25) return 'Extreme Fear';
-                    if (this.fearGreedScore <= 45) return 'Fear';
-                    if (this.fearGreedScore <= 55) return 'Neutral';
-                    if (this.fearGreedScore <= 75) return 'Greed';
-                    return 'Extreme Greed';
-                },
-
-                getFearGreedAlert() {
-                    if (this.fearGreedScore <= 25) return 'bg-success bg-opacity-10';
-                    if (this.fearGreedScore >= 75) return 'bg-danger bg-opacity-10';
-                    return 'bg-info bg-opacity-10';
-                },
-
-                getFearGreedTitle() {
-                    if (this.fearGreedScore <= 25) return 'Contrarian Buy Opportunity';
-                    if (this.fearGreedScore >= 75) return 'Take Profit Zone';
-                    return 'Neutral Zone';
-                },
-
-                getFearGreedMessage() {
-                    if (this.fearGreedScore <= 25) {
-                        return `Extreme fear terdeteksi (${this.fearGreedScore}/100). Secara historis titik entry yang baik untuk contrarian traders. Market oversold.`;
-                    }
-                    if (this.fearGreedScore >= 75) {
-                        return `Extreme greed terdeteksi (${this.fearGreedScore}/100). Pertimbangkan take profit. Market berpotensi overheated.`;
-                    }
-                    return `Sentimen neutral (${this.fearGreedScore}/100). Market menunjukkan perilaku seimbang. Ikuti tren dan gunakan manajemen risiko yang tepat.`;
-                },
-
-                formatChange(value) {
-                    return (value >= 0 ? '+' : '') + value.toFixed(1);
-                },
-
-                formatFundingRate(rate) {
-                    const percent = (rate * 100).toFixed(4);
-                    return (rate >= 0 ? '+' : '') + percent + '%';
-                },
-
-                getFundingActionBadge(rate) {
-                    if (rate > 0.015) return 'text-bg-danger';
-                    if (rate > 0.01) return 'text-bg-warning';
-                    if (rate < 0) return 'text-bg-success';
-                    return 'text-bg-secondary';
-                },
-
-                getFundingAction(rate) {
-                    if (rate > 0.015) return 'Long Squeeze Risk';
-                    if (rate > 0.01) return 'Monitor';
-                    if (rate < 0) return 'Short Squeeze Setup';
-                    return 'Neutral';
-                },
-
-                getWhaleAlertRowClass(type) {
-                    return type === 'in' ? 'table-danger' : 'table-success';
-                },
-
-                refreshAll() {
-                    this.loading = true;
-                    setTimeout(() => {
-                        this.fearGreedScore = Math.floor(Math.random() * 60 + 20);
-                        this.loading = false;
-                    }, 1000);
+            let checkCount = 0;
+            const checkInterval = setInterval(() => {
+                checkCount++;
+                if (typeof Chart !== 'undefined') {
+                    console.log('✅ Chart.js loaded (after', checkCount * 50, 'ms)');
+                    clearInterval(checkInterval);
+                    resolve();
+                } else if (checkCount > 40) {
+                    console.warn('⚠️ Chart.js load timeout, resolving anyway');
+                    clearInterval(checkInterval);
+                    resolve();
                 }
-            };
-        }
+            }, 50);
+        });
     </script>
 
+    <!-- Sentiment & Flow Controller - Load with defer -->
+    <script type="module" src="{{ asset('js/sentiment-flow/controller.js') }}" defer></script>
+
     <style>
-        .pulse-info {
-            background-color: #3b82f6;
-            box-shadow: 0 0 0 rgba(59, 130, 246, 0.7);
+        [x-cloak] { display: none !important; }
+        
+        /* Light Theme Chart Container */
+        .tradingview-chart-container {
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: none;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            background: rgba(59, 130, 246, 0.03);
+        }
+
+        .chart-body {
+            padding: 20px;
+            background: #ffffff;
+        }
+
+        /* Pulse animation */
+        .pulse-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .pulse-success {
+            background-color: #22c55e;
+            box-shadow: 0 0 0 rgba(34, 197, 94, 0.7);
         }
 
         @keyframes pulse {
             0%, 100% {
-                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+                box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
             }
             50% {
-                box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+                box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
             }
         }
 
+        /* Panel styling */
+        .df-panel {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .df-panel:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.3);
+            }
+
+        /* Table styling */
         .table-hover tbody tr:hover {
-            background-color: rgba(0, 0, 0, 0.02);
+            background-color: rgba(59, 130, 246, 0.05);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .derivatives-header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .chart-body {
+                height: 250px;
+                padding: 12px;
+            }
         }
     </style>
 @endsection
+
