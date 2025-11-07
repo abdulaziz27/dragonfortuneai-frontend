@@ -15,7 +15,6 @@ export function createFundingRateController() {
 
         // State
         selectedSymbol: 'BTC',
-        selectedUnit: 'percentage',
         selectedInterval: '8h', // Default 8H (funding rate payment interval)
         selectedTimeRange: '1w', // Default 1 week
 
@@ -98,7 +97,6 @@ export function createFundingRateController() {
 
                 console.log('[FR:LOAD]', {
                     symbol: this.selectedSymbol,
-                    unit: this.selectedUnit,
                     interval: this.selectedInterval,
                     range: this.selectedTimeRange,
                     start: new Date(start_time).toISOString(),
@@ -115,7 +113,6 @@ export function createFundingRateController() {
                     interval: effectiveInterval,
                     start_time,
                     end_time,
-                    unit: this.selectedUnit,
                     preferFresh: !isAutoRefresh
                 });
 
@@ -301,20 +298,6 @@ export function createFundingRateController() {
                 this.instantLoadData();
             } else {
                 console.log('⚠️ Same symbol or invalid value, skipping');
-            }
-        },
-
-        updateUnit(value) {
-            console.log('🎯 updateUnit called with:', value, 'current selectedUnit:', this.selectedUnit);
-            if (value && value !== this.selectedUnit) {
-                console.log('🎯 Headline unit changed to:', value);
-                this.selectedUnit = value;
-
-                // Always trigger load for filter changes
-                console.log('🚀 Headline filter changed, triggering instant load');
-                this.instantLoadData();
-            } else {
-                console.log('⚠️ Same unit or invalid value, skipping');
             }
         },
 
