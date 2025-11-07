@@ -57,11 +57,6 @@
                         <option value="DOGE">DOGE</option>
                     </select>
 
-                    <!-- Unit Selector -->
-                    <select class="form-select" style="width: 120px;" :value="selectedUnit" @change="updateUnit($event.target.value)">
-                        <option value="percentage">Percentage</option>
-                    </select>
-
                     <!-- Interval Selector (API Compliant) - SAME AS OPEN INTEREST -->
                     <select class="form-select" style="width: 120px;" :value="selectedInterval" @change="updateInterval($event.target.value)">
                         <option value="1m">1M</option>

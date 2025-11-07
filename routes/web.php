@@ -44,8 +44,9 @@ Route::view('/options-metrics/options-skew', 'options-metrics.options-skew')->na
 Route::view('/options-metrics/gamma-exposure', 'options-metrics.gamma-exposure')->name('options-metrics.gex');
 Route::view('/options-metrics/put-call-ratio', 'options-metrics.put-call-ratio')->name('options-metrics.pcr');
 
-// ETF & Institutional Routes
-Route::view('/etf-institutional/dashboard', 'etf-institutional.dashboard')->name('etf-institutional.dashboard');
+// ETF Institutional Routes
+Route::view('/etf-institutional/dashboard', 'etf-flows.dashboard')->name('etf-institutional.dashboard');
+Route::view('/etf-flows', 'etf-flows.dashboard')->name('etf-flows.dashboard');
 
 // Volatility Regime Routes
 Route::view('/volatility-regime/dashboard', 'volatility-regime.dashboard')->name('volatility-regime.dashboard');
@@ -145,6 +146,28 @@ Route::prefix('api/spot-microstructure')->group(function () {
     Route::get('/taker-volume/history', [App\Http\Controllers\SpotMicrostructureController::class, 'getTakerBuySellVolumeHistory']);
     Route::get('/taker-volume/aggregated-history', [App\Http\Controllers\SpotMicrostructureController::class, 'getAggregatedTakerVolumeHistory']);
     Route::get('/volume-footprint/history', [App\Http\Controllers\SpotMicrostructureController::class, 'getVolumeFootprintHistory']);
+// Coinglass ETF Flows (new proxy endpoints)
+Route::prefix('api/coinglass/etf-flows')->group(function () {
+    // Daily Flows (Aggregated)
+    Route::get('/history', [App\Http\Controllers\Coinglass\EtfFlowsController::class, 'flowHistory']);
+    
+    // ETF List (Real-time comparison data)
+    Route::get('/list', [App\Http\Controllers\Coinglass\EtfFlowsController::class, 'etfList']);
+    
+    // Premium/Discount History (Per ETF)
+    Route::get('/premium-discount', [App\Http\Controllers\Coinglass\EtfFlowsController::class, 'premiumDiscountHistory']);
+    
+    // Flow Breakdown (Per ETF from aggregated data)
+    Route::get('/breakdown', [App\Http\Controllers\Coinglass\EtfFlowsController::class, 'flowBreakdown']);
+});
+
+// Coinglass Volatility & Regime Analysis
+Route::prefix('api/coinglass/volatility')->group(function () {
+    // Spot Price History (OHLC)
+    Route::get('/price-history', [App\Http\Controllers\Coinglass\VolatilityRegimeController::class, 'priceHistory']);
+    
+    // End-of-Day data (for ATR/HV/RV calculations)
+    Route::get('/eod', [App\Http\Controllers\Coinglass\VolatilityRegimeController::class, 'eod']);
 });
 
 Route::get('/api/coinglass/liquidation-aggregated-history', [App\Http\Controllers\CoinglassController::class, 'getLiquidationAggregatedHistory'])->name('api.coinglass.liquidation-aggregated-history');

@@ -41,14 +41,13 @@ export class FundingRateAPIService {
     }
 
     // Build URLs used as cache keys
-    buildAggregatedUrl({ symbol, interval, start_time, end_time, unit }) {
+    buildAggregatedUrl({ symbol, interval, start_time, end_time }) {
         const url = new URL(`/api/coinglass/funding-rate/history`, window.location.origin);
         const qs = new URLSearchParams({
             ...(symbol ? { symbol } : {}),
             ...(interval ? { interval } : {}),
             ...(start_time ? { start_time: String(start_time) } : {}),
             ...(end_time ? { end_time: String(end_time) } : {}),
-            ...(unit ? { unit } : {}),
         });
         url.search = qs.toString();
         return url;
@@ -56,8 +55,8 @@ export class FundingRateAPIService {
 
     // Return mapped cached points immediately if available
     getCachedHistoryPoints(params = {}) {
-        const { symbol, interval, start_time, end_time, unit } = params;
-        const url = this.buildAggregatedUrl({ symbol, interval, start_time, end_time, unit });
+        const { symbol, interval, start_time, end_time } = params;
+        const url = this.buildAggregatedUrl({ symbol, interval, start_time, end_time });
         const cacheKey = this.getCacheKey(url);
         console.log('🔍 Cache lookup - URL:', url.toString());
 
@@ -95,7 +94,7 @@ export class FundingRateAPIService {
     }
 
     async fetchAggregatedFundingRate(params, { preferFresh = false } = {}) {
-        const { symbol, interval, start_time, end_time, unit } = params;
+        const { symbol, interval, start_time, end_time } = params;
         const controller = new AbortController();
 
         // Prefer date range over limit
@@ -106,7 +105,6 @@ export class FundingRateAPIService {
             ...(interval ? { interval } : {}),
             ...(range.start_time ? { start_time: String(range.start_time) } : {}),
             ...(range.end_time ? { end_time: String(range.end_time) } : {}),
-            ...(unit ? { unit } : {}),
         });
         url.search = qs.toString();
 
@@ -150,10 +148,10 @@ export class FundingRateAPIService {
 
     // Backward-compatible method used by controller
     async fetchHistory(params) {
-        const { symbol, interval, start_time, end_time, unit, preferFresh } = params || {};
+        const { symbol, interval, start_time, end_time, preferFresh } = params || {};
         
         const res = await this.fetchAggregatedFundingRate(
-            { symbol, interval, start_time, end_time, unit }, 
+            { symbol, interval, start_time, end_time }, 
             { preferFresh: !!preferFresh }
         );
         
