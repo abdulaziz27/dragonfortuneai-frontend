@@ -108,7 +108,7 @@
                         </span> -->
                     </div>
                     <p class="mb-0 text-secondary">
-                        Analisa mendalam opsi Bitcoin/altcoin: IV Surface, Skew, Strike/Expiry, dan Greeks untuk keputusan trading yang presisi.
+                        Analisa mendalam opsi Bitcoin: Implied Volatility Surface, 25D Skew, OI by Strike/Expiry, dan Greeks untuk keputusan trading yang presisi.
                         <span x-show="refreshEnabled" class="text-success">• Auto-refresh aktif</span>
                     </p>
                 </div>
@@ -176,8 +176,8 @@
                 <div class="tradingview-chart-container">
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0">📈 BTC ATM Implied Volatility</h5>
-                            <small class="text-muted">Interactive Chart from The Block</small>
+                            <h5 class="mb-0">BTC ATM Implied Volatility</h5>
+                            <!-- <small class="text-muted">Implied Volatility (ATM) menunjukkan ekspektasi pasar terhadap volatilitas harga Bitcoin di masa depan</small> -->
                         </div>
                     </div>
                     <div class="chart-body" style="position: relative; min-height: 460px; height: 460px; padding: 20px; background: #ffffff;">
@@ -248,8 +248,8 @@
                 <div class="tradingview-chart-container">
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0">📊 BTC Option Skew Delta 25</h5>
-                            <small class="text-muted">Interactive Chart from The Block</small>
+                            <h5 class="mb-0">BTC Option Skew Delta 25</h5>
+                            <!-- <small class="text-muted">Interactive Chart from The Block</small> -->
                         </div>
                     </div>
                     <div class="chart-body" style="position: relative; min-height: 460px; height: 460px; padding: 20px; background: #ffffff;">
@@ -320,8 +320,8 @@
                 <div class="tradingview-chart-container">
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0">🎯 Deribit BTC Option Open Interest by Expiry</h5>
-                            <small class="text-muted">Interactive Chart from The Block</small>
+                            <h5 class="mb-0">Deribit BTC Option Open Interest by Expiry</h5>
+                            <!-- <small class="text-muted">Interactive Chart from The Block</small> -->
                         </div>
                     </div>
                     <div class="chart-body" style="position: relative; min-height: 460px; height: 460px; padding: 20px; background: #ffffff;">

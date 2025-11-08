@@ -39,7 +39,7 @@
                     </div>
                     <p class="mb-0 text-secondary">
                         Track daily inflows and outflows of Bitcoin ETFs to gauge institutional sentiment. 
-                        <span x-show="refreshEnabled" class="text-success">• Auto-refresh aktif (5s)</span>
+                        <span x-show="refreshEnabled" class="text-success">• Auto-refresh aktif (3s)</span>
                     </p>
                 </div>
 
@@ -196,7 +196,7 @@
                             <!-- Table Header with Search -->
                             <div class="d-flex justify-content-between align-items-center mb-4">
                                 <div>
-                                    <h5 class="mb-1">🏆 Bitcoin ETF Rankings</h5>
+                                    <h5 class="mb-1">Bitcoin ETF Rankings</h5>
                                     <small class="text-muted">
                                         Compare performance, holdings, and premiums across all Bitcoin ETFs
                                     </small>
@@ -318,7 +318,7 @@
                         <div class="tradingview-chart-container">
                             <div class="chart-header">
                                 <div class="d-flex align-items-center gap-3">
-                                    <h5 class="mb-0">📈 Premium/Discount Tracker</h5>
+                                    <h5 class="mb-0">Premium/Discount Tracker</h5>
                                     <small class="text-muted">Compare ETF premium/discount trends</small>
                                 </div>
                                 <div class="chart-controls">
@@ -371,7 +371,7 @@
                 <div class="tradingview-chart-container">
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0">🏛️ CME Futures Open Interest</h5>
+                            <h5 class="mb-0">CME Futures Open Interest</h5>
                             <small class="text-muted">Track institutional exposure through CME Bitcoin Futures</small>
                         </div>
                         <div class="chart-controls d-flex gap-3 align-items-center flex-wrap">

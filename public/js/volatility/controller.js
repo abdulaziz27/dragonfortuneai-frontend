@@ -47,6 +47,7 @@ window.volatilityController = function() {
             selectedInterval: '1h',
             intervals: [
                 { value: '1m', label: '1 Minute' },
+                { value: '3m', label: '3 Minutes' },
                 { value: '5m', label: '5 Minutes' },
                 { value: '15m', label: '15 Minutes' },
                 { value: '30m', label: '30 Minutes' },
@@ -360,7 +361,7 @@ window.volatilityController = function() {
                         this.errorCount++;
                     });
 
-                }, 5000); // 5 seconds
+                }, 3000); // 5 seconds
 
                 // Refresh when tab becomes visible
                 document.addEventListener('visibilitychange', () => {

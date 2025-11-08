@@ -39,7 +39,7 @@
                     </div>
                     <p class="mb-0 text-secondary">
                         Monitor Bitcoin volatility regimes and price action across multiple timeframes. 
-                        <span x-show="refreshEnabled" class="text-success">• Auto-refresh aktif (5s)</span>
+                        <span x-show="refreshEnabled" class="text-success">• Auto-refresh aktif (3s)</span>
                     </p>
                 </div>
 

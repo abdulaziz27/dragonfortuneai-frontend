@@ -40,10 +40,10 @@
                         <option value="YTD">Year to Date</option>
                     </select>
 
-                    <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
+                    <!-- <button class="btn btn-primary" @click="refreshAll()" :disabled="loading">
                         <span x-show="!loading">Refresh Data</span>
                         <span x-show="loading" class="spinner-border spinner-border-sm"></span>
-                    </button>
+                    </button> -->
                 </div>
             </div>
         </div>

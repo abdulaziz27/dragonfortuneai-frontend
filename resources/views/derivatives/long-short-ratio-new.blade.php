@@ -96,7 +96,7 @@
         <!-- Summary Cards Row - Global Account -->
         <div class="row g-3">
             <div class="col-12">
-                <h5 class="mb-3">📊 Global Account (All Traders)</h5>
+                <h5 class="mb-3">Global Account (All Traders)</h5>
             </div>
             
             <!-- Current Ratio - Global -->
@@ -153,7 +153,7 @@
         <!-- Summary Cards Row - Top Account -->
         <div class="row g-3">
             <div class="col-12">
-                <h5 class="mb-3">🎯 Top Account (Smart Money)</h5>
+                <h5 class="mb-3">Top Account (Smart Money)</h5>
             </div>
             
             <!-- Current Ratio - Top -->
@@ -213,7 +213,7 @@
                 <div class="tradingview-chart-container">
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0">📊 Global Account Long-Short Ratio</h5>
+                            <h5 class="mb-0">Global Account Long-Short Ratio</h5>
                             <div class="chart-info">
                                 <div class="d-flex align-items-center gap-3">
                                     <span class="current-value" x-text="globalCurrentRatio !== null ? formatRatio(globalCurrentRatio) : '--'"></span>
@@ -285,7 +285,7 @@
                 <div class="tradingview-chart-container">
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0">🎯 Top Account Long-Short Ratio (Smart Money)</h5>
+                            <h5 class="mb-0">Top Account Long-Short Ratio (Smart Money)</h5>
                             <div class="chart-info">
                                 <div class="d-flex align-items-center gap-3">
                                     <span class="current-value" x-text="topCurrentRatio !== null ? formatRatio(topCurrentRatio) : '--'"></span>

@@ -225,7 +225,7 @@
                 <div class="tradingview-chart-container" style="min-height: 380px;">
                     <div class="chart-header">
                         <div class="d-flex align-items-center justify-content-between w-100">
-                            <h5 class="mb-0">📊 Analisis Distribusi Z-Score</h5>
+                            <h5 class="mb-0">Analisis Distribusi Z-Score</h5>
                             <div class="d-flex gap-2">
                                 <span class="badge" 
                                       x-show="zScore !== null"
@@ -265,7 +265,7 @@
                 <div class="tradingview-chart-container" style="min-height: 380px;">
                     <div class="chart-header">
                         <div class="d-flex align-items-center justify-content-between w-100">
-                            <h5 class="mb-0">📈 Moving Average Trend</h5>
+                            <h5 class="mb-0">Moving Average Trend</h5>
                             <div class="d-flex gap-2">
                                 <span class="badge" 
                                       x-show="ma7 !== null && ma30 !== null"
