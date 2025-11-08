@@ -196,6 +196,16 @@
                             </a>
                         </li>
                         <li class="df-sidebar-menu-item">
+                            <a href="/derivatives/options-metrics" class="df-sidebar-menu-button {{ request()->routeIs('derivatives.options-metrics') ? 'active' : '' }}" @click="closeSidebar()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                    <path d="M8 12h8"/>
+                                    <path d="M12 8v8"/>
+                                </svg>
+                                <span>Options Metrics</span>
+                            </a>
+                        </li>
+                        <li class="df-sidebar-menu-item">
                             <a href="/etf-institutional/dashboard" class="df-sidebar-menu-button {{ request()->routeIs('etf-institutional.*') || request()->routeIs('etf-basis.*') ? 'active' : '' }}" @click="closeSidebar()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <rect x="3" y="4" width="18" height="4"/>

@@ -18,6 +18,9 @@ Route::view('/derivatives/open-interest', 'derivatives.open-interest')->name('de
 Route::view('/derivatives/open-interest-old', 'derivatives.open-interest-old')->name('derivatives.open-interest-old');
 Route::view('/derivatives/long-short-ratio', 'derivatives.long-short-ratio-new')->name('derivatives.long-short-ratio');
 
+// Options Metrics (Blueprint from Open Interest)
+Route::view('/derivatives/options-metrics', 'derivatives.options-metrics')->name('derivatives.options-metrics');
+
 Route::view('/derivatives/liquidations', 'derivatives.liquidations-new')->name('derivatives.liquidations');
 Route::view('/derivatives/liquidations-stream', 'derivatives.liquidations-stream')->name('derivatives.liquidations-stream');
 Route::view('/derivatives/liquidations-aggregated', 'derivatives.liquidations-aggregated')->name('derivatives.liquidations-aggregated');
