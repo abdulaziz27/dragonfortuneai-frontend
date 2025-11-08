@@ -681,3 +681,77 @@ Response JSON Example:
     },
   ]
 }
+
+D. Aggregated Stablecoin Margin History (OHLC)
+
+Endpoint: https://open-api-v4.coinglass.com/api/futures/open-interest/aggregated-stablecoin-history
+
+This endpoint provides aggregated stablecoin-margined open interest data in OHLC (open, high, low, close) candlestick format.
+
+cURL Req:
+curl --request GET \
+     --url 'https://open-api-v4.coinglass.com/api/futures/open-interest/aggregated-stablecoin-history?exchange_list=CME&symbol=BTC&interval=1d' \
+     --header 'CG-API-KEY: f78a531eb0ef4d06ba9559ec16a6b0c2' \
+     --header 'accept: application/json'
+
+Query Params
+2. exchange_list
+string
+required
+Defaults to Binance
+Comma-separated exchange names (e.g., "Binance,OKX,Bybit"). Retrieve supported exchanges via the 'supported-exchange-pair' API.
+
+2. symbol
+string
+required
+Defaults to BTC
+Trading coin (e.g., BTC).Retrieve supported coins via the 'supported-coins' API.
+
+
+3. interval
+string
+required
+Defaults to 1d
+Time interval for data aggregation.Supported values: 1m, 3m, 5m, 15m, 30m, 1h, 4h, 6h, 8h, 12h, 1d, 1w
+
+
+4. limit
+int32
+Number of results per request. Default: 1000, Maximum: 1000
+
+5. start_time
+int64
+Start timestamp in milliseconds (e.g., 1641522717000).
+
+6. end_time
+int64
+End timestamp in milliseconds (e.g., 1641522717000).
+
+
+Response Json:
+{
+  "code": "0",
+  "data": [
+    {
+      "time": 1676246400000,
+      "open": 79394.7,
+      "high": 79394.7,
+      "low": 79065,
+      "close": 79065
+    },
+    {
+      "time": 1676332800000,
+      "open": 79065,
+      "high": 79065,
+      "low": 75835.5,
+      "close": 75835.5
+    },
+    {
+      "time": 1676419200000,
+      "open": 75835.5,
+      "high": 76996,
+      "low": 75835.5,
+      "close": 76996
+    },
+    more..
+}

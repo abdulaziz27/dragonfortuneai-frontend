@@ -94,63 +94,39 @@ Endpoint: https://open-api-v4.coinglass.com/api/index/bitcoin-vs-global-m2-growt
 
 cURL Req:
 curl --request GET \
-     --url 'https://open-api-v4.coinglass.com/api/option/exchange-oi-history?symbol=BTC&unit=USD&range=1h' \
-     --header 'CG-API-KEY: f78a531eb0ef4d06ba9559ec16a6b0c2' \
-     --header 'accept: application/json'
+     --url https://open-api-v4.coinglass.com/api/index/bitcoin-vs-global-m2-growth \
+     --header 'CG-API-KEY: f78a531eb0ef4d06ba9559ec16a6b0c2'
 
 Query Params:
-1. exchange
-string
-required
-Defaults to Binance
-Futures exchange names (e.g., Binance, OKX) .Retrieve supported exchanges via the 'supported-exchange-pair' API.
-
-
-2. symbol
-string
-required
-Defaults to BTCUSDT
-Trading pair (e.g., BTCUSDT). Retrieve supported pairs via the 'supported-exchange-pair' API.
-
-
-3. interval
-string
-required
-Defaults to 1d
-Time interval for data aggregation. Supported values: 1m, 3m, 5m, 15m, 30m, 1h, 4h, 6h, 8h, 12h, 1d, 1w
-
-4. start_time
-int64
-Start timestamp in milliseconds (e.g., 1641522717000).
-
-5. end_time
-int64
-End timestamp in milliseconds (e.g., 1641522717000).
+-
 
 Response JSON Example:
 {
   "code": "0",
   "data": [
     {
-      "time": 1675987200000,
-      "open": "0.01",
-      "high": "0.01",
-      "low": "0.007742",
-      "close": "0.007742"
+      "timestamp": 1369008000000,
+      "price": 122.5,
+      "global_m2_yoy_growth": 5.5654014717,
+      "global_m2_supply": 59166686473105
     },
     {
-      "time": 1676073600000,
-      "open": "0.007742",
-      "high": "0.01",
-      "low": "0.004176",
-      "close": "0.005343"
+      "timestamp": 1369612800000,
+      "price": 133.5,
+      "global_m2_yoy_growth": 5.8571414345,
+      "global_m2_supply": 59490171457382
     },
     {
-      "time": 1676160000000,
-      "open": "0.005343",
-      "high": "0.01",
-      "low": "0.000026",
-      "close": "0.002098"
-    }
+      "timestamp": 1370217600000,
+      "price": 122.5,
+      "global_m2_yoy_growth": 6.7670545757,
+      "global_m2_supply": 60072386054198
+    },
+    {
+      "timestamp": 1370822400000,
+      "price": 100.43699646,
+      "global_m2_yoy_growth": 7.2970858354,
+      "global_m2_supply": 60559839608422
+    },
   ]
 }
