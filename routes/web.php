@@ -153,6 +153,9 @@ Route::prefix('api/coinglass/etf-flows')->group(function () {
     
     // Flow Breakdown (Per ETF from aggregated data)
     Route::get('/breakdown', [App\Http\Controllers\Coinglass\EtfFlowsController::class, 'flowBreakdown']);
+    
+    // CME Futures Open Interest
+    Route::get('/cme-oi', [App\Http\Controllers\Coinglass\EtfFlowsController::class, 'cmeOpenInterest']);
 });
 
 // Coinglass Volatility & Regime Analysis

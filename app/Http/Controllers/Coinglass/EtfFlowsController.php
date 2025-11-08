@@ -68,6 +68,31 @@ class EtfFlowsController extends Controller
     }
 
     // ========================================================================
+    // CME FUTURES OPEN INTEREST
+    // ========================================================================
+    
+    // GET /api/coinglass/etf-flows/cme-oi
+    public function cmeOpenInterest(Request $request)
+    {
+        $symbol = $request->input('symbol', 'BTC');
+        $interval = $request->input('interval', '1d');
+        $limit = $request->input('limit', 30);
+        
+        return $this->fetchAndNormalize(
+            endpoint: '/futures/open-interest/aggregated-stablecoin-history',
+            cacheKey: "coinglass:cme:oi:{$symbol}:{$interval}:{$limit}",
+            normalizer: 'normalizeCMEOpenInterest',
+            queryParams: [
+                'exchange_list' => 'CME',
+                'symbol' => $symbol,
+                'interval' => $interval,
+                'limit' => $limit
+            ],
+            cacheTtl: 60 // 60 seconds cache for CME data
+        );
+    }
+
+    // ========================================================================
     // PER-ETF FLOW BREAKDOWN (from flow-history data)
     // ========================================================================
     
@@ -359,6 +384,56 @@ class EtfFlowsController extends Controller
             'success' => true,
             'data' => $breakdown,
             'latest_date' => $latestDate
+        ];
+    }
+
+    private function normalizeCMEOpenInterest($raw): array
+    {
+        if (!is_array($raw) || !isset($raw['data'])) {
+            return ['success' => false, 'error' => ['message' => 'Invalid response']];
+        }
+
+        $data = [];
+        foreach ($raw['data'] as $row) {
+            $time = $row['time'] ?? null;
+            if (!$time) continue;
+
+            $data[] = [
+                'ts' => (int) $time,
+                'date' => date('Y-m-d', $time / 1000),
+                'open' => (float) ($row['open'] ?? 0),
+                'high' => (float) ($row['high'] ?? 0),
+                'low' => (float) ($row['low'] ?? 0),
+                'close' => (float) ($row['close'] ?? 0),
+            ];
+        }
+
+        // Sort by timestamp ascending (oldest first)
+        usort($data, function($a, $b) {
+            return $a['ts'] <=> $b['ts'];
+        });
+
+        // Calculate change metrics
+        $latest = end($data);
+        $previous = count($data) > 1 ? $data[count($data) - 2] : null;
+        
+        $change = 0;
+        $changePercent = 0;
+        
+        if ($previous && $previous['close'] > 0) {
+            $change = $latest['close'] - $previous['close'];
+            $changePercent = ($change / $previous['close']) * 100;
+        }
+
+        return [
+            'success' => true,
+            'data' => $data,
+            'summary' => [
+                'latest_oi' => $latest['close'] ?? 0,
+                'change' => $change,
+                'change_percent' => $changePercent,
+                'latest_date' => $latest['date'] ?? null,
+            ]
         ];
     }
 }

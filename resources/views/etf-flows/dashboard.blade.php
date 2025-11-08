@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     
     <!-- Preload critical resources -->
-    <link rel="preload" href="{{ asset('js/etf-flows/controller-coinglass.js') }}" as="script" crossorigin="anonymous">
+    <link rel="preload" href="{{ asset('js/etf-flows/controller-coinglass.js') }}?v={{ time() }}" as="script" crossorigin="anonymous">
 @endpush
 
 @section('content')
@@ -360,6 +360,64 @@
                                         <span class="badge text-bg-success">Coinglass API</span>
                                     </small>
                         </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+        <!-- SECTION 4: CME FUTURES OPEN INTEREST -->
+        <div class="row g-3 mt-4">
+            <div class="col-12">
+                <div class="tradingview-chart-container">
+                    <div class="chart-header">
+                        <div class="d-flex align-items-center gap-3">
+                            <h5 class="mb-0">🏛️ CME Futures Open Interest</h5>
+                            <small class="text-muted">Track institutional exposure through CME Bitcoin Futures</small>
+                        </div>
+                        <div class="chart-controls d-flex gap-3 align-items-center flex-wrap">
+                            <!-- Current OI Badge (in contracts) -->
+                            <div class="badge text-bg-info" x-show="cmeOiLatest > 0">
+                                <strong x-text="formatCurrency(cmeOiLatest) + ' contracts'"></strong>
+                            </div>
+                            <!-- Change Badge -->
+                            <div class="badge" x-show="cmeOiChange !== 0" 
+                                 :class="cmeOiChange > 0 ? 'text-bg-success' : 'text-bg-danger'">
+                                <span x-text="(cmeOiChange > 0 ? '↑' : '↓') + ' ' + Math.abs(cmeOiChangePercent).toFixed(2) + '%'"></span>
+                            </div>
+                            
+                            <!-- Time Range Selector (SAME AS FUNDING RATE) -->
+                            <div class="time-range-selector">
+                                <template x-for="range in cmeTimeRanges" :key="range.value">
+                                    <button type="button" 
+                                            class="time-range-btn"
+                                            :class="selectedCmeTimeRange === range.value ? 'btn-primary' : ''"
+                                            @click="updateCmeTimeRange(range.value)"
+                                            x-text="range.label">
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-body">
+                        <!-- Loading Overlay (like Premium/Discount chart) -->
+                        <div x-show="cmeLoading && cmeData.length === 0" 
+                             class="position-absolute top-50 start-50 translate-middle"
+                             style="z-index: 10;">
+                            <div class="spinner-border text-primary"></div>
+                        </div>
+                        <!-- Chart Canvas (always visible like other charts) -->
+                        <canvas id="cmeOiChart"></canvas>
+                    </div>
+                    <div class="chart-footer">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="chart-footer-text">
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="margin-right: 4px;">
+                                    <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1"/>
+                                    <path d="M6 3v3l2 2" stroke="currentColor" stroke-width="1" fill="none"/>
+                                </svg>
+                                CME Open Interest data from Coinglass API
+                            </small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -443,6 +501,30 @@
                 avgDailyFlow: null,   // Average daily flow
                 flowTrend: null,      // Recent trend (positive/negative)
 
+                // CME Open Interest State
+                cmeData: [],
+                cmeLoading: false,
+                cmeIsRendering: false, // ⚡ Race condition guard (from Funding Rate)
+                cmeOiLatest: 0,
+                cmeOiChange: 0,
+                cmeOiChangePercent: 0,
+                
+                // Time ranges (SAME AS FUNDING RATE)
+                cmeTimeRanges: [
+                    { label: '1D', value: '1d', days: 1 },
+                    { label: '1W', value: '1w', days: 7 },
+                    { label: '1M', value: '1m', days: 30 },
+                    { label: '3M', value: '3m', days: 90 },
+                    { label: '1Y', value: '1y', days: 365 },
+                    { label: 'ALL', value: 'all', days: 1095 } // ~3 years
+                ],
+                selectedCmeTimeRange: '1m', // Default 1 month
+                
+                // Fixed interval: Always use daily (1d) data
+                selectedCmeInterval: '1d', // Fixed to daily only
+                
+                cmeChartInstance: null,
+
                 async init() {
                     if (this.initialized) return;
                     this.initialized = true;
@@ -452,11 +534,12 @@
                     this.apiService = new EtfFlowsAPIService();
                     this.chartManager = new ChartManager('etfFlowsMainChart');
 
-                    // Load all 3 sections in parallel
+                    // Load all 4 sections in parallel
                     await Promise.all([
                         this.loadData(),               // Section 1: Daily Flows
                         this.loadEtfList(),            // Section 2: ETF Rankings
-                        this.loadPremiumDiscount()     // Section 3: Premium/Discount
+                        this.loadPremiumDiscount(),    // Section 3: Premium/Discount
+                        this.loadCmeOpenInterest()     // Section 4: CME Futures OI
                     ]);
 
                     // Start auto-refresh for real-time updates
@@ -641,20 +724,21 @@
                     // 5 second interval for all sections
                     this.refreshInterval = setInterval(() => {
                         if (document.hidden) return;
-                        if (this.isLoading || this.etfListLoading || this.pdLoading) return;
+                        if (this.isLoading || this.etfListLoading || this.pdLoading || this.cmeLoading) return;
                         if (this.errorCount >= this.maxErrors) {
                             console.warn('🚨 Auto-refresh disabled due to errors');
                             this.stopAutoRefresh();
                             return;
                         }
 
-                        console.log('🔄 Auto-refresh: Silent update (5s) - ALL sections');
+                        console.log('🔄 Auto-refresh: Silent update (5s) - ALL 4 sections');
                         
-                        // Refresh ALL 3 sections in parallel
+                        // Refresh ALL 4 sections in parallel
                         Promise.all([
                             this.loadData(true),               // Section 1: Daily Flows
                             this.refreshEtfList(),             // Section 2: ETF Rankings
-                            this.refreshPremiumDiscount()      // Section 3: Premium/Discount
+                            this.refreshPremiumDiscount(),     // Section 3: Premium/Discount
+                            this.loadCmeOpenInterest()         // Section 4: CME Futures OI
                         ]).catch(error => {
                             console.error('Auto-refresh error:', error);
                             this.errorCount++;
@@ -671,7 +755,7 @@
                         }
                     });
 
-                    console.log('✅ Auto-refresh started (30 minute interval)');
+                    console.log('✅ Auto-refresh started (5s interval) for ALL 4 sections');
                 },
 
                 stopAutoRefresh() {
@@ -996,6 +1080,266 @@
                     console.log('🔄 Refreshing Premium/Discount...');
                     this.pdData = {}; // Clear data for fresh fetch
                     await this.loadPremiumDiscount();
+                },
+
+                // =================================================================
+                // SECTION 4: CME FUTURES OPEN INTEREST
+                // =================================================================
+
+                async loadCmeOpenInterest() {
+                    if (this.cmeLoading) return;
+                    
+                    this.cmeLoading = true;
+                    console.log('🏛️ Loading CME Open Interest...', {
+                        interval: '1d', // Fixed to daily
+                        timeRange: this.selectedCmeTimeRange
+                    });
+
+                    try {
+                        // Calculate limit for daily data
+                        // Coinglass API max limit is ~1000 data points
+                        const range = this.cmeTimeRanges.find(r => r.value === this.selectedCmeTimeRange);
+                        const limit = Math.min(range ? range.days : 30, 1000); // Simple: 1 day = 1 point
+                        
+                        console.log('📊 Calculated limit:', limit, 'days for daily data');
+                        
+                        const response = await fetch(`/api/coinglass/etf-flows/cme-oi?symbol=BTC&interval=1d&limit=${limit}`);
+                        const result = await response.json();
+
+                        if (result.success && result.data) {
+                            this.cmeData = result.data;
+                            
+                            // Update summary metrics
+                            if (result.summary) {
+                                this.cmeOiLatest = result.summary.latest_oi;
+                                this.cmeOiChange = result.summary.change;
+                                this.cmeOiChangePercent = result.summary.change_percent;
+                            }
+
+                            // Render chart
+                            this.renderCmeChart();
+                            console.log('✅ CME OI loaded:', this.cmeData.length, 'points');
+                        } else {
+                            console.error('❌ CME OI API error:', result.error);
+                        }
+                    } catch (error) {
+                        console.error('❌ Failed to load CME OI:', error);
+                    } finally {
+                        this.cmeLoading = false;
+                    }
+                },
+
+                updateCmeTimeRange(value) {
+                    if (this.selectedCmeTimeRange === value) return;
+                    
+                    console.log('📊 Updating CME time range to:', value);
+                    this.selectedCmeTimeRange = value;
+                    this.loadCmeOpenInterest();
+                },
+
+                async renderCmeChart() {
+                    // ⚡ FIX 1: Prevent concurrent renders (from Funding Rate)
+                    if (this.cmeIsRendering) {
+                        console.warn('⚠️ CME chart rendering already in progress, skipping');
+                        return;
+                    }
+
+                    this.cmeIsRendering = true;
+
+                    try {
+                        // ⚡ FIX 2: Always destroy existing chart FIRST (from Funding Rate)
+                        this.destroyCmeChart();
+
+                        // ⚡ FIX 3: Wait for Chart.js to be ready
+                        if (typeof Chart === 'undefined') {
+                            if (window.chartJsReady) {
+                                await window.chartJsReady;
+                            } else {
+                                console.warn('⚠️ Chart.js not loaded, aborting CME render');
+                                this.cmeIsRendering = false;
+                                return;
+                            }
+                        }
+
+                        // ⚡ FIX 4: Enhanced canvas validation - check isConnected (from Funding Rate)
+                        const canvas = document.getElementById('cmeOiChart');
+                        if (!canvas || !canvas.isConnected) {
+                            console.warn('⚠️ CME canvas not available or not connected to DOM');
+                            this.cmeIsRendering = false;
+                            return;
+                        }
+
+                        // ⚡ FIX 5: Validate context (from Funding Rate)
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) {
+                            console.warn('⚠️ Cannot get 2D context for CME chart');
+                            this.cmeIsRendering = false;
+                            return;
+                        }
+
+                        // ⚡ FIX 6: Clear canvas before rendering (from Funding Rate)
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        
+                        // Prepare data
+                        const labels = this.cmeData.map(d => new Date(d.ts));
+                        const values = this.cmeData.map(d => d.close);
+                        
+                        console.log('📊 CME Chart Data:', {
+                            labelsCount: labels.length,
+                            valuesCount: values.length,
+                            firstValue: values[0],
+                            lastValue: values[values.length - 1]
+                        });
+
+                        // Create chart
+                        this.cmeChartInstance = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'CME Open Interest',
+                                    data: values,
+                                    borderColor: '#f59e0b',
+                                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                                    borderWidth: 2,
+                                    fill: true,
+                                    tension: 0.4,
+                                    pointRadius: 0,
+                                    pointHoverRadius: 5,
+                                    pointHoverBackgroundColor: '#f59e0b',
+                                    pointHoverBorderColor: '#fff',
+                                    pointHoverBorderWidth: 2
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                animation: false, // ⚡ FIX 7: CRITICAL - Disable animations (from Funding Rate)
+                                interaction: {
+                                    mode: 'index',
+                                    intersect: false
+                                },
+                                plugins: {
+                                    legend: {
+                                        display: false
+                                    },
+                                    tooltip: {
+                                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                        padding: 12,
+                                        titleFont: {
+                                            size: 13,
+                                            weight: '600'
+                                        },
+                                        bodyFont: {
+                                            size: 13
+                                        },
+                                        displayColors: false,
+                                        callbacks: {
+                                            title: (tooltipItems) => {
+                                                const date = new Date(tooltipItems[0].parsed.x);
+                                                return date.toLocaleDateString('en-US', {
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                    year: 'numeric'
+                                                });
+                                            },
+                                            label: (context) => {
+                                                const value = context.parsed.y;
+                                                return `OI: ${this.formatCurrency(value)}`;
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        type: 'time',
+                                        time: {
+                                            unit: 'day', // Fixed to daily
+                                            tooltipFormat: 'MMM d, yyyy',
+                                            displayFormats: {
+                                                day: 'MMM d',
+                                                week: 'MMM d',
+                                                month: 'MMM yyyy'
+                                            }
+                                        },
+                                        grid: {
+                                            display: false
+                                        },
+                                        ticks: {
+                                            font: {
+                                                size: 11
+                                            }
+                                        }
+                                    },
+                                    y: {
+                                        beginAtZero: false,
+                                        grid: {
+                                            color: 'rgba(0, 0, 0, 0.05)'
+                                        },
+                                        ticks: {
+                                            font: {
+                                                size: 11
+                                            },
+                                            callback: (value) => {
+                                                return this.formatCurrencyShort(value);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+
+                        console.log('📊 CME chart rendered successfully');
+                        console.log('📊 CME chart instance:', this.cmeChartInstance);
+
+                    } catch (error) {
+                        console.error('❌ Error rendering CME chart:', error);
+                        this.cmeChartInstance = null;
+                    } finally {
+                        // ⚡ FIX 8: Always reset rendering flag (from Funding Rate)
+                        this.cmeIsRendering = false;
+                    }
+                },
+
+                // ⚡ FIX 9: Robust destroy method (from Funding Rate)
+                destroyCmeChart() {
+                    if (this.cmeChartInstance) {
+                        try {
+                            // Stop all animations before destroying
+                            if (this.cmeChartInstance.options && this.cmeChartInstance.options.animation) {
+                                this.cmeChartInstance.options.animation = false;
+                            }
+                            
+                            // Stop chart updates
+                            this.cmeChartInstance.stop();
+                            
+                            // Destroy chart
+                            this.cmeChartInstance.destroy();
+                            console.log('🗑️ CME chart destroyed');
+                        } catch (error) {
+                            console.warn('⚠️ CME chart destroy error:', error);
+                        }
+                        this.cmeChartInstance = null;
+                    }
+                },
+
+                formatCurrency(value) {
+                    if (value === null || value === undefined) return '0';
+                    // CME OI is in number of contracts (e.g., 140878.7 contracts)
+                    // Display as thousands with K suffix
+                    if (value >= 1000) {
+                        return (value / 1000).toFixed(1) + 'K';
+                    }
+                    return value.toFixed(0);
+                },
+
+                formatCurrencyShort(value) {
+                    if (value === null || value === undefined) return '0';
+                    // CME OI is in number of contracts
+                    if (value >= 1000) {
+                        return (value / 1000).toFixed(0) + 'K';
+                    }
+                    return value.toFixed(0);
                 }
             };
         }

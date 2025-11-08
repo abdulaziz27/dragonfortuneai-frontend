@@ -45,6 +45,21 @@ function etfFlowsController() {
         avgDailyFlow: null,   // Average daily flow
         flowTrend: null,      // Recent trend (positive/negative)
 
+        // CME Open Interest State
+        cmeData: [],
+        cmeLoading: false,
+        cmeOiLatest: 0,
+        cmeOiChange: 0,
+        cmeOiChangePercent: 0,
+        cmeTimeRanges: [
+            { label: '1W', value: 7 },
+            { label: '1M', value: 30 },
+            { label: '3M', value: 90 },
+            { label: '6M', value: 180 }
+        ],
+        selectedCmeTimeRange: 30, // Default 1 month
+        cmeChartInstance: null,
+
         async init() {
             if (this.initialized) return;
             this.initialized = true;
@@ -55,6 +70,9 @@ function etfFlowsController() {
             this.chartManager = new ChartManager('etfFlowsMainChart');
 
             await this.loadData();
+            
+            // Load CME Open Interest
+            await this.loadCmeOpenInterest();
 
             // Start auto-refresh for real-time updates
             this.startAutoRefresh();
@@ -430,6 +448,179 @@ function etfFlowsController() {
             console.log('🔄 Manual refresh triggered');
             this.apiService.clearCache();
             this.loadData(false); // preferFresh = true
+        },
+
+        // =================================================================
+        // SECTION 4: CME FUTURES OPEN INTEREST
+        // =================================================================
+
+        async loadCmeOpenInterest() {
+            if (this.cmeLoading) return;
+            
+            this.cmeLoading = true;
+            console.log('🏛️ Loading CME Open Interest...');
+
+            try {
+                const response = await fetch(`/api/coinglass/etf-flows/cme-oi?symbol=BTC&interval=1d&limit=${this.selectedCmeTimeRange}`);
+                const result = await response.json();
+
+                if (result.success && result.data) {
+                    this.cmeData = result.data;
+                    
+                    // Update summary metrics
+                    if (result.summary) {
+                        this.cmeOiLatest = result.summary.latest_oi;
+                        this.cmeOiChange = result.summary.change;
+                        this.cmeOiChangePercent = result.summary.change_percent;
+                    }
+
+                    // Render chart
+                    this.renderCmeChart();
+                    console.log('✅ CME OI loaded:', this.cmeData.length, 'points');
+                } else {
+                    console.error('❌ CME OI API error:', result.error);
+                }
+            } catch (error) {
+                console.error('❌ Failed to load CME OI:', error);
+            } finally {
+                this.cmeLoading = false;
+            }
+        },
+
+        updateCmeTimeRange(days) {
+            if (this.selectedCmeTimeRange === days) return;
+            
+            console.log('📊 Updating CME time range to:', days, 'days');
+            this.selectedCmeTimeRange = days;
+            this.loadCmeOpenInterest();
+        },
+
+        renderCmeChart() {
+            const canvas = document.getElementById('cmeOiChart');
+            if (!canvas) {
+                console.warn('⚠️ CME chart canvas not found');
+                return;
+            }
+
+            // Destroy existing chart
+            if (this.cmeChartInstance) {
+                this.cmeChartInstance.destroy();
+            }
+
+            const ctx = canvas.getContext('2d');
+            
+            // Prepare data
+            const labels = this.cmeData.map(d => new Date(d.ts));
+            const values = this.cmeData.map(d => d.close);
+
+            // Create chart
+            this.cmeChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'CME Open Interest',
+                        data: values,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 5,
+                        pointHoverBackgroundColor: '#f59e0b',
+                        pointHoverBorderColor: '#fff',
+                        pointHoverBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: {
+                                size: 13,
+                                weight: '600'
+                            },
+                            bodyFont: {
+                                size: 13
+                            },
+                            displayColors: false,
+                            callbacks: {
+                                title: (tooltipItems) => {
+                                    const date = new Date(tooltipItems[0].parsed.x);
+                                    return date.toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                    });
+                                },
+                                label: (context) => {
+                                    const value = context.parsed.y;
+                                    return `OI: ${this.formatCurrency(value)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: this.selectedCmeTimeRange <= 30 ? 'day' : 'week',
+                                tooltipFormat: 'MMM d, yyyy',
+                                displayFormats: {
+                                    day: 'MMM d',
+                                    week: 'MMM d'
+                                }
+                            },
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            ticks: {
+                                font: {
+                                    size: 11
+                                },
+                                callback: (value) => {
+                                    return this.formatCurrencyShort(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            console.log('📊 CME chart rendered successfully');
+        },
+
+        formatCurrency(value) {
+            if (value === null || value === undefined) return '$0';
+            return '$' + (value / 1_000_000_000).toFixed(2) + 'B';
+        },
+
+        formatCurrencyShort(value) {
+            if (value === null || value === undefined) return '$0';
+            const billions = value / 1_000_000_000;
+            return '$' + billions.toFixed(1) + 'B';
         }
     };
 }
