@@ -263,26 +263,8 @@
             </div>
         </section>
 
-        <!-- Options Snapshot + On‑Chain + ETF Netflow + Risk -->
+        <!-- On‑Chain + ETF Netflow + Risk -->
         <section class="row g-3">
-            <div class="col-lg-3 col-md-6">
-                <a href="/options-metrics/implied-volatility" class="text-decoration-none" style="color: inherit;">
-                    <div class="df-panel p-3 h-100">
-                        <div class="small" style="color: var(--muted-foreground);">30d IV (BTC)</div>
-                        <div class="h4 mb-0" x-text="iv30.toFixed(1) + '%'">52.3%</div>
-                        <div class="small" :class="ivTrend >= 0 ? 'text-success' : 'text-danger'" x-text="trendText(ivTrend) + ' this week'">Rising this week</div>
-                    </div>
-                </a>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <a href="/options-metrics/options-skew" class="text-decoration-none" style="color: inherit;">
-                    <div class="df-panel p-3 h-100">
-                        <div class="small" style="color: var(--muted-foreground);">25d RR (BTC)</div>
-                        <div class="h4 mb-0" :class="rr25 >= 0 ? 'text-success' : 'text-danger'" x-text="signed(rr25) + '%'">-3.1%</div>
-                        <div class="small text-secondary">Skew toward puts/calls</div>
-                    </div>
-                </a>
-            </div>
             <div class="col-lg-3 col-md-6">
                 <a href="/onchain-metrics/exchange-netflow" class="text-decoration-none" style="color: inherit;">
                     <div class="df-panel p-3 h-100">

@@ -52,10 +52,10 @@ export class SentimentFlowChartManager {
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Prepare data
+            // Prepare data - use timestamp for reliable date parsing
             const labels = history.length > 0 
-                ? history.map(item => item.date || item.value)
-                : ['Current'];
+                ? history.map(item => item.timestamp || item.date || new Date(item.date).getTime())
+                : [Date.now()];
             
             const data = history.length > 0 
                 ? history.map(item => item.value || item)
@@ -85,10 +85,36 @@ export class SentimentFlowChartManager {
                             display: false
                         },
                         tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                            titleColor: '#1e293b',
+                            bodyColor: '#334155',
+                            borderColor: 'rgba(0, 0, 0, 0.1)',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: true,
+                            boxWidth: 8,
+                            boxHeight: 8,
                             callbacks: {
                                 title: function(context) {
-                                    // Show actual date in tooltip
-                                    return context[0].label;
+                                    // Format date properly for tooltip
+                                    if (!context || !context[0]) return 'Date unavailable';
+                                    
+                                    const label = context[0].label;
+                                    
+                                    // Try to parse as date
+                                    const date = new Date(label);
+                                    
+                                    // Check if valid date
+                                    if (!isNaN(date.getTime())) {
+                                        return date.toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric'
+                                        });
+                                    }
+                                    
+                                    // Fallback to original label
+                                    return label;
                                 },
                                 label: function(context) {
                                     const value = context.parsed.y;
@@ -99,7 +125,7 @@ export class SentimentFlowChartManager {
                                     else if (value >= 20) sentiment = 'Fear';
                                     else sentiment = 'Extreme Fear';
                                     
-                                    return `Value: ${value} (${sentiment})`;
+                                    return `Fear & Greed: ${value} (${sentiment})`;
                                 }
                             }
                         }
@@ -125,7 +151,27 @@ export class SentimentFlowChartManager {
                                 maxRotation: 45,
                                 minRotation: 45,
                                 autoSkip: true,
-                                maxTicksLimit: 10
+                                maxTicksLimit: 10,
+                                color: '#64748b',
+                                font: { size: 10 },
+                                callback: function(value, index) {
+                                    // Get label for this tick
+                                    const label = this.getLabelForValue(value);
+                                    
+                                    // Try to parse as date
+                                    const date = new Date(label);
+                                    
+                                    // Check if valid date
+                                    if (!isNaN(date.getTime())) {
+                                        return date.toLocaleDateString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric'
+                                        });
+                                    }
+                                    
+                                    // Fallback to original label
+                                    return label;
+                                }
                             }
                         }
                     }

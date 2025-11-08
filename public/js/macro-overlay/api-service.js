@@ -155,18 +155,15 @@ export class MacroAPIService {
 
     /**
      * Fetch Bitcoin vs M2 data
+     * Note: Endpoint does not require any query parameters
      */
     async fetchBitcoinM2(options = {}) {
         const {
-            interval = '1w',
             preferFresh = false
         } = options;
         
-        const params = {
-            interval
-        };
-        
-        return this.fetchWithCache('/api/coinglass/macro-overlay/bitcoin-m2', params, {
+        // No parameters needed - endpoint returns all data
+        return this.fetchWithCache('/api/coinglass/macro-overlay/bitcoin-m2', {}, {
             preferFresh,
             ttl: 60 * 60 * 1000 // 1 hour cache for historical data
         });

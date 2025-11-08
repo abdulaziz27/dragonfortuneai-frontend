@@ -44,8 +44,11 @@ window.macroController = function() {
             { value: 90, label: '90 Days' },
             { value: 180, label: '6 Months' },
             { value: 365, label: '1 Year' },
-            { value: 730, label: '2 Years' }
+            { value: 730, label: '2 Years' },
+            { value: 10000, label: 'ALL' } // ⚡ ALL option (FRED max)
         ],
+
+        // Bitcoin M2 Data (no filters needed - endpoint returns all data)
 
         // Auto-refresh
         refreshEnabled: true,
@@ -241,11 +244,11 @@ window.macroController = function() {
         /**
          * Load Bitcoin vs M2 data
          * Pattern: Simple and robust - always render
+         * Note: Endpoint does not require any parameters
          */
         async loadBitcoinM2(silent = false) {
             try {
                 const response = await this.apiService.fetchBitcoinM2({
-                    interval: '1w', // Weekly data for better performance
                     preferFresh: !silent
                 });
 
@@ -256,7 +259,7 @@ window.macroController = function() {
                     this.chartManager.renderBitcoinM2Chart('bitcoinM2Chart', this.bitcoinM2Data);
                     
                     if (!silent) {
-                        console.log('✅ Bitcoin vs M2 data loaded:', this.bitcoinM2Data.length, 'points');
+                        console.log(`✅ Bitcoin vs M2 data loaded: ${this.bitcoinM2Data.length} points`);
                     }
                 }
             } catch (error) {
@@ -293,6 +296,7 @@ window.macroController = function() {
             this.apiService.clearCache();
             await this.loadHistoricalCharts();
         },
+
 
         /**
          * Start auto-refresh

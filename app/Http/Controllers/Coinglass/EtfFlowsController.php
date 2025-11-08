@@ -101,16 +101,34 @@ class EtfFlowsController extends Controller
         int $cacheTtl = null
     ) {
         $ttl = $cacheTtl ?? $this->cacheTtlSeconds;
+        $backupKey = $cacheKey . ':backup';
 
         try {
-            $raw = Cache::remember($cacheKey, $ttl, function () use ($endpoint, $queryParams) {
-                return $this->callCoinglassApi($endpoint, $queryParams);
+            $raw = Cache::remember($cacheKey, $ttl, function () use ($endpoint, $queryParams, $backupKey, $ttl) {
+                $response = $this->callCoinglassApi($endpoint, $queryParams);
+                // Keep a longer-lived backup in case subsequent calls fail
+                Cache::put($backupKey, $response, max($ttl * 12, 300));
+                return $response;
             });
 
             $normalized = $this->$normalizer($raw);
             return response()->json($normalized);
 
         } catch (\Exception $e) {
+            $fallbackRaw = Cache::get($backupKey);
+            if ($fallbackRaw) {
+                Log::warning('ETF API fallback using stale cache', [
+                    'endpoint' => $endpoint,
+                    'params' => $queryParams,
+                    'error' => $e->getMessage()
+                ]);
+
+                $normalized = $this->$normalizer($fallbackRaw);
+                $normalized['stale'] = true;
+
+                return response()->json($normalized);
+            }
+
             return $this->errorResponse($e);
         }
     }

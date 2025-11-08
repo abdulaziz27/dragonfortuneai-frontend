@@ -19,7 +19,7 @@ class MacroOverlayController extends Controller
     public function __construct(CoinglassClient $client)
     {
         $this->client = $client;
-        $this->fredApiKey = '6430aed90a9710e51f71603bc00d00d5';
+        $this->fredApiKey = env('FRED_API_KEY');
         $this->fredBaseUrl = 'https://api.stlouisfed.org/fred/series/observations';
         $this->cacheTtlMinutes = (int) env('COINGLASS_CACHE_TTL', 15);
     }
@@ -193,20 +193,17 @@ class MacroOverlayController extends Controller
     /**
      * Get Bitcoin vs Global M2 data
      * GET /api/coinglass/macro-overlay/bitcoin-m2
+     * 
+     * Note: Endpoint does not require any query parameters
      */
     public function bitcoinVsM2(Request $request)
     {
-        $interval = $request->input('interval', '1w');
-        
-        $cacheKey = "coinglass:bitcoin-m2:{$interval}";
-        
+        $cacheKey = 'coinglass:bitcoin-m2';
+
         try {
-            $data = Cache::remember($cacheKey, 60 * 60, function () use ($interval) { // 1 hour cache
-                $params = [
-                    'interval' => $interval
-                ];
-                
-                $raw = $this->callCoinglassApi('/index/bitcoin-vs-global-m2-growth', $params);
+            $data = Cache::remember($cacheKey, 60 * 60, function () { // 1 hour cache
+                // Fetch global M2 supply & growth data (no parameters needed)
+                $raw = $this->callCoinglassApi('/index/bitcoin-vs-global-m2-growth', []);
                 return $this->normalizeBitcoinM2($raw);
             });
 
@@ -334,6 +331,7 @@ class MacroOverlayController extends Controller
 
     /**
      * Normalize Bitcoin vs M2 data
+     * Response format: { code: "0", data: [{ timestamp, price, global_m2_yoy_growth, global_m2_supply }] }
      */
     private function normalizeBitcoinM2($raw): array
     {
@@ -355,19 +353,24 @@ class MacroOverlayController extends Controller
         $normalized = [];
         
         foreach ($data as $item) {
-            // Coinglass returns timestamp, price, global_m2_yoy_growth, global_m2_supply
+            // API returns: timestamp, price, global_m2_yoy_growth, global_m2_supply
             $timestamp = $item['timestamp'] ?? null;
             
             if (!$timestamp) continue;
             
+            $supply = (float) ($item['global_m2_supply'] ?? 0);
+            $supplyTrillions = $supply > 0 ? $supply / 1_000_000_000_000 : null;
+            $price = (float) ($item['price'] ?? 0);
+            $ratio = $supplyTrillions ? ($price / $supplyTrillions) : null;
+            
             $normalized[] = [
                 'time' => (int) $timestamp,
                 'date' => date('Y-m-d', $timestamp / 1000),
-                'price' => (float) ($item['price'] ?? 0),
+                'price' => $price,
                 'global_m2_yoy_growth' => (float) ($item['global_m2_yoy_growth'] ?? 0),
-                'global_m2_supply' => (float) ($item['global_m2_supply'] ?? 0),
-                // Calculate ratio (simplified - just use price as proxy)
-                'ratio' => (float) ($item['price'] ?? 0)
+                'global_m2_supply' => $supply,
+                'global_m2_supply_trillions' => $supplyTrillions,
+                'ratio' => $ratio
             ];
         }
 

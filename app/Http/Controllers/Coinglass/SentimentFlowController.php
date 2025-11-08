@@ -117,9 +117,9 @@ class SentimentFlowController extends Controller
             ];
         }
 
-        // Extract data_list and update_time from response
+        // Extract data_list and time_list from response
         $dataList = $raw['data']['data_list'] ?? [];
-        $timeList = $raw['data']['update_time'] ?? [];
+        $timeList = $raw['data']['time_list'] ?? [];
         
         if (empty($dataList)) {
             return [
@@ -138,10 +138,11 @@ class SentimentFlowController extends Controller
         $history = [];
         $count = count($dataList);
         for ($i = 0; $i < $count; $i++) {
+            $timestamp = $timeList[$i] ?? null;
             $history[] = [
                 'value' => $dataList[$i],
-                'timestamp' => $timeList[$i] ?? null,
-                'date' => isset($timeList[$i]) ? date('Y-m-d', $timeList[$i] / 1000) : null
+                'timestamp' => $timestamp,
+                'date' => $timestamp ? date('Y-m-d', $timestamp / 1000) : null
             ];
         }
         

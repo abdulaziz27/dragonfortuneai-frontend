@@ -102,8 +102,8 @@
                                 <div class="time-range-selector">
                                     <template x-for="range in fearGreedTimeRanges" :key="range.value">
                                         <button type="button" 
-                                                class="btn btn-sm time-range-btn"
-                                                :class="selectedFearGreedRange === range.value ? 'btn-primary' : 'btn-outline-secondary'"
+                                                class="time-range-btn"
+                                                :class="selectedFearGreedRange === range.value ? 'btn-primary' : ''"
                                                 @click="updateFearGreedRange(range.value)"
                                                 x-text="range.label">
                                         </button>
@@ -451,6 +451,53 @@
         /* Table styling */
         .table-hover tbody tr:hover {
             background-color: rgba(59, 130, 246, 0.05);
+        }
+
+        /* Time Range Selector Styling (ETF Flows style) */
+        .time-range-selector {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            background: linear-gradient(135deg, 
+                rgba(241, 245, 249, 0.8) 0%, 
+                rgba(226, 232, 240, 0.8) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.15);
+            border-radius: 8px;
+            padding: 0.25rem;
+        }
+
+        .time-range-btn {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 6px;
+            transition: all 0.2s;
+            white-space: nowrap;
+            color: #64748b;
+            background: transparent;
+            border: none;
+        }
+
+        .time-range-btn:hover {
+            color: #1e293b;
+            background: rgba(241, 245, 249, 1);
+        }
+
+        .time-range-btn.btn-primary {
+            background: #3b82f6 !important;
+            color: white !important;
+        }
+
+        .time-range-btn.btn-primary:hover {
+            background: #2563eb !important;
+            color: white !important;
+        }
+
+        .chart-controls {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
 
         /* Responsive */

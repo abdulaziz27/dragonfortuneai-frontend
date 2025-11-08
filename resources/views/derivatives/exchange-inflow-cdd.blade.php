@@ -1,5 +1,15 @@
 @extends('layouts.app')
 
+@section('title', 'Exchange Inflow CDD | DragonFortune')
+
+@push('head')
+    <!-- Resource Hints for Faster API Loading -->
+    <link rel="dns-prefetch" href="{{ config('app.api_urls.internal') }}">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="{{ config('app.api_urls.internal') }}" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+@endpush
+
 @section('content')
     {{--
         Bitcoin: Exchange Inflow CDD Dashboard
@@ -12,120 +22,146 @@
         - Low CDD → Mostly young coins moving → Normal trading activity
     --}}
 
-    <div class="d-flex flex-column h-100 gap-3" x-data="exchangeInflowCDDController()">
+    <div class="d-flex flex-column h-100 gap-3" x-data="createCDDController()">
         <!-- Page Header -->
         <div class="derivatives-header">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <h1 class="mb-0">₿ Bitcoin: Exchange Inflow CDD</h1>
-                        <span class="pulse-dot pulse-success"></span>
+                        <h1 class="mb-0">Exchange Inflow CDD</h1>
+                        <span class="pulse-dot pulse-success" x-show="rawData.length > 0 && refreshEnabled"></span>
+                        <span class="spinner-border spinner-border-sm text-primary" style="width: 16px; height: 16px;" x-show="rawData.length === 0" x-cloak></span>
+                        <span class="badge text-bg-success" x-show="refreshEnabled" title="Auto-refresh setiap 15 detik">
+                            <i class="fas fa-sync-alt"></i> LIVE
+                        </span>
                     </div>
                     <p class="mb-0 text-secondary">
-                        Monitor umur koin yang masuk ke exchange untuk mendeteksi distribusi long-term holder dan potensi selling pressure
+                        Monitor umur koin yang masuk ke exchange untuk mendeteksi distribusi long-term holder. 
+                        <span x-show="refreshEnabled" class="text-success">• Auto-refresh aktif</span>
                     </p>
                 </div>
 
                 <!-- Global Controls -->
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                     <!-- Exchange Selector -->
-                    <select class="form-select" style="width: 200px;" x-model="selectedExchange" @change="updateExchange()">
-                        <option value="all_exchange">All Exchanges</option>
-                        <option value="spot_exchange">Spot Exchanges</option>
-                        <option value="derivative_exchange">Derivative Exchanges</option>
-                        <option disabled>──────────</option>
-                        <option value="binance">Binance</option>
-                        <option value="kraken">Kraken</option>
-                        <option value="bybit">Bybit</option>
-                        <option value="gemini">Gemini</option>
-                        <option value="bitfinex">Bitfinex</option>
-                        <option value="kucoin">KuCoin</option>
-                        <option value="bitstamp">Bitstamp</option>
-                        <option value="mexc">MEXC</option>
+                    <select class="form-select" style="width: 200px;" :value="selectedExchange" @change="updateExchange($event.target.value)">
+                        <template x-for="ex in exchangeOptions" :key="ex.value">
+                            <option :value="ex.value" x-text="ex.label" :selected="ex.value === selectedExchange"></option>
+                        </template>
                     </select>
                     
-                    <!-- Info tooltip for Aggregated Exchanges -->
-                    <div x-show="['all_exchange', 'spot_exchange', 'derivative_exchange'].includes(selectedExchange)" class="small text-muted mt-1" style="font-size: 0.75em;">
-                        <span x-show="selectedExchange === 'all_exchange'">*Semua exchange yang didukung (agregasi lengkap)</span>
-                        <span x-show="selectedExchange === 'spot_exchange'">*Hanya exchange spot trading</span>
-                        <span x-show="selectedExchange === 'derivative_exchange'">*Hanya exchange derivatives trading</span>
+                    <!-- Interval Selector (Hidden - only 1D available for CryptoQuant plan) -->
+                    <!-- <select class="form-select" style="width: 120px;" :value="selectedInterval" @change="updateInterval($event.target.value)">
+                        <template x-for="interval in chartIntervals" :key="interval.value">
+                            <option :value="interval.value" x-text="interval.label"></option>
+                        </template>
+                    </select> -->
+                    <!-- <span class="badge text-bg-info">Daily Data Only</span> -->
+
+                    <!-- Date Range Selector -->
+                    <div class="d-flex align-items-center gap-2">
+                        <select class="form-select" style="width: 120px;" :value="selectedTimeRange" @change="updateTimeRange($event.target.value)">
+                            <template x-for="range in timeRanges" :key="range.value">
+                                <option :value="range.value" x-text="range.label" :selected="range.value === selectedTimeRange"></option>
+                            </template>
+                        </select>
                     </div>
-
-
-
-                    <button class="btn btn-primary" @click="refreshAll()" :disabled="globalLoading">
-                        <span x-show="!globalLoading">🔄 Refresh</span>
-                        <span x-show="globalLoading" class="spinner-border spinner-border-sm"></span>
-                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Summary Cards Row -->
+        <!-- Summary Cards Row (Compact) -->
         <div class="row g-3">
-            <!-- Bitcoin Price USD -->
-            <div class="col-md-2">
-                <div class="df-panel p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">₿ BTC/USD</span>
-                        <span class="badge text-bg-warning">Live</span>
-                    </div>
-                    <div class="h3 mb-1 text-warning" x-text="formatPriceUSD(currentPrice)">--</div>
-                    <div class="small" :class="getPriceTrendClass(priceChange)">
-                        <span x-text="formatChange(priceChange)">--</span> 24j
-                    </div>
-                </div>
-            </div>
-
             <!-- Current CDD -->
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">CDD Saat Ini</span>
-                        <span class="badge text-bg-primary">Terbaru</span>
+                        <span class="small text-secondary">Current CDD</span>
+                        <span class="badge text-bg-primary" x-show="currentCDD !== null">Latest</span>
+                        <span class="badge text-bg-secondary" x-show="currentCDD === null">Loading...</span>
                     </div>
-                    <div class="h3 mb-1" x-text="formatCDD(currentCDD)">--</div>
-                    <div class="small" :class="getTrendClass(cddChange)">
-                        <span x-text="formatChange(cddChange)">--</span> 24j
+                    <div>
+                        <div class="h3 mb-1" x-show="currentCDD !== null" x-text="formatCDD(currentCDD)"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="currentCDD === null">...</div>
+                        <small class="text-muted" x-show="cddChange !== null">
+                            <span :class="cddChange >= 0 ? 'text-danger' : 'text-success'" x-text="formatChange(cddChange)"></span>
+                        </small>
                     </div>
                 </div>
             </div>
 
-            <!-- Average CDD -->
-            <div class="col-md-2">
+            <!-- Z-Score Quick Status -->
+            <div class="col-md-3">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Rata-rata Periode</span>
-                        <span class="badge text-bg-info">Avg</span>
+                        <span class="small text-secondary">Z-Score Alert</span>
+                        <span class="badge" 
+                              x-show="zScore !== null"
+                              :class="zScore !== null && Math.abs(zScore) > 2 ? 'text-bg-danger' : zScore !== null && Math.abs(zScore) > 1 ? 'text-bg-warning' : 'text-bg-success'">
+                            <span x-show="zScore !== null && Math.abs(zScore) > 2">⚠️ EXTREME</span>
+                            <span x-show="zScore !== null && Math.abs(zScore) <= 2 && Math.abs(zScore) > 1">⚡ High</span>
+                            <span x-show="zScore !== null && Math.abs(zScore) <= 1">✓ Normal</span>
+                        </span>
                     </div>
-                    <div class="h3 mb-1" x-text="formatCDD(avgCDD)">--</div>
-                    <div class="small text-secondary">
-                        Med: <span x-text="formatCDD(medianCDD)">--</span>
+                    <div>
+                        <div class="h3 mb-1" 
+                             x-show="zScore !== null" 
+                             x-text="zScore !== null ? zScore.toFixed(2) : '...'"
+                             :class="zScore !== null && Math.abs(zScore) > 2 ? 'text-danger' : zScore !== null && Math.abs(zScore) > 1 ? 'text-warning' : 'text-success'"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="zScore === null">...</div>
+                        <small class="text-muted" x-show="zScore !== null">
+                            <span x-show="zScore !== null && Math.abs(zScore) > 2">Anomaly Detected</span>
+                            <span x-show="zScore !== null && Math.abs(zScore) <= 2 && Math.abs(zScore) > 1">Above Average</span>
+                            <span x-show="zScore !== null && Math.abs(zScore) <= 1">Within Range</span>
+                        </small>
                     </div>
                 </div>
             </div>
 
-            <!-- Peak CDD -->
-            <div class="col-md-2">
+            <!-- MA Cross Quick Status -->
+            <div class="col-md-3">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">CDD Tertinggi</span>
-                        <span class="badge text-bg-danger">Max</span>
+                        <span class="small text-secondary">MA Trend</span>
+                        <span class="badge" 
+                              x-show="ma7 !== null && ma30 !== null"
+                              :class="maCrossSignal === 'warning' ? 'text-bg-danger' : maCrossSignal === 'safe' ? 'text-bg-success' : 'text-bg-secondary'">
+                            <span x-show="maCrossSignal === 'warning'">⚠️ RISING</span>
+                            <span x-show="maCrossSignal === 'safe'">✓ FALLING</span>
+                            <span x-show="maCrossSignal === 'neutral'">➡️ NEUTRAL</span>
+                        </span>
+                        <span class="badge text-bg-warning" x-show="ma7 === null || ma30 === null">
+                            Need 30D
+                        </span>
                     </div>
-                    <div class="h3 mb-1 text-danger" x-text="formatCDD(maxCDD)">--</div>
-                    <div class="small text-secondary" x-text="peakDate">--</div>
+                    <div>
+                        <div x-show="ma7 !== null && ma30 !== null">
+                            <div class="h4 mb-0" x-text="formatCDD(ma7)"></div>
+                            <small class="text-muted">vs <span x-text="formatCDD(ma30)"></span></small>
+                    </div>
+                        <div class="h3 mb-1 text-secondary" x-show="ma7 === null || ma30 === null">...</div>
+                </div>
                 </div>
             </div>
 
-            <!-- Market Signal -->
-            <div class="col-md-4">
+            <!-- Momentum -->
+            <div class="col-md-3">
                 <div class="df-panel p-3 h-100">
                     <div class="d-flex justify-content-between align-items-start mb-2">
-                        <span class="small text-secondary">Sinyal Market</span>
-                        <span class="badge" :class="getSignalBadgeClass()" x-text="signalStrength">--</span>
+                        <span class="small text-secondary">Momentum</span>
+                        <span class="badge" :class="momentum > 0 ? 'text-bg-danger' : momentum < 0 ? 'text-bg-success' : 'text-bg-secondary'">
+                            <span x-show="momentum > 0">📈 Distribution</span>
+                            <span x-show="momentum < 0">📉 Accumulation</span>
+                            <span x-show="momentum === 0">➡️ Neutral</span>
+                        </span>
                     </div>
-                    <div class="h4 mb-1" :class="getSignalColorClass()" x-text="marketSignal">--</div>
-                    <div class="small text-secondary" x-text="signalDescription">--</div>
+                    <div>
+                        <div class="h3 mb-1" x-show="avgCDD !== null" x-text="formatCDD(avgCDD)"></div>
+                        <div class="h3 mb-1 text-secondary" x-show="avgCDD === null">...</div>
+                        <small class="text-muted" x-show="momentum !== null">
+                            <span :class="momentum >= 0 ? 'text-danger' : 'text-success'" x-text="formatPercentage(momentum)"></span>
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -136,136 +172,33 @@
                 <div class="tradingview-chart-container">
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
-                            <h5 class="mb-0">
-                                Exchange Inflow CDD
-                                <!-- <span class="text-muted" style="font-size: 0.8em; font-weight: normal;" x-text="'(' + formatExchangeName(selectedExchange) + ')'">
-                                    (All Exchanges)
-                                </span> -->
-                            </h5>
-                            <div class="chart-info">
-                                <span class="current-value" x-text="formatCDD(currentCDD)">--</span>
-                                <span class="change-badge" :class="cddChange >= 0 ? 'positive' : 'negative'" x-text="formatChange(cddChange)">--</span>
+                            <h5 class="mb-0">Exchange Inflow CDD Chart</h5>
                             </div>
-                        </div>
-                        <div class="chart-controls">
-                            <!-- Time Range Buttons -->
-                            <div class="time-range-selector me-3">
-                                <template x-for="range in timeRanges" :key="range.value">
-                                    <button type="button" 
-                                            class="btn btn-sm time-range-btn"
-                                            :class="globalPeriod === range.value ? 'btn-primary' : 'btn-outline-secondary'"
-                                            @click="setTimeRange(range.value)"
-                                            x-text="range.label">
-                                    </button>
-                                </template>
-                            </div>
-
-                            <!-- Chart Type Toggle -->
-                            <div class="btn-group btn-group-sm me-3" role="group">
-                                <button type="button" class="btn" :class="chartType === 'line' ? 'btn-primary' : 'btn-outline-secondary'" @click="chartType = 'line'; renderChart()">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <path d="M2 12l3-3 3 3 6-6"/>
+                        <div class="chart-controls d-flex align-items-center gap-2">
+                            <!-- BTC Price Overlay Toggle -->
+                            <button 
+                                @click="togglePriceOverlay()" 
+                                class="btn btn-sm"
+                                :class="showPriceOverlay ? 'btn-warning' : 'btn-outline-secondary'"
+                                style="font-size: 0.75rem; padding: 0.35rem 0.75rem;">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1">
+                                    <path d="M0 3a2 2 0 0 1 2-2h13.5a.5.5 0 0 1 0 1H15v2a1 1 0 0 1 1 1v8.5a1.5 1.5 0 0 1-1.5 1.5h-12A2.5 2.5 0 0 1 0 12.5V3zm1 1.732V12.5A1.5 1.5 0 0 0 2.5 14h12a.5.5 0 0 0 .5-.5V5H2a1.99 1.99 0 0 1-1-.268zM1 3a1 1 0 0 0 1 1h12V2H2a1 1 0 0 0-1 1z"/>
                                     </svg>
+                                <span x-text="showPriceOverlay ? 'BTC Price ON' : 'BTC Price OFF'"></span>
                                 </button>
-                                <button type="button" class="btn" :class="chartType === 'bar' ? 'btn-primary' : 'btn-outline-secondary'" @click="chartType = 'bar'; renderChart()">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <rect x="2" y="6" width="3" height="8"/>
-                                        <rect x="6" y="4" width="3" height="10"/>
-                                        <rect x="10" y="8" width="3" height="6"/>
-                                    </svg>
-                                </button>
-                            </div>
-
-                            <!-- Interval Dropdown -->
-                            <div class="dropdown me-3">
-                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle interval-dropdown-btn" 
-                                        type="button" 
-                                        data-bs-toggle="dropdown" 
-                                        :title="'Chart Interval: ' + (chartIntervals.find(i => i.value === selectedInterval)?.label || '1D')">
+                            
+                            <!-- Daily Data Badge -->
+                            <span class="badge text-bg-secondary" style="font-size: 0.75rem; padding: 0.5rem 0.75rem;">
                                     <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-1">
                                         <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
                                         <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
                                     </svg>
-                                    <span x-text="chartIntervals.find(i => i.value === selectedInterval)?.label || '1D'"></span>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-dark">
-                                    <template x-for="interval in chartIntervals" :key="interval.value">
-                                        <li>
-                                            <a class="dropdown-item" 
-                                               href="#" 
-                                               @click.prevent="setChartInterval(interval.value)"
-                                               :class="selectedInterval === interval.value ? 'active' : ''"
-                                               x-text="interval.label">
-                                            </a>
-                                        </li>
-                                    </template>
-                                </ul>
+                                Daily Data
+                            </span>
                             </div>
-
-                            <!-- Scale Toggle -->
-                            <div class="btn-group btn-group-sm me-3" role="group">
-                                <button type="button" 
-                                        class="btn scale-toggle-btn"
-                                        :class="scaleType === 'linear' ? 'btn-primary' : 'btn-outline-secondary'"
-                                        @click="toggleScale('linear')"
-                                        title="Linear Scale - Equal intervals, good for absolute changes">
-                                    Linear
-                                </button>
-                                <button type="button" 
-                                        class="btn scale-toggle-btn"
-                                        :class="scaleType === 'logarithmic' ? 'btn-primary' : 'btn-outline-secondary'"
-                                        @click="toggleScale('logarithmic')"
-                                        title="Logarithmic Scale - Exponential intervals, good for percentage changes">
-                                    Log
-                                </button>
                             </div>
-
-                            <!-- Chart Tools -->
-                            <div class="btn-group btn-group-sm chart-tools" role="group">
-                                <button type="button" class="btn btn-outline-secondary chart-tool-btn" @click="resetZoom()" title="Reset Zoom">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
-                                        <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
-                                    </svg>
-                                </button>
-                                
-                                <!-- Export Dropdown -->
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <button type="button" class="btn btn-outline-secondary dropdown-toggle chart-tool-btn" data-bs-toggle="dropdown" title="Export Chart">
-                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
-                                            <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
-                                        </svg>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-dark">
-                                        <li><a class="dropdown-item" href="#" @click.prevent="exportChart('png')">
-                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-2">
-                                                <path d="M4.502 9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM4 10.5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0z"/>
-                                                <path d="M14 2H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1zM2 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2H2z"/>
-                                                <path d="M10.648 7.646a.5.5 0 0 1 .577-.093L15.002 9.5V13h-14v-1l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.773 3.71-3.71z"/>
-                                            </svg>
-                                            Export as PNG
-                                        </a></li>
-                                        <li><a class="dropdown-item" href="#" @click.prevent="exportChart('svg')">
-                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="me-2">
-                                                <path d="M8.5 2a.5.5 0 0 0-1 0v5.793L5.354 5.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 7.793V2z"/>
-                                                <path d="M3 9.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5z"/>
-                                            </svg>
-                                            Export as SVG
-                                        </a></li>
-                                    </ul>
-                                </div>
-                                
-                                <button type="button" class="btn btn-outline-secondary chart-tool-btn" @click="shareChart()" title="Share Chart">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                        <path d="M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.499 2.499 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5z"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="chart-body">
-                        <canvas id="cddMainChart"></canvas>
+                    <div class="chart-body" style="position: relative;">
+                        <canvas id="cdd-chart"></canvas>
                     </div>
                     <div class="chart-footer">
                         <div class="d-flex justify-content-between align-items-center">
@@ -274,15 +207,10 @@
                                     <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1"/>
                                     <path d="M6 3v3l2 2" stroke="currentColor" stroke-width="1" fill="none"/>
                                 </svg>
-                                Nilai CDD tinggi menunjukkan koin lama bergerak ke exchange (potensi distribusi)
+                                CDD tinggi menunjukkan old coins masuk exchange - potensi selling pressure dari long-term holders
                             </small>
-                            <small class="text-muted" x-data="{ source: 'Loading...' }" x-init="
-                                fetch('/api/cryptoquant/exchange-inflow-cdd?start_date=' + new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0] + '&end_date=' + new Date().toISOString().split('T')[0])
-                                    .then(r => r.json())
-                                    .then(d => source = d.meta?.source || 'Unknown')
-                                    .catch(() => source = 'Error')
-                            ">
-                                <span class="badge" :class="source.includes('CryptoQuant') ? 'text-bg-success' : 'text-bg-warning'" x-text="source">Loading...</span>
+                            <small class="text-muted">
+                                <span class="badge text-bg-success">CryptoQuant API</span>
                             </small>
                         </div>
                     </div>
@@ -290,43 +218,83 @@
             </div>
         </div>
 
-        <!-- Analysis Row -->
-        <div class="row g-3">
-            <!-- Distribution Analysis -->
-            <div class="col-lg-6">
-                <div class="df-panel p-3 h-100">
-                    <h5 class="mb-3">📈 Analisis Distribusi</h5>
-                    <div style="height: 300px; position: relative;">
-                        <canvas id="cddDistributionChart"></canvas>
+        <!-- Analysis Charts Section -->
+        <div class="row g-3 mb-3">
+            <!-- Z-Score Distribution Chart -->
+            <div class="col-md-6">
+                <div class="tradingview-chart-container" style="min-height: 380px;">
+                    <div class="chart-header">
+                        <div class="d-flex align-items-center justify-content-between w-100">
+                            <h5 class="mb-0">📊 Analisis Distribusi Z-Score</h5>
+                            <div class="d-flex gap-2">
+                                <span class="badge" 
+                                      x-show="zScore !== null"
+                                      :class="zScore !== null && Math.abs(zScore) > 2 ? 'text-bg-danger' : zScore !== null && Math.abs(zScore) > 1 ? 'text-bg-warning' : 'text-bg-success'">
+                                    <span x-show="zScore !== null && Math.abs(zScore) > 2">⚠️ EXTREME</span>
+                                    <span x-show="zScore !== null && Math.abs(zScore) <= 2 && Math.abs(zScore) > 1">⚡ HIGH</span>
+                                    <span x-show="zScore !== null && Math.abs(zScore) <= 1">✓ NORMAL</span>
+                                </span>
                     </div>
-                    <div class="mt-3">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="small text-secondary">Event CDD Tinggi (>2σ)</span>
-                            <span class="badge text-bg-warning" x-text="highCDDEvents">0</span>
                         </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="small text-secondary">Event Ekstrem (>3σ)</span>
-                            <span class="badge text-bg-danger" x-text="extremeCDDEvents">0</span>
+                        </div>
+                    <div class="chart-body" style="position: relative; padding: 20px; height: 240px;">
+                        <canvas id="zscore-distribution-chart"></canvas>
+                    </div>
+                    <div class="chart-footer">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="d-flex gap-3 small">
+                                <div>
+                                    <span class="badge bg-warning text-dark" x-text="zScoreHighEvents"></span>
+                                    <span class="text-muted ms-1">Event CDD Tinggi (>2σ)</span>
+                                </div>
+                                <div>
+                                    <span class="badge bg-danger" x-text="zScoreExtremeEvents"></span>
+                                    <span class="text-muted ms-1">Event Ekstrem (>3σ)</span>
+                                </div>
+                            </div>
+                            <small class="text-muted">
+                                Z-Score mengukur seberapa ekstrem nilai CDD saat ini
+                            </small>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Moving Averages -->
-            <div class="col-lg-6">
-                <div class="df-panel p-3 h-100">
-                    <h5 class="mb-3">📉 Moving Average</h5>
-                    <div style="height: 300px; position: relative;">
-                        <canvas id="cddMAChart"></canvas>
+            <!-- Moving Average Trend Chart -->
+            <div class="col-md-6">
+                <div class="tradingview-chart-container" style="min-height: 380px;">
+                    <div class="chart-header">
+                        <div class="d-flex align-items-center justify-content-between w-100">
+                            <h5 class="mb-0">📈 Moving Average Trend</h5>
+                            <div class="d-flex gap-2">
+                                <span class="badge" 
+                                      x-show="ma7 !== null && ma30 !== null"
+                                      :class="maCrossSignal === 'warning' ? 'text-bg-danger' : maCrossSignal === 'safe' ? 'text-bg-success' : 'text-bg-secondary'">
+                                    <span x-show="maCrossSignal === 'warning'">⚠️ RISING</span>
+                                    <span x-show="maCrossSignal === 'safe'">✓ FALLING</span>
+                                    <span x-show="maCrossSignal === 'neutral'">➡️ NEUTRAL</span>
+                                </span>
                     </div>
-                    <div class="mt-3">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="small">MA 7 Hari:</span>
-                            <span class="fw-bold" x-text="formatCDD(ma7)">--</span>
                         </div>
-                        <div class="d-flex justify-content-between">
-                            <span class="small">MA 30 Hari:</span>
-                            <span class="fw-bold" x-text="formatCDD(ma30)">--</span>
+                        </div>
+                    <div class="chart-body" style="position: relative; padding: 20px; height: 240px;">
+                        <canvas id="ma-trend-chart"></canvas>
+                    </div>
+                    <div class="chart-footer">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="d-flex gap-3 small">
+                                <div>
+                                    <span style="display: inline-block; width: 12px; height: 3px; background: rgb(59, 130, 246); margin-right: 4px;"></span>
+                                    <span class="text-muted">MA 7 Hari: <strong x-show="ma7 !== null" x-text="formatCDD(ma7)"></strong></span>
+                                </div>
+                                <div>
+                                    <span style="display: inline-block; width: 12px; height: 3px; background: rgb(239, 68, 68); margin-right: 4px;"></span>
+                                    <span class="text-muted">MA 30 Hari: <strong x-show="ma30 !== null" x-text="formatCDD(ma30)"></strong></span>
+                                </div>
+                            </div>
+                            <small class="text-muted">
+                                MA7 > MA30 = Tekanan meningkat
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -342,13 +310,13 @@
                     <div class="row g-3">
                         <div class="col-md-4">
                             <div class="p-3 rounded" style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444;">
-                                <div class="fw-bold mb-2 text-danger">🔴 CDD Tinggi (Distribution)</div>
+                                <div class="fw-bold mb-2 text-danger">🔴 CDD Spike (Tinggi)</div>
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
-                                        <li>Koin lama (long-term holder) pindah ke exchange</li>
-                                        <li>Potensi selling pressure akan datang</li>
-                                        <li>Sering mendahului koreksi harga</li>
-                                        <li>Strategi: Perhatikan resistance, pertimbangkan ambil profit</li>
+                                        <li>Old coins (long-term holders) masuk exchange</li>
+                                        <li>Potensi selling pressure meningkat</li>
+                                        <li>Signal distribusi dari smart money</li>
+                                        <li>Strategi: Hati-hati, potensi koreksi</li>
                                     </ul>
                                 </div>
                             </div>
@@ -356,13 +324,13 @@
 
                         <div class="col-md-4">
                             <div class="p-3 rounded" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e;">
-                                <div class="fw-bold mb-2 text-success">🟢 CDD Rendah (Accumulation)</div>
+                                <div class="fw-bold mb-2 text-success">🟢 CDD Rendah</div>
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
-                                        <li>Koin muda bergerak (aktivitas trading normal)</li>
-                                        <li>Long-term holder tidak melakukan distribusi</li>
-                                        <li>Kondisi market yang sehat</li>
-                                        <li>Strategi: Cari peluang beli saat dip</li>
+                                        <li>Mostly young coins yang bergerak</li>
+                                        <li>Normal trading activity</li>
+                                        <li>Long-term holders masih HODL</li>
+                                        <li>Strategi: Trend masih sehat</li>
                                     </ul>
                                 </div>
                             </div>
@@ -370,13 +338,13 @@
 
                         <div class="col-md-4">
                             <div class="p-3 rounded" style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6;">
-                                <div class="fw-bold mb-2 text-primary">⚡ CDD Spike</div>
+                                <div class="fw-bold mb-2 text-primary">⚡ CDD Menurun Drastis</div>
                                 <div class="small text-secondary">
                                     <ul class="mb-0 ps-3">
-                                        <li>Pergerakan besar koin lama secara tiba-tiba</li>
-                                        <li>Holder besar melakukan reposisi</li>
-                                        <li>Volatilitas tinggi diperkirakan</li>
-                                        <li>Strategi: Tunggu konfirmasi, kelola risiko dengan hati-hati</li>
+                                        <li>Fase accumulation potensial</li>
+                                        <li>Long-term holders confident HODL</li>
+                                        <li>Supply shock bisa terjadi</li>
+                                        <li>Strategi: Peluang entry yang baik</li>
                                     </ul>
                                 </div>
                             </div>
@@ -384,46 +352,75 @@
                     </div>
 
                     <div class="alert alert-info mt-3 mb-0">
-                        <strong>💡 Pro Tip:</strong> Kombinasikan analisis CDD dengan price action dan volume. CDD tinggi saat rally harga sering menandakan distribusi, sedangkan CDD tinggi saat crash bisa menunjukkan kapitulasi.
+                        <strong>💡 Tips Pro:</strong> CDD adalah indikator on-chain yang powerful untuk melihat behavior long-term holders. Spike CDD sering mendahului top market, sedangkan CDD rendah menunjukkan confidence holders dan potensi bullish.
+                        <hr class="my-2">
+                        <div class="small">
+                            <strong>📊 Z-Score:</strong> Mengukur deviasi dari average. Z > 2 = anomaly/distribution besar. Z > 3 = extreme event (top market potential).<br>
+                            <strong>📈 MA Cross:</strong> MA7 > MA30 = Pressure naik (WARNING). MA7 < MA30 = Pressure turun (SAFE). Monitor divergence dengan price untuk konfirmasi signal.<br>
+                            <strong>⚠️ Data Requirement:</strong> MA Cross needs minimum 30 days of data. Select ≥1M (1 Month) time range for full metrics.
                     </div>
                 </div>
             </div>
         </div>
+        </div>
+
     </div>
 @endsection
 
 @section('scripts')
     <!-- Chart.js with Date Adapter and Plugins -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js" defer></script>
 
-    <!-- Wait for Chart.js to load -->
+    <!-- Initialize Chart.js ready promise -->
     <script>
         window.chartJsReady = new Promise((resolve) => {
             if (typeof Chart !== 'undefined') {
-                console.log('✅ Chart.js loaded');
+                console.log('✅ Chart.js already loaded');
                 resolve();
-            } else {
-                setTimeout(() => resolve(), 100);
+                return;
             }
+            
+            let checkCount = 0;
+            const checkInterval = setInterval(() => {
+                checkCount++;
+                if (typeof Chart !== 'undefined') {
+                    console.log('✅ Chart.js loaded (after', checkCount * 50, 'ms)');
+                    clearInterval(checkInterval);
+                    resolve();
+                } else if (checkCount > 40) {
+                    console.warn('⚠️ Chart.js load timeout, resolving anyway');
+                    clearInterval(checkInterval);
+                    resolve();
+            }
+            }, 50);
         });
     </script>
 
-    <!-- Safe Chart Renderer -->
-    <script src="{{ asset('js/cdd-chart-safe.js') }}"></script>
-    
-    <!-- Exchange Inflow CDD Controller -->
-    <script src="{{ asset('js/exchange-inflow-cdd-controller.js') }}"></script>
+    <!-- Exchange Inflow CDD Modular Controller -->
+    <script type="module">
+        // Import modular components
+        import { CDDUtils } from '{{ asset('js/exchange-inflow-cdd/utils.js') }}';
+        import { ExchangeInflowCDDAPIService } from '{{ asset('js/exchange-inflow-cdd/api-service.js') }}';
+        import { ChartManager } from '{{ asset('js/exchange-inflow-cdd/chart-manager.js') }}';
+        import { createCDDController } from '{{ asset('js/exchange-inflow-cdd/controller.js') }}';
+
+        // Register controller globally for Alpine
+        window.createCDDController = createCDDController;
+        
+        console.log('✅ CDD modular components loaded');
+    </script>
 
     <style>
+        [x-cloak] { display: none !important; }
         /* Light Theme Chart Container */
         .tradingview-chart-container {
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            background: #ffffff;
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(0, 0, 0, 0.06);
+            box-shadow: none;
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
 
         .chart-header {
@@ -442,59 +439,40 @@
             margin: 0;
         }
 
-        .chart-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .current-value {
-            color: #3b82f6;
-            font-size: 20px;
-            font-weight: 700;
-            font-family: 'Courier New', monospace;
-        }
-
-        .change-badge {
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 600;
-            font-family: 'Courier New', monospace;
-        }
-
-        .change-badge.positive {
-            background: rgba(34, 197, 94, 0.15);
-            color: #22c55e;
-        }
-
-        .change-badge.negative {
-            background: rgba(239, 68, 68, 0.15);
-            color: #ef4444;
-        }
-
         .chart-controls .btn-group {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(241, 245, 249, 0.8);
             border-radius: 6px;
             padding: 2px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
 
         .chart-controls .btn {
             border: none;
             padding: 6px 12px;
-            color: #94a3b8;
+            color: #64748b;
             background: transparent;
             transition: all 0.2s;
         }
 
         .chart-controls .btn:hover {
-            color: #fff;
-            background: rgba(255, 255, 255, 0.05);
+            color: #1e293b;
+            background: rgba(241, 245, 249, 1);
         }
 
-        .chart-controls .btn-primary {
+        .chart-controls .btn-primary,
+        .chart-controls .btn.btn-primary {
             background: #3b82f6;
             color: #fff;
+        }
+
+        .chart-controls .btn-outline-secondary {
+            color: #64748b;
+            border-color: rgba(226, 232, 240, 0.8);
+        }
+
+        .chart-controls .btn-outline-secondary:hover {
+            background: rgba(241, 245, 249, 1);
+            color: #1e293b;
         }
 
         .chart-body {
@@ -552,91 +530,6 @@
             border-color: rgba(59, 130, 246, 0.3);
         }
 
-        /* Professional Time Range Controls */
-        .time-range-selector {
-            display: flex;
-            gap: 0.125rem;
-            background: linear-gradient(135deg, 
-                rgba(30, 41, 59, 0.8) 0%, 
-                rgba(51, 65, 85, 0.8) 100%);
-            border: 1px solid rgba(59, 130, 246, 0.2);
-            border-radius: 8px;
-            padding: 0.25rem;
-            box-shadow: 
-                0 4px 12px rgba(0, 0, 0, 0.2),
-                inset 0 1px 0 rgba(255, 255, 255, 0.05);
-        }
-
-        .time-range-btn {
-            padding: 0.5rem 0.875rem !important;
-            font-size: 0.75rem !important;
-            font-weight: 600 !important;
-            border: none !important;
-            border-radius: 6px !important;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            min-width: 44px;
-            position: relative;
-            overflow: hidden;
-            color: #94a3b8 !important;
-            background: transparent !important;
-        }
-
-        .time-range-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.1) 0%, 
-                rgba(139, 92, 246, 0.1) 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .time-range-btn:hover {
-            color: #e2e8f0 !important;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.2) !important;
-        }
-
-        .time-range-btn:hover::before {
-            opacity: 1;
-        }
-
-        .time-range-btn.btn-primary {
-            background: linear-gradient(135deg, 
-                #3b82f6 0%, 
-                #2563eb 100%) !important;
-            color: white !important;
-            box-shadow: 
-                0 4px 12px rgba(59, 130, 246, 0.4),
-                0 2px 4px rgba(59, 130, 246, 0.3) !important;
-            transform: translateY(-1px);
-        }
-
-        .time-range-btn.btn-primary::before {
-            background: linear-gradient(135deg, 
-                rgba(255, 255, 255, 0.1) 0%, 
-                rgba(255, 255, 255, 0.05) 100%);
-            opacity: 1;
-        }
-
-        .time-range-btn.btn-primary:hover {
-            box-shadow: 
-                0 6px 16px rgba(59, 130, 246, 0.5),
-                0 3px 6px rgba(59, 130, 246, 0.4) !important;
-            transform: translateY(-2px);
-        }
-
-        .scale-toggle-btn {
-            font-size: 0.75rem !important;
-            font-weight: 600 !important;
-            padding: 0.375rem 0.75rem !important;
-            min-width: 50px;
-        }
-
         .chart-controls {
             display: flex;
             align-items: center;
@@ -644,277 +537,26 @@
             gap: 0.5rem;
         }
 
-        .chart-controls .btn-group {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 6px;
-            padding: 2px;
-        }
-
-        .chart-controls .btn-outline-secondary {
-            border-color: rgba(148, 163, 184, 0.3) !important;
-            color: #94a3b8 !important;
-        }
-
-        .chart-controls .btn-outline-secondary:hover {
-            background: rgba(59, 130, 246, 0.1) !important;
-            border-color: rgba(59, 130, 246, 0.4) !important;
-            color: #3b82f6 !important;
-        }
-
-        /* Enhanced Chart Tools */
-        .chart-tools {
-            background: linear-gradient(135deg, 
-                rgba(30, 41, 59, 0.6) 0%, 
-                rgba(51, 65, 85, 0.6) 100%);
-            border-radius: 8px;
-            padding: 0.25rem;
-            border: 1px solid rgba(59, 130, 246, 0.15);
-        }
-
-        .chart-tool-btn {
-            border: none !important;
-            background: transparent !important;
-            color: #94a3b8 !important;
+        /* Interval Dropdown Styling */
+        .interval-dropdown-btn {
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
             padding: 0.5rem 0.75rem !important;
-            border-radius: 6px !important;
+            min-width: 70px;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            position: relative;
-            overflow: hidden;
+            border: 1px solid rgba(59, 130, 246, 0.15) !important;
+            background: rgba(241, 245, 249, 0.8) !important;
+            color: #64748b !important;
         }
 
-        .chart-tool-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.1) 0%, 
-                rgba(139, 92, 246, 0.1) 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
+        .interval-dropdown-btn:hover {
+            color: #1e293b !important;
+            border-color: rgba(59, 130, 246, 0.3) !important;
+            background: rgba(241, 245, 249, 1) !important;
         }
 
-        .chart-tool-btn:hover {
-            color: #e2e8f0 !important;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.2) !important;
-        }
-
-        .chart-tool-btn:hover::before {
-            opacity: 1;
-        }
-
-        .chart-tool-btn:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
-        }
-
-        /* Dropdown Menu Styling */
-        .dropdown-menu-dark {
-            background: linear-gradient(135deg, 
-                rgba(15, 23, 42, 0.95) 0%, 
-                rgba(30, 41, 59, 0.95) 100%) !important;
-            border: 1px solid rgba(59, 130, 246, 0.2) !important;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
-            backdrop-filter: blur(12px);
-        }
-
-        .dropdown-menu-dark .dropdown-item {
-            color: #e2e8f0 !important;
-            transition: all 0.2s ease !important;
-            border-radius: 4px !important;
-            margin: 0.125rem !important;
-        }
-
-        .dropdown-menu-dark .dropdown-item:hover {
-            background: rgba(59, 130, 246, 0.15) !important;
-            color: #60a5fa !important;
-        }
-
-        /* Professional Chart Container - CryptoQuant Level */
-        .tradingview-chart-container {
-            background: linear-gradient(135deg, 
-                rgba(15, 23, 42, 0.98) 0%, 
-                rgba(30, 41, 59, 0.98) 50%,
-                rgba(15, 23, 42, 0.98) 100%);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(59, 130, 246, 0.25);
-            box-shadow: 
-                0 10px 40px rgba(0, 0, 0, 0.4),
-                0 4px 16px rgba(59, 130, 246, 0.1),
-                inset 0 1px 0 rgba(255, 255, 255, 0.08);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .tradingview-chart-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(59, 130, 246, 0.5) 50%, 
-                transparent 100%);
-            z-index: 1;
-        }
-
-        .tradingview-chart-container:hover {
-            box-shadow: 
-                0 16px 48px rgba(0, 0, 0, 0.5),
-                0 6px 20px rgba(59, 130, 246, 0.15),
-                inset 0 1px 0 rgba(255, 255, 255, 0.12);
-            border-color: rgba(59, 130, 246, 0.4);
-            transform: translateY(-1px);
-        }
-
-        .chart-header {
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.08) 0%, 
-                rgba(139, 92, 246, 0.06) 100%);
-            border-bottom: 1px solid rgba(59, 130, 246, 0.25);
-            position: relative;
-            z-index: 2;
-        }
-
-        .chart-header::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(59, 130, 246, 0.3) 50%, 
-                transparent 100%);
-        }
-
-        .chart-header h5 {
-            color: #f1f5f9;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-            font-weight: 600;
-            letter-spacing: 0.025em;
-        }
-
-        .current-value {
-            color: #60a5fa;
-            text-shadow: 0 0 12px rgba(96, 165, 250, 0.4);
-            font-weight: 700;
-            letter-spacing: -0.025em;
-        }
-
-        .chart-body {
-            background: linear-gradient(135deg, 
-                rgba(15, 23, 42, 0.9) 0%, 
-                rgba(30, 41, 59, 0.85) 50%,
-                rgba(15, 23, 42, 0.9) 100%);
-            position: relative;
-        }
-
-        .chart-body::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: radial-gradient(circle at 50% 50%, 
-                rgba(59, 130, 246, 0.03) 0%, 
-                transparent 70%);
-            pointer-events: none;
-        }
-
-        .chart-footer {
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.04) 0%, 
-                rgba(139, 92, 246, 0.03) 100%);
-            border-top: 1px solid rgba(59, 130, 246, 0.2);
-            position: relative;
-        }
-
-        .chart-footer::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(59, 130, 246, 0.2) 50%, 
-                transparent 100%);
-        }
-
-        /* Professional Animations */
-        @keyframes chartLoad {
-            0% {
-                opacity: 0;
-                transform: translateY(20px) scale(0.95);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        @keyframes pulseGlow {
-            0%, 100% {
-                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
-            }
-            50% {
-                box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
-            }
-        }
-
-        .tradingview-chart-container {
-            animation: chartLoad 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .pulse-dot.pulse-success {
-            animation: pulse 2s ease-in-out infinite, pulseGlow 2s ease-in-out infinite;
-        }
-
-        /* Loading States */
-        .chart-loading {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .chart-loading::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, 
-                transparent 0%, 
-                rgba(59, 130, 246, 0.1) 50%, 
-                transparent 100%);
-            animation: shimmer 1.5s infinite;
-        }
-
-        @keyframes shimmer {
-            0% { left: -100%; }
-            100% { left: 100%; }
-        }
-
-        /* Enhanced Hover Effects */
-        .df-panel {
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .df-panel:hover {
-            transform: translateY(-4px) scale(1.02);
-            box-shadow: 
-                0 12px 32px rgba(59, 130, 246, 0.2),
-                0 4px 16px rgba(59, 130, 246, 0.1);
+        .interval-dropdown-btn:focus {
+            box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25) !important;
         }
 
         /* Responsive adjustments */
@@ -933,10 +575,6 @@
                 gap: 12px;
                 align-items: flex-start;
             }
-            
-            .current-value {
-                font-size: 16px;
-            }
 
             .chart-controls {
                 flex-direction: column;
@@ -945,22 +583,8 @@
                 gap: 0.75rem;
             }
 
-            .time-range-selector {
-                justify-content: center;
-                flex-wrap: wrap;
-            }
-
-            .time-range-btn {
-                flex: 1;
-                min-width: 35px;
-            }
-
-            .chart-tools {
-                justify-content: center;
-            }
-
             .df-panel:hover {
-                transform: translateY(-2px) scale(1.01);
+                transform: translateY(-2px);
             }
         }
 
@@ -973,136 +597,31 @@
         /* Light mode chart styling */
         @media (prefers-color-scheme: light) {
             .tradingview-chart-container {
-                background: linear-gradient(135deg, 
-                    rgba(248, 250, 252, 0.98) 0%, 
-                    rgba(241, 245, 249, 0.98) 50%,
-                    rgba(248, 250, 252, 0.98) 100%);
-                border: 1px solid rgba(59, 130, 246, 0.2);
-                box-shadow: 
-                    0 10px 40px rgba(0, 0, 0, 0.1),
-                    0 4px 16px rgba(59, 130, 246, 0.05),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+                background: #ffffff;
+                border: 1px solid rgba(226, 232, 240, 0.8);
+                box-shadow: none;
             }
 
             .chart-header {
-                background: linear-gradient(135deg, 
-                    rgba(59, 130, 246, 0.05) 0%, 
-                    rgba(139, 92, 246, 0.03) 100%);
-                border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+                background: rgba(59, 130, 246, 0.03);
+                border-bottom: 1px solid rgba(0, 0, 0, 0.08);
             }
 
             .chart-header h5 {
                 color: #1e293b;
-                text-shadow: none;
-            }
-
-            .current-value {
-                color: #2563eb;
-                text-shadow: none;
             }
 
             .chart-body {
-                background: linear-gradient(135deg, 
-                    rgba(248, 250, 252, 0.9) 0%, 
-                    rgba(241, 245, 249, 0.85) 50%,
-                    rgba(248, 250, 252, 0.9) 100%);
+                background: #ffffff;
             }
 
             .chart-footer {
-                background: linear-gradient(135deg, 
-                    rgba(59, 130, 246, 0.03) 0%, 
-                    rgba(139, 92, 246, 0.02) 100%);
-                border-top: 1px solid rgba(59, 130, 246, 0.15);
+                background: rgba(59, 130, 246, 0.02);
+                border-top: 1px solid rgba(0, 0, 0, 0.08);
             }
 
             .chart-footer-text {
                 color: #64748b !important;
-            }
-
-            .time-range-selector {
-                background: linear-gradient(135deg, 
-                    rgba(241, 245, 249, 0.8) 0%, 
-                    rgba(226, 232, 240, 0.8) 100%);
-                border: 1px solid rgba(59, 130, 246, 0.15);
-            }
-
-            .time-range-btn {
-                color: #64748b !important;
-            }
-
-            .time-range-btn:hover {
-                color: #1e293b !important;
-            }
-
-            .chart-tools {
-                background: linear-gradient(135deg, 
-                    rgba(241, 245, 249, 0.6) 0%, 
-                    rgba(226, 232, 240, 0.6) 100%);
-                border: 1px solid rgba(59, 130, 246, 0.1);
-            }
-
-            .chart-tool-btn {
-                color: #64748b !important;
-            }
-
-            .chart-tool-btn:hover {
-                color: #1e293b !important;
-            }
-        }
-
-        /* Dark mode enhancements */
-        @media (prefers-color-scheme: dark) {
-            .tradingview-chart-container {
-                box-shadow: 
-                    0 12px 48px rgba(0, 0, 0, 0.6),
-                    0 4px 16px rgba(59, 130, 246, 0.1),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-            }
-
-            .chart-footer-text {
-                color: #94a3b8 !important;
-            }
-        }
-
-        /* Interval Dropdown Styling */
-        .interval-dropdown-btn {
-            font-size: 0.75rem !important;
-            font-weight: 600 !important;
-            padding: 0.5rem 0.75rem !important;
-            min-width: 70px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-            border: 1px solid rgba(59, 130, 246, 0.2) !important;
-            background: linear-gradient(135deg, 
-                rgba(30, 41, 59, 0.6) 0%, 
-                rgba(51, 65, 85, 0.6) 100%) !important;
-            color: #94a3b8 !important;
-        }
-
-        .interval-dropdown-btn:hover {
-            color: #e2e8f0 !important;
-            border-color: rgba(59, 130, 246, 0.4) !important;
-            background: linear-gradient(135deg, 
-                rgba(59, 130, 246, 0.1) 0%, 
-                rgba(139, 92, 246, 0.1) 100%) !important;
-        }
-
-        .interval-dropdown-btn:focus {
-            box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25) !important;
-        }
-
-        /* Light mode interval dropdown */
-        @media (prefers-color-scheme: light) {
-            .interval-dropdown-btn {
-                background: linear-gradient(135deg, 
-                    rgba(241, 245, 249, 0.8) 0%, 
-                    rgba(226, 232, 240, 0.8) 100%) !important;
-                border: 1px solid rgba(59, 130, 246, 0.15) !important;
-                color: #64748b !important;
-            }
-
-            .interval-dropdown-btn:hover {
-                color: #1e293b !important;
-                border-color: rgba(59, 130, 246, 0.3) !important;
             }
         }
     </style>

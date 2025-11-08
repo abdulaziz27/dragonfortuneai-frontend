@@ -10,6 +10,29 @@ export class MacroChartManager {
         this.renderingFlags = new Map(); // Track rendering state per chart
     }
 
+    getTimeUnitForInterval(interval) {
+        switch (interval) {
+            case '1m':
+            case '3m':
+            case '5m':
+                return 'minute';
+            case '15m':
+            case '30m':
+            case '1h':
+                return 'hour';
+            case '4h':
+            case '6h':
+            case '8h':
+            case '12h':
+                return 'day';
+            case '1d':
+                return 'week';
+            case '1w':
+            default:
+                return 'month';
+        }
+    }
+
     /**
      * Render FRED time series chart
      */
@@ -67,6 +90,19 @@ export class MacroChartManager {
                 return;
             }
 
+            // Determine time unit based on data frequency
+            // FRED data is typically daily, but can be monthly for some series
+            const dataCount = data.length;
+            let timeUnit = 'day'; // Default for daily FRED data
+            
+            // If we have less than 100 points, might be monthly data
+            if (dataCount < 100) {
+                timeUnit = 'month';
+            } else if (dataCount > 1000) {
+                // Very large datasets, use week for better readability
+                timeUnit = 'week';
+            }
+
             const chart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -120,8 +156,12 @@ export class MacroChartManager {
                         x: {
                             type: 'time',
                             time: {
-                                unit: 'month',
+                                unit: timeUnit,
                                 displayFormats: {
+                                    minute: 'HH:mm',
+                                    hour: 'MMM d HH:mm',
+                                    day: 'MMM d',
+                                    week: 'MMM d',
                                     month: 'MMM yy'
                                 }
                             },
@@ -166,8 +206,9 @@ export class MacroChartManager {
 
     /**
      * Render Bitcoin vs M2 comparison chart
+     * Note: Endpoint returns all historical data, no filters needed
      */
-    renderBitcoinM2Chart(canvasId, data, options = {}) {
+    renderBitcoinM2Chart(canvasId, data) {
         // ⚡ FIXED: Prevent concurrent renders
         if (this.renderingFlags.get(canvasId)) {
             console.warn(`⚠️ Chart ${canvasId} render already in progress, skipping`);
@@ -175,6 +216,12 @@ export class MacroChartManager {
         }
 
         this.renderingFlags.set(canvasId, true);
+
+        // Determine time unit based on data frequency (weekly data from API)
+        const timeUnit = 'week';
+
+        const priceLabel = 'Bitcoin Price';
+        const yoyLabel = 'Global M2 YoY Growth %';
 
         console.log('📊 Rendering Bitcoin vs M2 chart:', {
             dataPoints: data.length,
@@ -220,7 +267,7 @@ export class MacroChartManager {
                     labels: data.map(d => d.date),
                     datasets: [
                         {
-                            label: 'BTC Price',
+                            label: priceLabel,
                             data: data.map(d => d.price),
                             borderColor: '#f59e0b',
                             backgroundColor: '#f59e0b20',
@@ -235,7 +282,7 @@ export class MacroChartManager {
                             yAxisID: 'y'
                         },
                         {
-                            label: 'M2 YoY Growth %',
+                            label: yoyLabel,
                             data: data.map(d => d.global_m2_yoy_growth),
                             borderColor: '#3b82f6',
                             backgroundColor: '#3b82f620',
@@ -279,7 +326,17 @@ export class MacroChartManager {
                                 label: (context) => {
                                     const item = data[context.dataIndex];
                                     if (context.datasetIndex === 0) {
-                                        return `BTC Price: $${item.price.toLocaleString()}`;
+                                        const lines = [`Bitcoin Price: $${item.price.toLocaleString()}`];
+
+                                        if (item.global_m2_supply_trillions) {
+                                            lines.push(`Global M2 Supply: ${item.global_m2_supply_trillions.toFixed(2)}T`);
+                                        }
+
+                                        if (item.ratio) {
+                                            lines.push(`Price per $1T M2: ${item.ratio.toFixed(4)}`);
+                                        }
+
+                                        return lines;
                                     } else {
                                         return `M2 YoY Growth: ${item.global_m2_yoy_growth.toFixed(2)}%`;
                                     }
@@ -320,7 +377,7 @@ export class MacroChartManager {
                             },
                             title: {
                                 display: true,
-                                text: 'BTC Price (USD)'
+                                text: 'Bitcoin Price (USD)'
                             }
                         },
                         y1: {

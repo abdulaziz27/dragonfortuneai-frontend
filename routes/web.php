@@ -36,14 +36,6 @@ Route::view('/onchain-ethereum', 'onchain-ethereum.dashboard')->name('onchain-et
 Route::view('/onchain-exchange', 'onchain-exchange.dashboard')->name('onchain-exchange.dashboard');
 Route::view('/onchain-mining-price', 'onchain-mining-price.dashboard')->name('onchain-mining-price.dashboard');
 
-// Options Intelligence Routes
-Route::view('/options-metrics/dashboard', 'options-metrics.dashboard')->name('options-metrics.dashboard');
-Route::view('/options-metrics/test', 'options-metrics.test')->name('options-metrics.test');
-Route::view('/options-metrics/implied-volatility', 'options-metrics.implied-volatility')->name('options-metrics.iv');
-Route::view('/options-metrics/options-skew', 'options-metrics.options-skew')->name('options-metrics.skew');
-Route::view('/options-metrics/gamma-exposure', 'options-metrics.gamma-exposure')->name('options-metrics.gex');
-Route::view('/options-metrics/put-call-ratio', 'options-metrics.put-call-ratio')->name('options-metrics.pcr');
-
 // ETF Institutional Routes
 Route::view('/etf-institutional/dashboard', 'etf-flows.dashboard')->name('etf-institutional.dashboard');
 Route::view('/etf-flows', 'etf-flows.dashboard')->name('etf-flows.dashboard');

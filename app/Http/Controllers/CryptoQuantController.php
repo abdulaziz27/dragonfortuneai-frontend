@@ -8,8 +8,13 @@ use Illuminate\Support\Facades\Log;
 
 class CryptoQuantController extends Controller
 {
-    private $apiKey = 'jED5yIBUPyzpeRTodjcSPGiltvvdAaJQmV1op1ED3v4UkDorgm6O20rRTq3yKWloyebmxw';
+    private $apiKey;
     private $baseUrl = 'https://api.cryptoquant.com/v1';
+
+    public function __construct()
+    {
+        $this->apiKey = env('CRYPTOQUANT_API_KEY');
+    }
 
     /**
      * Get Bitcoin Market Price from CryptoQuant API
@@ -155,35 +160,16 @@ class CryptoQuantController extends Controller
 
     /**
      * Get Exchange Inflow CDD data from CryptoQuant API
-     * Note: CryptoQuant free tier has limited historical data access
+     * Using CryptoQuant Professional Package - no historical data limitations
      */
     public function getExchangeInflowCDD(Request $request)
     {
         try {
-            $startDate = $request->input('start_date', now()->subDays(7)->format('Y-m-d'));
-            $endDate = $request->input('end_date', now()->subDay()->format('Y-m-d')); // Yesterday as end date
+            // Default to 30 days (1 month) to match frontend default and ensure MA30 calculation
+            $startDate = $request->input('start_date', now()->subDays(30)->format('Y-m-d'));
+            $endDate = $request->input('end_date', now()->format('Y-m-d')); // Default to today
             
-            // Enforce API limitations - CryptoQuant free tier only allows recent data
-            $maxDaysBack = 30;
-            $minAllowedDate = now()->subDays($maxDaysBack)->format('Y-m-d');
-            $maxAllowedDate = now()->subDay()->format('Y-m-d'); // Yesterday
-            
-            // Adjust dates if they're outside allowed range
-            if ($startDate < $minAllowedDate) {
-                $startDate = $minAllowedDate;
-                Log::info('Adjusted start date due to CryptoQuant API limitations', [
-                    'requested' => $request->input('start_date'),
-                    'adjusted' => $startDate
-                ]);
-            }
-            
-            if ($endDate > $maxAllowedDate) {
-                $endDate = $maxAllowedDate;
-                Log::info('Adjusted end date due to CryptoQuant API limitations', [
-                    'requested' => $request->input('end_date'),
-                    'adjusted' => $endDate
-                ]);
-            }
+            // No limitations - using CryptoQuant Professional Package
             
             // Convert date format from YYYY-MM-DD to YYYYMMDD for CryptoQuant API
             $fromDate = str_replace('-', '', $startDate);
@@ -195,8 +181,12 @@ class CryptoQuantController extends Controller
             $daysDiff = $start->diffInDays($end) + 1;
             $limit = max($daysDiff, 30); // Minimum 30 for better data coverage
             
-            // Get exchange parameter from request
+            // Get exchange and interval parameters from request
             $requestedExchange = $request->input('exchange', 'binance');
+            $interval = $request->input('interval', '1d');
+            
+            // Convert interval to CryptoQuant window format
+            $window = $this->convertIntervalToWindow($interval);
             
             $url = "{$this->baseUrl}/btc/flow-indicator/exchange-inflow-cdd";
             
@@ -204,6 +194,8 @@ class CryptoQuantController extends Controller
             Log::info('CryptoQuant CDD Request', [
                 'url' => $url,
                 'exchange' => $requestedExchange,
+                'interval' => $interval,
+                'window' => $window,
                 'from' => $fromDate,
                 'to' => $toDate,
                 'limit' => $limit,
@@ -214,21 +206,24 @@ class CryptoQuantController extends Controller
                     : 'Single exchange data'
             ]);
             
-            $transformedData = $this->fetchSingleExchangeCDD($url, $requestedExchange, $fromDate, $toDate, $limit, $startDate, $endDate);
+            $transformedData = $this->fetchSingleExchangeCDD($url, $requestedExchange, $window, $fromDate, $toDate, $limit, $startDate, $endDate);
             $actualExchange = $requestedExchange;
+            
+            // Calculate advanced metrics (Z-Score, MA7, MA30, MA Cross Signal)
+            $metrics = $this->calculateCDDMetrics($transformedData);
                 
             return response()->json([
                 'success' => true,
                 'data' => $transformedData,
+                'metrics' => $metrics, // Pre-calculated metrics from backend
                 'meta' => [
                     'start_date' => $startDate,
                     'end_date' => $endDate,
                     'exchange' => $actualExchange,
                     'requested_exchange' => $requestedExchange,
                     'count' => count($transformedData),
-                    'source' => 'CryptoQuant Exchange Inflow CDD - Real Data Only',
+                    'source' => 'CryptoQuant Exchange Inflow CDD',
                     'latest_data_date' => !empty($transformedData) ? end($transformedData)['date'] : null,
-                    'api_limitations' => 'CryptoQuant free tier: max 30 days historical data',
                     'is_native_all_exchange' => $requestedExchange === 'all_exchange',
                     'note' => $requestedExchange === 'all_exchange' 
                         ? 'CryptoQuant native all_exchange endpoint (complete aggregation)' 
@@ -644,13 +639,125 @@ class CryptoQuantController extends Controller
     }
 
     /**
+     * Convert interval format to CryptoQuant window format
+     * 
+     * NOTE: Current CryptoQuant plan only supports DAILY data
+     * - window=day → ✅ Available
+     * - window=hour → ❌ 403 Forbidden
+     * - window=week → ❌ 403 Forbidden
+     * 
+     * All intervals fallback to 'day' to prevent 403 errors
+     */
+    private function convertIntervalToWindow($interval)
+    {
+        // Force 'day' for all intervals due to API plan limitations
+        return 'day';
+        
+        /* Original mapping (disabled - requires higher tier plan):
+        $mapping = [
+            '1h' => 'hour',
+            '4h' => 'hour',
+            '1d' => 'day',
+            '1w' => 'week'
+        ];
+        return $mapping[$interval] ?? 'day';
+        */
+    }
+
+    /**
+     * Calculate advanced metrics for CDD data
+     * Includes: Z-Score, MA7, MA30, MA Cross Signal
+     * 
+     * @param array $data Array of CDD data with 'value' field
+     * @return array Calculated metrics
+     */
+    private function calculateCDDMetrics($data)
+    {
+        if (empty($data)) {
+            return [
+                'zScore' => null,
+                'ma7' => null,
+                'ma30' => null,
+                'maCrossSignal' => 'neutral'
+            ];
+        }
+
+        // Extract values
+        $values = array_map(function($item) {
+            return floatval($item['value'] ?? 0);
+        }, $data);
+
+        $count = count($values);
+        if ($count === 0) {
+            return [
+                'zScore' => null,
+                'ma7' => null,
+                'ma30' => null,
+                'maCrossSignal' => 'neutral'
+            ];
+        }
+
+        // Basic statistics
+        $currentCDD = $values[$count - 1];
+        $avgCDD = array_sum($values) / $count;
+
+        // Calculate Standard Deviation
+        $variance = 0;
+        foreach ($values as $value) {
+            $variance += pow($value - $avgCDD, 2);
+        }
+        $variance = $variance / $count;
+        $stdDev = sqrt($variance);
+
+        // Z-Score calculation (anomaly detection)
+        $zScore = null;
+        if ($stdDev > 0) {
+            $zScore = ($currentCDD - $avgCDD) / $stdDev;
+            $zScore = round($zScore, 2);
+        }
+
+        // Moving Averages
+        $ma7 = null;
+        if ($count >= 7) {
+            $last7 = array_slice($values, -7);
+            $ma7 = array_sum($last7) / 7;
+        }
+
+        $ma30 = null;
+        if ($count >= 30) {
+            $last30 = array_slice($values, -30);
+            $ma30 = array_sum($last30) / 30;
+        }
+
+        // MA Cross Signal
+        // For CDD: MA7 > MA30 = pressure increasing (WARNING/bearish for price)
+        // For CDD: MA7 < MA30 = pressure decreasing (SAFE/bullish for price)
+        $maCrossSignal = 'neutral';
+        if ($ma7 !== null && $ma30 !== null && $ma30 > 0) {
+            $crossPct = (($ma7 - $ma30) / $ma30) * 100;
+            if ($crossPct > 5) {
+                $maCrossSignal = 'warning'; // MA7 significantly above MA30 = distribution increasing
+            } elseif ($crossPct < -5) {
+                $maCrossSignal = 'safe'; // MA7 significantly below MA30 = distribution decreasing
+            }
+        }
+
+        return [
+            'zScore' => $zScore,
+            'ma7' => $ma7,
+            'ma30' => $ma30,
+            'maCrossSignal' => $maCrossSignal
+        ];
+    }
+
+    /**
      * Fetch CDD data from single exchange
      */
-    private function fetchSingleExchangeCDD($url, $exchange, $fromDate, $toDate, $limit, $startDate, $endDate)
+    private function fetchSingleExchangeCDD($url, $exchange, $window, $fromDate, $toDate, $limit, $startDate, $endDate)
     {
         $params = [
             'exchange' => $exchange,
-            'window' => 'day',
+            'window' => $window,
             'from' => $fromDate,
             'to' => $toDate,
             'limit' => $limit

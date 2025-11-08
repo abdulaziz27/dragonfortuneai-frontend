@@ -241,7 +241,7 @@
                     <div class="chart-header">
                         <div class="d-flex align-items-center gap-3">
                             <h5 class="mb-0">Bitcoin vs Global M2 Growth</h5>
-                            <small class="text-muted">Ratio of Bitcoin price to global money supply</small>
+                            <small class="text-muted">Bitcoin price vs global money supply correlation</small>
                         </div>
                     </div>
                     <div class="chart-body" style="height: 400px;">
@@ -253,7 +253,7 @@
                                 <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1"/>
                                 <path d="M6 3v3l2 2" stroke="currentColor" stroke-width="1" fill="none"/>
                             </svg>
-                            Higher ratio indicates Bitcoin is outperforming money supply expansion
+                            Higher BTC price relative to M2 growth indicates Bitcoin is outperforming money supply expansion
                         </small>
                     </div>
                 </div>
