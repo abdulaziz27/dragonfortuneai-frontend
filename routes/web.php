@@ -68,11 +68,11 @@ Route::get('/api/cryptoquant/funding-rates-comparison', [App\Http\Controllers\Cr
 
 // On-Chain Metrics API Proxy
 Route::prefix('api/onchain')->group(function () {
-    Route::get('/metrics', [App\Http\Controllers\OnchainMetricsController::class, 'metrics'])->name('api.onchain.metrics');
-    Route::get('/metrics/available', [App\Http\Controllers\OnchainMetricsController::class, 'availableMetrics'])->name('api.onchain.metrics.available');
-    Route::get('/exchange-flows', [App\Http\Controllers\OnchainMetricsController::class, 'exchangeFlows'])->name('api.onchain.exchange-flows');
-    Route::get('/network-activity', [App\Http\Controllers\OnchainMetricsController::class, 'networkActivity'])->name('api.onchain.network-activity');
-    Route::get('/market-data', [App\Http\Controllers\OnchainMetricsController::class, 'marketData'])->name('api.onchain.market-data');
+    Route::get('/metrics', [App\Http\Controllers\OnChainMetricsController::class, 'metrics'])->name('api.onchain.metrics');
+    Route::get('/metrics/available', [App\Http\Controllers\OnChainMetricsController::class, 'availableMetrics'])->name('api.onchain.metrics.available');
+    Route::get('/exchange-flows', [App\Http\Controllers\OnChainMetricsController::class, 'exchangeFlows'])->name('api.onchain.exchange-flows');
+    Route::get('/network-activity', [App\Http\Controllers\OnChainMetricsController::class, 'networkActivity'])->name('api.onchain.network-activity');
+    Route::get('/market-data', [App\Http\Controllers\OnChainMetricsController::class, 'marketData'])->name('api.onchain.market-data');
 });
 Route::get('/api/coinglass/global-account-ratio', [App\Http\Controllers\CoinglassController::class, 'getGlobalAccountRatio'])->name('api.coinglass.global-account-ratio');
 Route::get('/api/coinglass/top-account-ratio', [App\Http\Controllers\CoinglassController::class, 'getTopAccountRatio'])->name('api.coinglass.top-account-ratio');
