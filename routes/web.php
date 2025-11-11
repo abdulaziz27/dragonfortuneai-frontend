@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\SignalController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'workspace')->name('workspace');
@@ -55,6 +56,9 @@ Route::view('/macro-overlay/dashboard-legacy', 'macro-overlay.dashboard-legacy')
 // Sentiment & Flow Routes
 Route::view('/sentiment-flow/dashboard', 'sentiment-flow.dashboard')->name('sentiment-flow.dashboard');
 
+// Signal & Analytics Routes
+Route::view('/signal-analytics', 'signal-analytics.dashboard')->name('signal-analytics.index');
+
 // CryptoQuant API Proxy Routes
 Route::get('/api/cryptoquant/exchange-inflow-cdd', [App\Http\Controllers\CryptoQuantController::class, 'getExchangeInflowCDD'])->name('api.cryptoquant.exchange-inflow-cdd');
 Route::get('/api/cryptoquant/btc-market-price', [App\Http\Controllers\CryptoQuantController::class, 'getBitcoinPrice'])->name('api.cryptoquant.btc-market-price');
@@ -63,6 +67,11 @@ Route::get('/api/cryptoquant/funding-rate', [App\Http\Controllers\CryptoQuantCon
 Route::get('/api/cryptoquant/funding-rates', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRates'])->name('api.cryptoquant.funding-rates');
 Route::get('/api/cryptoquant/open-interest', [App\Http\Controllers\CryptoQuantController::class, 'getOpenInterest'])->name('api.cryptoquant.open-interest');
 Route::get('/api/cryptoquant/funding-rates-comparison', [App\Http\Controllers\CryptoQuantController::class, 'getFundingRatesComparison'])->name('api.cryptoquant.funding-rates-comparison');
+
+// Internal Signal API
+Route::get('/api/signal/analytics', [SignalController::class, 'show'])->name('api.signal.analytics');
+Route::get('/api/signal/backtest', [SignalController::class, 'backtest'])->name('api.signal.backtest');
+Route::get('/api/signal/history', [SignalController::class, 'history'])->name('api.signal.history');
 
 // Coinglass API Proxy Routes
 
