@@ -8,12 +8,16 @@ class ModelTrainer
 {
     protected array $featureNames = [
         'funding_heat',
+        'funding_trend',
         'oi_pct_change',
         'whale_pressure',
+        'whale_cex_ratio',
         'etf_flow',
+        'etf_streak',
         'sentiment',
         'taker_ratio',
         'liquidation_bias',
+        'volatility_24h',
     ];
 
     protected string $modelPath = 'signal-model.json';
@@ -73,13 +77,17 @@ class ModelTrainer
     public function extractFeatureVector(array $payload): ?array
     {
         $funding = data_get($payload, 'funding.heat_score');
+        $fundingTrend = data_get($payload, 'funding.trend_pct');
         $oi = data_get($payload, 'open_interest.pct_change_24h');
         $whale = data_get($payload, 'whales.pressure_score');
+        $whaleCex = data_get($payload, 'whales.cex_ratio');
         $etf = data_get($payload, 'etf.latest_flow');
+        $etfStreak = data_get($payload, 'etf.streak');
         $sentiment = data_get($payload, 'sentiment.value');
         $taker = data_get($payload, 'microstructure.taker_flow.buy_ratio');
         $longs = data_get($payload, 'liquidations.sum_24h.longs');
         $shorts = data_get($payload, 'liquidations.sum_24h.shorts');
+        $volatility = data_get($payload, 'microstructure.price.volatility_24h');
 
         if ($funding === null && $oi === null && $whale === null) {
             return null;
@@ -92,12 +100,16 @@ class ModelTrainer
 
         return [
             $this->normalize($funding, 3),
+            $this->normalize($fundingTrend, 100),
             $this->normalize($oi, 50),
             $this->normalize($whale, 3),
+            $whaleCex ?? 0.5,
             $this->normalize($etf, 100_000_000),
+            $this->normalize($etfStreak, 10),
             $this->normalize($sentiment, 100),
             $taker ?? 0.5,
             $liquidationBias ?? 0.0,
+            $this->normalize($volatility, 10),
         ];
     }
 

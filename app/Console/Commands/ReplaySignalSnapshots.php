@@ -120,19 +120,23 @@ class ReplaySignalSnapshots extends Command
         array $features,
         array $signal
     ): void {
+        $key = [
+            'symbol' => $symbol,
+            'interval' => $interval,
+            'generated_at' => $timestamp->toDateTimeString(),
+        ];
+
+        $existing = SignalSnapshot::where($key)->first();
+
         SignalSnapshot::updateOrCreate(
-            [
-                'symbol' => $symbol,
-                'interval' => $interval,
-                'generated_at' => $timestamp->toDateTimeString(),
-            ],
+            $key,
             [
                 'pair' => $pair,
                 'run_id' => $timestamp->format('YmdH00') . '-replay',
                 'price_now' => data_get($features, 'microstructure.price.last_close'),
-                'price_future' => null,
-                'label_direction' => null,
-                'label_magnitude' => null,
+                'price_future' => $existing->price_future ?? null,
+                'label_direction' => $existing->label_direction ?? null,
+                'label_magnitude' => $existing->label_magnitude ?? null,
                 'signal_rule' => $signal['signal'] ?? 'NEUTRAL',
                 'signal_score' => $signal['score'] ?? 0,
                 'signal_confidence' => $signal['confidence'] ?? 0,

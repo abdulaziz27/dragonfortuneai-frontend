@@ -45,14 +45,14 @@ class FeatureBuilder
         ];
     }
 
-    protected function buildFundingFeatures(string $pair): array
+    protected function buildFundingFeatures(string $pair, ?int $timestampMs = null): array
     {
         $preferredInterval = '1h';
-        $series = $this->marketData->latestFundingRates($pair, $preferredInterval, [], 200);
+        $series = $this->marketData->latestFundingRates($pair, $preferredInterval, [], 200, $timestampMs);
 
         if ($series->isEmpty()) {
             $preferredInterval = '1m';
-            $series = $this->marketData->latestFundingRates($pair, $preferredInterval, [], 500);
+            $series = $this->marketData->latestFundingRates($pair, $preferredInterval, [], 500, $timestampMs);
         }
 
         $grouped = $series->groupBy('exchange');
@@ -62,22 +62,30 @@ class FeatureBuilder
             $mean = $window->avg();
             $std = $this->stdDev($window);
             $zScore = $this->zScore($this->toFloat($latest->close), $mean, $std);
+            $ordered = $rows->sortByDesc('time')->values();
+            $trendReference = $ordered->get(min($ordered->count() - 1, 3));
+            $trend = $trendReference
+                ? $this->percentChange($this->toFloat($ordered->first()->close), $this->toFloat($trendReference->close))
+                : null;
 
             return [
                 'latest' => $this->toFloat($latest->close),
                 'mean' => $mean,
                 'std' => $std,
                 'z_score' => $zScore,
+                'trend_pct' => $trend,
             ];
         });
 
         $heatScore = $exchangeSnapshots->avg('z_score');
         $latestConsensus = $exchangeSnapshots->avg('latest');
+        $trendConsensus = $exchangeSnapshots->avg('trend_pct');
 
         return [
             'interval' => $preferredInterval,
             'heat_score' => $heatScore,
             'consensus' => $latestConsensus,
+             'trend_pct' => $trendConsensus,
             'exchanges' => $exchangeSnapshots,
         ];
     }
@@ -145,11 +153,14 @@ class FeatureBuilder
             : 0.0;
         $baseline = max($avgDailyMagnitude, 1.0);
         $pressure = $agg24h['net_usd'] / $baseline;
+        $activityTotal = ($agg24h['inflow_usd'] + $agg24h['outflow_usd']);
+        $cexRatio = $activityTotal > 0 ? $agg24h['inflow_usd'] / $activityTotal : null;
 
         return [
             'window_24h' => $agg24h,
             'window_7d' => $agg7d,
             'pressure_score' => $pressure,
+            'cex_ratio' => $cexRatio,
             'sample_size' => [
                 'd24' => $daily->count(),
                 'd7' => $window7d->count(),
@@ -169,11 +180,32 @@ class FeatureBuilder
         $latest = $series->first();
         $ma7 = $this->movingAverage($series, 7);
         $ma30 = $this->movingAverage($series, 30);
+        $streak = 0;
+        $direction = null;
+        foreach ($series as $row) {
+            $flow = $this->toFloat($row->flow_usd);
+            if ($flow > 0) {
+                if ($direction !== 'positive') {
+                    $direction = 'positive';
+                    $streak = 0;
+                }
+                $streak++;
+            } elseif ($flow < 0) {
+                if ($direction !== 'negative') {
+                    $direction = 'negative';
+                    $streak = 0;
+                }
+                $streak--;
+            } else {
+                break;
+            }
+        }
 
         return [
             'latest_flow' => $this->toFloat($latest->flow_usd),
             'ma7' => $ma7,
             'ma30' => $ma30,
+            'streak' => $streak,
         ];
     }
 
@@ -209,6 +241,7 @@ class FeatureBuilder
         $bidDepth = $orderbookLatest ? $this->toFloat($orderbookLatest->aggregated_bids_usd) : null;
         $askDepth = $orderbookLatest ? $this->toFloat($orderbookLatest->aggregated_asks_usd) : null;
         $imbalance = $this->orderbookImbalance($bidDepth, $askDepth);
+        $volatility = $this->computeVolatility($prices);
 
         return [
             'orderbook' => [
@@ -226,6 +259,7 @@ class FeatureBuilder
             'price' => [
                 'last_close' => $priceLatest ? $this->toFloat($priceLatest->close) : null,
                 'pct_change_24h' => $this->percentChangeFromIndex($prices, 24),
+                'volatility_24h' => $volatility,
             ],
         ];
     }
@@ -369,6 +403,31 @@ class FeatureBuilder
         }
 
         return ($bid - $ask) / ($bid + $ask);
+    }
+
+    protected function computeVolatility(Collection $prices): ?float
+    {
+        if ($prices->count() < 2) {
+            return null;
+        }
+
+        $ordered = $prices->sortByDesc('time')->values();
+        $returns = [];
+        $limit = min(24, $ordered->count() - 1);
+        for ($i = 0; $i < $limit; $i++) {
+            $current = $this->toFloat($ordered[$i]->close);
+            $previous = $this->toFloat($ordered[$i + 1]->close ?? null);
+            $change = $this->percentChange($current, $previous);
+            if ($change !== null) {
+                $returns[] = $change;
+            }
+        }
+
+        if (empty($returns)) {
+            return null;
+        }
+
+        return $this->stdDev(collect($returns));
     }
 
     protected function toFloat(mixed $value): ?float

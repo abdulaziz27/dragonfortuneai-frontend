@@ -191,6 +191,11 @@
                         <td x-text="fundingInterpretation()"></td>
                     </tr>
                     <tr>
+                        <td>Funding Trend</td>
+                        <td x-text="formatPercent(features?.funding?.trend_pct)"></td>
+                        <td x-text="fundingTrendInterpretation()"></td>
+                    </tr>
+                    <tr>
                         <td>Open Interest Δ 24h</td>
                         <td x-text="formatPercent(features?.open_interest?.pct_change_24h)"></td>
                         <td x-text="oiInterpretation()"></td>
@@ -206,6 +211,11 @@
                         <td x-text="etfInterpretation()"></td>
                     </tr>
                     <tr>
+                        <td>ETF Streak</td>
+                        <td x-text="formatStreak(features?.etf?.streak)"></td>
+                        <td x-text="etfStreakInterpretation()"></td>
+                    </tr>
+                    <tr>
                         <td>Sentiment (Fear & Greed)</td>
                         <td x-text="features?.sentiment?.value ?? '--'"></td>
                         <td x-text="sentimentInterpretation()"></td>
@@ -214,6 +224,11 @@
                         <td>Microstructure (Taker Buy Ratio)</td>
                         <td x-text="formatPercent(features?.microstructure?.taker_flow?.buy_ratio ? features.microstructure.taker_flow.buy_ratio * 100 : null, 1)"></td>
                         <td x-text="microInterpretation()"></td>
+                    </tr>
+                    <tr>
+                        <td>Volatility (24h)</td>
+                        <td x-text="formatPercent(features?.microstructure?.price?.volatility_24h, 2, true)"></td>
+                        <td x-text="volatilityInterpretation()"></td>
                     </tr>
                 </tbody>
             </table>
@@ -448,6 +463,13 @@ document.addEventListener('alpine:init', () => {
             if (heat < -1.5) return 'Discounted (bullish)';
             return 'Netral';
         },
+        fundingTrendInterpretation() {
+            const trend = this.features?.funding?.trend_pct;
+            if (trend === null || trend === undefined) return 'Data belum tersedia';
+            if (trend > 15) return 'Funding naik tajam';
+            if (trend < -15) return 'Funding turun tajam';
+            return 'Stabil';
+        },
         oiInterpretation() {
             const pct = this.features?.open_interest?.pct_change_24h;
             if (pct === null || pct === undefined) return 'Data belum tersedia';
@@ -459,9 +481,10 @@ document.addEventListener('alpine:init', () => {
             if (!this.features?.whales) return 'Data belum tersedia';
             if (this.features.whales.is_stale) return 'Data >7 hari (arsip)';
             const score = this.features.whales.pressure_score;
+            const cexRatio = this.features.whales.cex_ratio;
             if (score === null || score === undefined) return 'Tidak ada aktivitas besar';
-            if (score > 1.2) return 'Inflow berat (bearish)';
-            if (score < -1.2) return 'Outflow / akumulasi';
+            if (score > 1.2) return cexRatio > 0.65 ? 'Inflow berat ke CEX' : 'Inflow berat (bearish)';
+            if (score < -1.2) return cexRatio !== null && cexRatio < 0.4 ? 'Outflow kuat ke cold storage' : 'Outflow / akumulasi';
             return 'Netral';
         },
         whaleStatus() {
@@ -480,6 +503,13 @@ document.addEventListener('alpine:init', () => {
             if (latest > 0) return 'Institusi net buy';
             if (latest < 0) return 'Institusi net sell';
             return 'Flat';
+        },
+        etfStreakInterpretation() {
+            const streak = this.features?.etf?.streak;
+            if (streak === null || streak === undefined) return 'Data belum tersedia';
+            if (streak >= 3) return `Inflow ${streak} hari berturut`;
+            if (streak <= -3) return `Outflow ${Math.abs(streak)} hari berturut`;
+            return 'Tidak ada streak berarti';
         },
         sentimentInterpretation() {
             const value = this.features?.sentiment?.value;
@@ -502,6 +532,13 @@ document.addEventListener('alpine:init', () => {
             if (longs > shorts * 1.3) return 'Long flush';
             if (shorts > longs * 1.3) return 'Short squeeze';
             return 'Balanced';
+        },
+        volatilityInterpretation() {
+            const vol = this.features?.microstructure?.price?.volatility_24h;
+            if (vol === null || vol === undefined) return 'Data belum tersedia';
+            if (vol > 5) return 'Vol tinggi / regime agresif';
+            if (vol < 1.5) return 'Vol rendah / market tenang';
+            return 'Vol moderat';
         },
         formatNumber(value, decimals = 2) {
             if (value === null || value === undefined) return '--';
@@ -539,6 +576,11 @@ document.addEventListener('alpine:init', () => {
         },
         historyRows() {
             return this.history || [];
+        },
+        formatStreak(value) {
+            if (value === null || value === undefined) return '--';
+            if (value > 0) return `+${value}`;
+            return `${value}`;
         },
     }));
 });

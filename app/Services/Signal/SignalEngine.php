@@ -12,14 +12,18 @@ class SignalEngine
 
         $fundingHeat = $features['funding']['heat_score'] ?? null;
         $fundingConsensus = $features['funding']['consensus'] ?? null;
+        $fundingTrend = $features['funding']['trend_pct'] ?? null;
         $oiPct24 = $features['open_interest']['pct_change_24h'] ?? null;
         $oiPct6 = $features['open_interest']['pct_change_6h'] ?? null;
         $whalePressure = $features['whales']['pressure_score'] ?? null;
+        $whaleCexRatio = $features['whales']['cex_ratio'] ?? null;
         $etfFlow = $features['etf']['latest_flow'] ?? null;
         $etfMa7 = $features['etf']['ma7'] ?? null;
+        $etfStreak = $features['etf']['streak'] ?? null;
         $sentimentValue = $features['sentiment']['value'] ?? null;
         $takerRatio = $features['microstructure']['taker_flow']['buy_ratio'] ?? null;
         $orderImbalance = $features['microstructure']['orderbook']['imbalance'] ?? null;
+        $volatility = $features['microstructure']['price']['volatility_24h'] ?? null;
         $liq = $features['liquidations']['sum_24h'] ?? null;
 
         $this->contribute(
@@ -40,6 +44,26 @@ class SignalEngine
             $reasons,
             $factors,
             ['heat' => $fundingHeat, 'consensus' => $fundingConsensus]
+        );
+
+        $this->contribute(
+            $fundingTrend !== null && $fundingTrend > 15,
+            0.6,
+            'Funding momentum turning higher',
+            $score,
+            $reasons,
+            $factors,
+            ['trend_pct' => $fundingTrend]
+        );
+
+        $this->contribute(
+            $fundingTrend !== null && $fundingTrend < -15,
+            -0.6,
+            'Funding momentum rolling over',
+            $score,
+            $reasons,
+            $factors,
+            ['trend_pct' => $fundingTrend]
         );
 
         $this->contribute(
@@ -83,6 +107,26 @@ class SignalEngine
         );
 
         $this->contribute(
+            $whaleCexRatio !== null && $whaleCexRatio > 0.65,
+            -0.6,
+            'Whale inflow concentrated on exchanges',
+            $score,
+            $reasons,
+            $factors,
+            ['cex_ratio' => $whaleCexRatio]
+        );
+
+        $this->contribute(
+            $whaleCexRatio !== null && $whaleCexRatio < 0.35,
+            0.6,
+            'Whales distributing to cold storage',
+            $score,
+            $reasons,
+            $factors,
+            ['cex_ratio' => $whaleCexRatio]
+        );
+
+        $this->contribute(
             $etfFlow !== null && $etfFlow > 0 && $etfMa7 !== null && $etfFlow > $etfMa7,
             1.2,
             'ETF net inflow above weekly average',
@@ -100,6 +144,26 @@ class SignalEngine
             $reasons,
             $factors,
             ['latest_flow' => $etfFlow, 'ma7' => $etfMa7]
+        );
+
+        $this->contribute(
+            $etfStreak !== null && $etfStreak >= 3,
+            0.9,
+            'ETF inflow streak',
+            $score,
+            $reasons,
+            $factors,
+            ['streak' => $etfStreak]
+        );
+
+        $this->contribute(
+            $etfStreak !== null && $etfStreak <= -3,
+            -0.9,
+            'ETF outflow streak',
+            $score,
+            $reasons,
+            $factors,
+            ['streak' => $etfStreak]
         );
 
         $this->contribute(
@@ -160,6 +224,26 @@ class SignalEngine
             $reasons,
             $factors,
             ['orderbook_imbalance' => $orderImbalance]
+        );
+
+        $this->contribute(
+            $volatility !== null && $volatility > 5 && $takerRatio !== null && $takerRatio < 0.45,
+            -0.6,
+            'High volatility with aggressive sellers',
+            $score,
+            $reasons,
+            $factors,
+            ['volatility_24h' => $volatility, 'taker_buy_ratio' => $takerRatio]
+        );
+
+        $this->contribute(
+            $volatility !== null && $volatility < 1.5 && $takerRatio !== null && $takerRatio > 0.55,
+            0.5,
+            'Calm flow with buyers in control',
+            $score,
+            $reasons,
+            $factors,
+            ['volatility_24h' => $volatility, 'taker_buy_ratio' => $takerRatio]
         );
 
         if ($liq) {
